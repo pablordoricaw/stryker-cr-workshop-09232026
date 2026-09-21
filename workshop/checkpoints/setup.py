@@ -25,21 +25,28 @@ from workshop.results import CheckResult
 
 SETUP_CHECKPOINT_ID = "00_setup"
 
+# The name column each SHOW result exposes (header varies by Databricks version).
+# We read *only* the name column — never every string cell — because
+# ``SHOW VOLUMES`` also returns the schema/database name, so scanning all cells
+# would let a volume whose name equals the schema name false-pass.
+_SCHEMA_NAME_COLUMNS = ("databaseName", "schemaName", "schema_name", "namespace")
+_VOLUME_NAME_COLUMNS = ("volume_name", "volumeName")
 
-def _string_values(df: Any) -> set[str]:
-    """All string cell values across a SHOW result.
 
-    ``SHOW SCHEMAS`` / ``SHOW VOLUMES`` return the object name in a column whose
-    header differs by Databricks version (``databaseName`` vs ``volume_name``).
-    Scanning every string cell finds the name without hard-coding a column, and
-    these SHOW results carry no free-text columns that could cause a false match.
+def _column_values(df: Any, candidates: tuple[str, ...]) -> set[str]:
+    """The values of the first candidate column present in each row.
+
+    Reads only the object-name column so unrelated columns (e.g. the schema name
+    in a ``SHOW VOLUMES`` result) can't cause a false match.
     """
     values: set[str] = set()
     for row in df.collect():
         as_dict = row.asDict() if hasattr(row, "asDict") else dict(row)
-        for value in as_dict.values():
+        for column in candidates:
+            value = as_dict.get(column)
             if isinstance(value, str):
                 values.add(value)
+                break
     return values
 
 
@@ -69,8 +76,9 @@ def check_setup(ctx: CheckContext) -> CheckResult:
     # Listing schemas in the catalog doubles as the accessibility probe: if the
     # catalog is missing or the participant lacks USE CATALOG, this raises.
     try:
-        schemas = _string_values(
-            spark.sql(f"SHOW SCHEMAS IN {quote_identifier(catalog)}")
+        schemas = _column_values(
+            spark.sql(f"SHOW SCHEMAS IN {quote_identifier(catalog)}"),
+            _SCHEMA_NAME_COLUMNS,
         )
     except Exception as exc:  # noqa: BLE001 - turn into a targeted failure
         return CheckResult(
@@ -91,9 +99,27 @@ def check_setup(ctx: CheckContext) -> CheckResult:
             {"missing": "schema", "catalog": catalog, "schema": schema},
         )
 
-    volumes = _string_values(
-        spark.sql(f"SHOW VOLUMES IN {fully_qualified(catalog, schema)}")
-    )
+    # Listing volumes probes schema access (USE SCHEMA); handle it separately so a
+    # permission/listing failure gets a targeted message, not a raw traceback.
+    try:
+        volumes = _column_values(
+            spark.sql(f"SHOW VOLUMES IN {fully_qualified(catalog, schema)}"),
+            _VOLUME_NAME_COLUMNS,
+        )
+    except Exception as exc:  # noqa: BLE001 - turn into a targeted failure
+        return CheckResult(
+            SETUP_CHECKPOINT_ID,
+            False,
+            f"Schema `{catalog}`.`{schema}` exists but its UC Volumes could not be "
+            f"listed ({type(exc).__name__}). Confirm you have USE SCHEMA on it, "
+            f"then re-run the setup notebook (notebooks/00_setup).",
+            {
+                "missing": "volume",
+                "catalog": catalog,
+                "schema": schema,
+                "error_type": type(exc).__name__,
+            },
+        )
     if volume not in volumes:
         return CheckResult(
             SETUP_CHECKPOINT_ID,

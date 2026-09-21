@@ -122,13 +122,23 @@ def resolve_config(
             "it, and does not create the catalog itself."
         )
     resolved_catalog = catalog.strip()
-    resolved_schema = (schema or resolved_domain).strip()
-    resolved_volume = (volume or DEFAULT_VOLUME).strip()
+    # Strip *before* the fallback so a whitespace-only widget value ("   ") uses
+    # the default instead of collapsing to an empty identifier.
+    resolved_schema = schema.strip() if schema and schema.strip() else resolved_domain
+    resolved_volume = volume.strip() if volume and volume.strip() else DEFAULT_VOLUME
 
     if suffix:
         token = _sanitize_suffix(suffix)
         if token:
             resolved_schema = f"{resolved_schema}_{token}"
+
+    # Defaults are non-empty, so this is a safety net (e.g. a future default or
+    # suffix change) rather than a reachable path today.
+    if not resolved_schema or not resolved_volume:
+        raise ValueError(
+            "Resolved schema and volume names must be non-empty; got "
+            f"schema={resolved_schema!r}, volume={resolved_volume!r}."
+        )
 
     return WorkshopConfig(
         domain=resolved_domain,

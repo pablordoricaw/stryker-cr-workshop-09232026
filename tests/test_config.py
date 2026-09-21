@@ -58,6 +58,14 @@ def test_blank_optional_strings_fall_back_to_defaults():
     assert cfg.schema and cfg.volume
 
 
+def test_whitespace_only_schema_and_volume_fall_back_to_defaults():
+    # A widget left as spaces ("   ") is truthy but must not collapse to an empty
+    # identifier — it should use the default.
+    cfg = resolve_config(catalog="c", domain="finance", schema="   ", volume="  ")
+    assert cfg.schema == "finance"  # default = domain
+    assert cfg.volume == DEFAULT_VOLUME
+
+
 def test_suffix_is_appended_to_schema_and_sanitized():
     # The catalog is a shared, pre-existing resource, so isolation suffixes the
     # schema, not the catalog.

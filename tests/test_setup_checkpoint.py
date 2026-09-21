@@ -39,10 +39,12 @@ class FakeSpark:
         schemas_by_catalog: dict[str, list[str]] | None = None,
         volumes_by_schema: dict[tuple[str, str], list[str]] | None = None,
         inaccessible: set[str] | None = None,
+        volumes_inaccessible: set[tuple[str, str]] | None = None,
     ) -> None:
         self.schemas_by_catalog = schemas_by_catalog or {}
         self.volumes_by_schema = volumes_by_schema or {}
         self.inaccessible = inaccessible or set()
+        self.volumes_inaccessible = volumes_inaccessible or set()
 
     def sql(self, query: str) -> _DF:
         q = query.replace("`", "").strip()
@@ -55,7 +57,11 @@ class FakeSpark:
             )
         if q.startswith("SHOW VOLUMES IN "):
             catalog, schema = q[len("SHOW VOLUMES IN ") :].strip().split(".", 1)
+            if (catalog, schema) in self.volumes_inaccessible:
+                raise RuntimeError(f"No USE SCHEMA on '{catalog}.{schema}'")
             vols = self.volumes_by_schema.get((catalog, schema), [])
+            # The real SHOW VOLUMES shape: a `database` (schema) column and a
+            # `volume_name` column. The checkpoint must read only `volume_name`.
             return _DF([_Row({"database": schema, "volume_name": v}) for v in vols])
         raise AssertionError(f"unexpected SQL: {query!r}")
 
@@ -124,3 +130,37 @@ def test_volume_defaults_to_landing_when_extra_omitted():
     result = _check(spark, catalog="c", schema="finance")  # no volume= extra
     assert result.passed is True
     assert result.details["volume"] == "landing"
+
+
+def test_volume_name_equal_to_schema_name_does_not_false_pass():
+    # Regression: SHOW VOLUMES also returns the schema (`database`) name. If we
+    # scanned every string column, requesting a volume named like the schema
+    # would false-pass whenever *any* volume exists. Only `volume_name` counts.
+    spark = FakeSpark(
+        schemas_by_catalog={"c": ["finance"]},
+        volumes_by_schema={("c", "finance"): ["other"]},  # a volume exists, not "finance"
+    )
+    result = _check(spark, catalog="c", schema="finance", volume="finance")
+    assert result.passed is False
+    assert result.details["missing"] == "volume"
+
+
+def test_volume_named_like_schema_that_actually_exists_passes():
+    spark = FakeSpark(
+        schemas_by_catalog={"c": ["finance"]},
+        volumes_by_schema={("c", "finance"): ["finance"]},  # really is named "finance"
+    )
+    result = _check(spark, catalog="c", schema="finance", volume="finance")
+    assert result.passed is True
+
+
+def test_volume_listing_failure_is_targeted():
+    spark = FakeSpark(
+        schemas_by_catalog={"c": ["finance"]},
+        volumes_inaccessible={("c", "finance")},
+    )
+    result = _check(spark, catalog="c", schema="finance", volume="landing")
+    assert result.passed is False
+    assert result.details["missing"] == "volume"
+    assert "error_type" in result.details
+    assert "USE SCHEMA" in result.message
