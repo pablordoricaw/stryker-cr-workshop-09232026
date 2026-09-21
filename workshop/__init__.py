@@ -19,6 +19,7 @@ variables. Later tickets extend the workshop by registering new checkpoints; see
 
 from __future__ import annotations
 
+from .bootstrap import bootstrap, find_repo_root
 from .context import CheckContext
 from .registry import (
     Checkpoint,
@@ -40,11 +41,20 @@ from . import checkpoints as _checkpoints  # noqa: E402
 
 _checkpoints.load_all()
 
+# module name -> import exception for any checkpoint module that failed to load.
+# Empty in normal operation; a broken later-ticket module lands here instead of
+# breaking ``import workshop`` (the module is also surfaced as an unavailable
+# checkpoint keyed by its module name).
+checkpoint_load_errors = _checkpoints.LOAD_ERRORS
+
 __all__ = [
     "check",
     "checkpoint",
     "register",
     "registry",
+    "bootstrap",
+    "find_repo_root",
+    "checkpoint_load_errors",
     "CheckResult",
     "CheckContext",
     "Checkpoint",

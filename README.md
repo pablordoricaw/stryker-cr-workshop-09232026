@@ -55,12 +55,29 @@ workspace.
 
 ## How you know you passed: `workshop.check()`
 
-Each checkpoint ends with a validation call. From any notebook in the repo
-folder:
+Each checkpoint ends with a validation call. **The first cell of every notebook**
+is this copy-pasteable bootstrap — it puts the repo root on the path so `import
+workshop` works no matter where the notebook lives in your Git folder (don't
+hardcode a path; this finds the root for you):
 
 ```python
-import workshop
+# --- Workshop bootstrap: run this first in every notebook ---
+import os, sys
+_root = os.path.abspath(os.getcwd())
+while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
+    _parent = os.path.dirname(_root)
+    if _parent == _root:
+        raise RuntimeError("workshop repo root not found; open this notebook inside the cloned workshop Git folder.")
+    _root = _parent
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
+import workshop
+```
+
+Then, at any checkpoint:
+
+```python
 workshop.check("smoke")
 # [✅ PASS] smoke: workshop.check() is wired up correctly. ...
 ```

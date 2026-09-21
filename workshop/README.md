@@ -4,10 +4,38 @@ The single test seam every workshop checkpoint runs through. Participant
 notebooks and maintainer CI both call `workshop.check(<id>)`; there is no second
 test framework.
 
+## Making `import workshop` work in notebooks (canonical first cell)
+
+In a Databricks Git folder the repo root is **not** guaranteed to be on
+`sys.path` — a notebook's working directory is its own folder. Every starter
+notebook's **first cell** is this one canonical, self-contained bootstrap (it
+must run before `workshop` is importable, so it can't import from the repo).
+Ticket authors: reuse this exact snippet; do not invent variants.
+
+```python
+# --- Workshop bootstrap: run this first in every notebook ---
+import os, sys
+_root = os.path.abspath(os.getcwd())
+while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
+    _parent = os.path.dirname(_root)
+    if _parent == _root:
+        raise RuntimeError("workshop repo root not found; open this notebook inside the cloned workshop Git folder.")
+    _root = _parent
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
+import workshop
+```
+
+The same anchor logic is available programmatically once `workshop` is imported:
+`workshop.bootstrap()` (idempotent path insert, returns the root) and
+`workshop.find_repo_root()`. Both are dependency-free and Free-Edition-safe. The
+snippet is validated end-to-end by a nested-CWD subprocess regression test in
+`tests/test_bootstrap.py`.
+
 ## Participant usage
 
 ```python
-import workshop
 result = workshop.check("smoke")     # returns a CheckResult
 print(result)                        # [✅ PASS] smoke: ...
 if result:                           # CheckResult is truthy when it passed
@@ -22,10 +50,11 @@ back as `passed=False` with an explanatory message.
 | Module              | Responsibility                                              |
 | ------------------- | ----------------------------------------------------------- |
 | `results.py`        | `CheckResult` — the structured pass/fail contract           |
-| `context.py`        | `CheckContext` — spark / catalog / schema / extras handed to a check |
+| `context.py`        | `CheckContext` — spark / catalog / schema / extras handed to a check (backtick-safe `fully_qualified`) |
 | `registry.py`       | `CheckpointRegistry` + `@checkpoint` / `register` API       |
 | `runner.py`         | `check()` — looks up, runs, and normalizes a checkpoint      |
-| `checkpoints/`      | One module per checkpoint; auto-discovered on import        |
+| `bootstrap.py`      | `find_repo_root` / `bootstrap` — the notebook import path fix |
+| `checkpoints/`      | One module per checkpoint; auto-discovered, failure-isolated |
 
 ## Adding a checkpoint (for later tickets)
 
@@ -73,6 +102,12 @@ runner normalizes those into a `CheckResult`.
   `AttributeError` when run with no connection.
 - **Pick a unique id.** Duplicate ids raise at import; use
   `@checkpoint(id, replace=True)` only if you deliberately override.
+- **Optional dependencies are isolated, not free.** If your module's import
+  fails (e.g. an optional dependency is missing), discovery records it in
+  `workshop.checkpoint_load_errors` and surfaces the module as an *unavailable*
+  checkpoint (keyed by the module name) rather than breaking `import workshop`.
+  Still, keep top-level imports light and import heavy/optional deps inside the
+  check function so your checkpoint stays runnable.
 
 ## Running the framework tests
 
