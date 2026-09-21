@@ -18,6 +18,6 @@ Each domain holds:
   in bronze. This is the **Delta fallback** for the Lakebase CDF path, so no
   participant is ever blocked by the one preview dependency.
 
-> Placeholder. Domain datasets are produced by offline generators in later
-> tickets (Finance seed #4; Security #13; ITSM #14). The `.gitkeep` files hold
-> the directory structure until then.
+The Finance seed is populated by issue #4. Security and ITSM remain placeholders
+for their later offline generators (#13 and #14); their `.gitkeep` files retain
+the intended directory structure until then.
