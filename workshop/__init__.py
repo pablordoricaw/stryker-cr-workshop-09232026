@@ -20,7 +20,10 @@ variables. Later tickets extend the workshop by registering new checkpoints; see
 from __future__ import annotations
 
 from .bootstrap import bootstrap, find_repo_root
+from .config import DOMAINS, WorkshopConfig, resolve_config
 from .context import CheckContext
+from .identifiers import fully_qualified, quote_identifier
+from .provisioning import ProvisionReport, provision
 from .registry import (
     Checkpoint,
     CheckpointRegistry,
@@ -32,20 +35,36 @@ from .registry import (
 )
 from .results import CheckResult
 from .runner import check
+from .seeds import (
+    DuplicateSeedError,
+    SeedContext,
+    SeedHook,
+    SeedRegistry,
+    SeedResult,
+    register_seed,
+    run_seeds,
+    seed_hook,
+    seed_registry,
+)
 
 # Import the checkpoint modules so their @checkpoint decorators self-register on
 # the default registry. Done here (after the registry is defined) so a plain
 # ``import workshop`` makes every checkpoint — the smoke check today, everything
 # later tickets add — immediately available to workshop.check().
 from . import checkpoints as _checkpoints  # noqa: E402
+from . import seeds as _seeds  # noqa: E402
 
 _checkpoints.load_all()
+_seeds.load_all()
 
 # module name -> import exception for any checkpoint module that failed to load.
 # Empty in normal operation; a broken later-ticket module lands here instead of
 # breaking ``import workshop`` (the module is also surfaced as an unavailable
 # checkpoint keyed by its module name).
 checkpoint_load_errors = _checkpoints.LOAD_ERRORS
+
+# Same, for seed modules; a broken later-ticket seed is surfaced by run_seeds.
+seed_load_errors = _seeds.LOAD_ERRORS
 
 __all__ = [
     "check",
@@ -61,4 +80,23 @@ __all__ = [
     "CheckpointRegistry",
     "DuplicateCheckpointError",
     "UnknownCheckpointError",
+    # Config + provisioning (ticket #3)
+    "resolve_config",
+    "WorkshopConfig",
+    "DOMAINS",
+    "provision",
+    "ProvisionReport",
+    "quote_identifier",
+    "fully_qualified",
+    # Seed hooks (ticket #3; later data tickets extend)
+    "run_seeds",
+    "seed_hook",
+    "register_seed",
+    "seed_registry",
+    "SeedContext",
+    "SeedResult",
+    "SeedHook",
+    "SeedRegistry",
+    "DuplicateSeedError",
+    "seed_load_errors",
 ]
