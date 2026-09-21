@@ -5,7 +5,7 @@ This repository is developed with multiple coding agents using Git worktrees. Fo
 ## Branch Roles
 
 - `dev` is the development integration branch. All feature work starts from and returns to `dev`.
-- `main` is the participant-ready release branch and the remote default branch. It must not contain `AGENTS.md`, `CLAUDE.md`, or other maintainer-only material.
+- `main` is the participant-ready release branch and the remote default branch. It must not contain `AGENTS.md`, `CLAUDE.md`, the `docs/agents/` skill configuration, or other maintainer-only material.
 - Feature branches use one dedicated worktree per agent task.
 - `worktrees/dev/` and `worktrees/main/` are reserved for coordination, review, and integration. Do not make feature changes directly in either worktree.
 
@@ -86,13 +86,14 @@ From the main worktree:
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm --ignore-unmatch AGENTS.md CLAUDE.md
+git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents
 test ! -e AGENTS.md
 test ! -e CLAUDE.md
+test ! -e docs/agents
 git commit -m "chore(release): promote dev to main"
 ```
 
-Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md` and `CLAUDE.md` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, and `docs/agents/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 
