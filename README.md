@@ -17,8 +17,10 @@ the whole thing — whether you use Databricks every day or have never opened it
 **You do not need a local development environment.** There is no terminal step,
 no `git` on your laptop, no CLI, and no admin action required. You work entirely
 in the **Databricks Workspace UI**, and you get help from **Genie Code** (the
-in-workspace coding assistant) as you go. A single **setup notebook** provisions
-your catalog, schema, and volume and seeds your data.
+in-workspace coding assistant) as you go. A single **setup notebook** creates a
+schema and UC Volume inside your team's **existing catalog** and seeds your data
+— you bring the catalog (the workshop never creates one), so no catalog-creation
+privilege is required.
 
 ## Get the workshop repo into your workspace
 

@@ -9,6 +9,10 @@ Security, ITSM); only the dataset and pre-authored semantic content differ, so
 notebooks are domain-agnostic and read your selected domain from the setup
 notebook's config.
 
-> Placeholder. Notebooks are added by later tickets:
-> setup/provisioning (#3), the medallion + AI-functions build spine (#5–#9),
-> metric views (#10), the Genie agent (#11), and the app wiring (#12).
+`00_setup.py` (added by #3) is the participant setup notebook: it creates a
+schema and UC Volume inside your team's **existing catalog**, runs seed hooks,
+and ends on the `00_setup` checkpoint. Start there.
+
+> The remaining notebooks are added by later tickets: the medallion +
+> AI-functions build spine (#5–#9), metric views (#10), the Genie agent (#11),
+> and the app wiring (#12).

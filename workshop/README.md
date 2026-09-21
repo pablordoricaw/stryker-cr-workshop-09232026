@@ -109,6 +109,57 @@ runner normalizes those into a `CheckResult`.
   Still, keep top-level imports light and import heavy/optional deps inside the
   check function so your checkpoint stays runnable.
 
+## Environment config and provisioning (ticket #3)
+
+One resolved config names *where* a participant's data lives, so the setup
+notebook, the seed hooks, and the `00_setup` checkpoint all agree:
+
+```python
+config = workshop.resolve_config(catalog="my_existing_catalog", domain="finance")
+# WorkshopConfig(domain='finance', catalog='my_existing_catalog',
+#                schema='finance', volume='landing')
+```
+
+**Bring-your-own-catalog:** `catalog` is required (participants have no
+catalog-create privilege — each team already has a catalog). `schema` defaults to
+the domain; `volume` defaults to `landing`. `resolve_config(..., suffix="tok")`
+appends the token to the *schema* for throwaway/validation isolation.
+
+`workshop.provision(config, spark)` creates the schema and UC Volume inside the
+existing catalog (idempotent `CREATE ... IF NOT EXISTS`; never `CREATE CATALOG`).
+It's the exact logic the setup notebook runs.
+
+## Seed hooks (ticket #3; later data tickets populate)
+
+The setup notebook calls `workshop.run_seeds(config, spark=spark)` after
+provisioning. *What* gets loaded is an extension point, discovered exactly like
+checkpoints: drop a module into `workshop/seeds/` and decorate a function.
+
+```python
+# workshop/seeds/finance_transactional.py  (a later ticket)
+from workshop import seed_hook, SeedResult
+
+@seed_hook("finance_transactional", domains="finance",
+           summary="Load the pre-seeded Delta transactional rows into bronze")
+def load(ctx):
+    spark = ctx.require_spark()
+    # write into ctx.config.catalog / ctx.config.schema / ctx.config.volume_path
+    return SeedResult("finance_transactional", True, "Loaded 2,500 rows.")
+```
+
+- `domains=` targets one domain (`"finance"`), several (`("finance", "security")`),
+  or all (omit / `None`). `run_seeds` runs exactly the hooks matching the run's
+  domain, in stable name order.
+- A hook receives a `SeedContext` (`ctx.config`, `ctx.spark`/`ctx.require_spark()`,
+  `ctx.domain`, `ctx.extras`) and returns a `SeedResult`, a `bool`, a
+  `(bool, message)` tuple, or `None`.
+- Failures are isolated (a raising hook becomes a failed `SeedResult`; a seed
+  module that fails to import is surfaced, not fatal) — one broken later-ticket
+  seed can't block a participant's setup.
+
+This ticket ships the mechanism plus a no-op `placeholder` seed, so the setup
+notebook's seed step is real and green today.
+
 ## Running the framework tests
 
 ```bash
