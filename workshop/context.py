@@ -18,6 +18,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _quote_identifier(identifier: str) -> str:
+    """Backtick-quote a single Unity Catalog / Spark SQL identifier.
+
+    Embedded backticks are escaped by doubling, per Spark SQL rules. Quoting
+    every component means names with hyphens, spaces, or reserved words (all
+    legal in Unity Catalog) resolve correctly instead of producing a syntax
+    error or, worse, a silently wrong reference.
+    """
+    return "`" + identifier.replace("`", "``") + "`"
+
+
 @dataclass
 class CheckContext:
     """Inputs available to a checkpoint function.
@@ -55,15 +66,19 @@ class CheckContext:
         return self.spark
 
     def fully_qualified(self, table: str) -> str:
-        """Build ``catalog.schema.table`` from the context.
+        """Build a backtick-quoted ``catalog.schema.table`` from the context.
 
         Convenience for the many later checkpoints that assert on a table in the
-        participant's own schema. Raises if catalog/schema are unset so the
-        mistake surfaces as a clear failure message.
+        participant's own schema. Each component is backtick-quoted so names with
+        hyphens, spaces, or reserved words resolve correctly. Raises if
+        catalog/schema are unset so the mistake surfaces as a clear failure
+        message.
         """
         if not self.catalog or not self.schema:
             raise RuntimeError(
                 "catalog and schema must be set to resolve a table name; pass "
                 "catalog=... and schema=... to workshop.check(...)."
             )
-        return f"{self.catalog}.{self.schema}.{table}"
+        return ".".join(
+            _quote_identifier(part) for part in (self.catalog, self.schema, table)
+        )
