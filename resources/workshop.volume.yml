@@ -1,0 +1,9 @@
+# The UC Volume where source documents land (bronze source for the doc pipeline).
+resources:
+  volumes:
+    workshop_volume:
+      catalog_name: ${var.catalog}
+      schema_name: ${var.schema}
+      name: ${var.volume}
+      volume_type: MANAGED
+      comment: "Landing volume for source documents (ai_classify -> ai_parse_document -> ai_extract)."

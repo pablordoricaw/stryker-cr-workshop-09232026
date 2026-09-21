@@ -1,0 +1,10 @@
+# The provided data app (FastAPI) participants wire to their Genie agent and a
+# Lakebase-synced gold table. The app code is added by a later ticket (#12); this
+# resource declares and versions the app so the bundle packages the same app the
+# workshop ships. `source_code_path` points at the app directory in this repo.
+resources:
+  apps:
+    workshop_app:
+      name: ${var.app_name}
+      description: "Stryker workshop data app — wired to a Genie agent and a Lakebase-synced gold table."
+      source_code_path: ../app
