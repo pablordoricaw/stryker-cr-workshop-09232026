@@ -9,6 +9,9 @@
 # MAGIC margin slices by product, geography, customer type, and date; and
 # MAGIC `finance_contract_metrics` provides contract-performance KPIs. No catalog
 # MAGIC or additional schema is created.
+# MAGIC
+# MAGIC **Compute requirement:** `WITH METRICS ... version: 1.1` needs DBR 17.2+
+# MAGIC and `DESCRIBE ... AS JSON` needs DBR 16.2+, so use DBR 17.2+ overall.
 
 # COMMAND ----------
 

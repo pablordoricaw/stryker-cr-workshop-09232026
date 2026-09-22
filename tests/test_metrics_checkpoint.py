@@ -165,6 +165,46 @@ def test_green_and_quotes_identifiers():
     assert "MEASURE(`Net Sales`)" in aggregate
 
 
+def test_joined_view_uses_top_level_source_even_when_join_comes_first():
+    spark = FakeSpark()
+    spark.descriptions["finance_sales_metrics"]["view_definition"] = """\
+joins:
+  - name: dim_region
+    source: "`catalog`.`schema`.`dim_region`"
+source: "`catalog`.`schema`.`gold_sales`"
+"""
+    result = _check(spark)
+    assert result.passed is True
+
+
+def test_green_with_real_uc_json_shape():
+    spark = FakeSpark()
+    for name, contract in DEFAULT_METRIC_VIEWS.items():
+        spark.descriptions[name] = {
+            "columns": [
+                *[
+                    {"name": dimension, "type": "STRING", "nullable": True}
+                    for dimension in contract.dimensions
+                ],
+                *[
+                    {
+                        "name": measure,
+                        "type": "DECIMAL(38,6)",
+                        "nullable": True,
+                        "is_measure": True,
+                    }
+                    for measure in contract.measures
+                ],
+            ],
+            "view_text": (
+                "version: 1.1\n"
+                f'source: "`catalog`.`schema`.`{contract.source_table}`"\n'
+            ),
+        }
+    result = _check(spark)
+    assert result.passed is True
+
+
 def test_custom_metric_view_contract_is_honored():
     contracts = {
         "service metrics": {

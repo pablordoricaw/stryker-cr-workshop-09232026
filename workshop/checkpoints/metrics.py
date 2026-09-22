@@ -159,11 +159,18 @@ def _source_from_description(description: Mapping[str, Any]) -> str | None:
     # exact enclosing property is platform-owned, so inspect its string values
     # and extract the declarative YAML ``source:`` entry rather than depending
     # on a non-contractual property name.
+    candidates: list[tuple[int, str]] = []
     for text in _walk_strings(description):
-        match = re.search(r"(?m)^\s*source:\s*[\"']?([^\n\"']+)", text)
-        if match:
-            return _normalize_reference(match.group(1).strip())
-    return None
+        for match in re.finditer(
+            r"(?m)^(?P<indent>[ \t]*)source:\s*[\"']?([^\n\"']+)", text
+        ):
+            candidates.append((len(match.group("indent")), match.group(2).strip()))
+    if not candidates:
+        return None
+    # Joined models have nested ``joins[].source`` entries. YAML allows ``joins``
+    # to appear before the top-level source, so document order is not reliable.
+    # The least-indented source is the metric view's own source declaration.
+    return _normalize_reference(min(candidates, key=lambda item: item[0])[1])
 
 
 def _sane(value: Any) -> bool:

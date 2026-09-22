@@ -13,6 +13,9 @@
 # MAGIC Metric Views are YAML semantic models, not copied tables. They keep one
 # MAGIC governed definition of each KPI for SQL, AI/BI, and Genie. Run `03_gold`
 # MAGIC first. This notebook never creates a catalog or a second schema.
+# MAGIC
+# MAGIC **Compute requirement:** `WITH METRICS ... version: 1.1` needs DBR 17.2+
+# MAGIC and `DESCRIBE ... AS JSON` needs DBR 16.2+, so use DBR 17.2+ overall.
 
 # COMMAND ----------
 
