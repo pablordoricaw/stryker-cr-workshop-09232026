@@ -81,6 +81,66 @@ def test_green_for_seeded_row_count_and_quotes_identifiers():
     assert result.passed is True
     assert result.details["row_count"] == EXPECTED_ROW_COUNT
     assert spark.queries == [
-        "SELECT COUNT(*) AS row_count FROM "
-        "`team-catalog`.`finance data`.`bronze_sales_transactions`"
+        (
+            "SELECT COUNT(*) AS row_count FROM "
+            "`team-catalog`.`finance data`.`bronze_sales_transactions`"
+        )
     ]
+
+
+def test_domain_overrides_use_callers_namespaced_table_and_expected_count():
+    spark = FakeSpark(42)
+
+    result = _check(
+        spark,
+        catalog="team-catalog",
+        schema="workshop_itsm_1234abcd",
+        bronze_txn_table="bronze_service_tickets",
+        expected_txn_rows=42,
+        transaction_key="ticket_id",
+    )
+
+    assert result.passed is True
+    assert result.details == {
+        "table": "team-catalog.workshop_itsm_1234abcd.bronze_service_tickets",
+        "row_count": 42,
+        "expected_row_count": 42,
+    }
+    assert spark.queries == [
+        (
+            "SELECT COUNT(*) AS row_count FROM "
+            "`team-catalog`.`workshop_itsm_1234abcd`.`bronze_service_tickets`"
+        )
+    ]
+
+
+def test_overridden_config_wrong_count_keeps_targeted_guard():
+    result = _check(
+        FakeSpark(41),
+        catalog="c",
+        schema="itsm",
+        bronze_txn_table="bronze_service_tickets",
+        expected_txn_rows=42,
+        transaction_key="ticket_id",
+    )
+
+    assert result.passed is False
+    assert result.details["table"] == "c.itsm.bronze_service_tickets"
+    assert result.details["expected_row_count"] == 42
+    assert "expected exactly 42" in result.message
+    assert "ticket_id" in result.message
+
+
+def test_overridden_config_missing_table_keeps_targeted_guard():
+    result = _check(
+        FakeSpark(None),
+        catalog="c",
+        schema="itsm",
+        bronze_txn_table="bronze_service_tickets",
+        expected_txn_rows=42,
+    )
+
+    assert result.passed is False
+    assert result.details["table"] == "c.itsm.bronze_service_tickets"
+    assert "bronze_service_tickets" in result.message
+    assert "either the Lakebase CDF path or the Delta fallback" in result.message
