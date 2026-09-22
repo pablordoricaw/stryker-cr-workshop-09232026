@@ -130,11 +130,19 @@ def test_missing_domain_and_no_override():
     assert "domain=config.domain" in result.message
 
 
-def test_no_committed_source_docs_for_empty_domain():
-    # 'security'/'itsm' ship an empty data/<domain>/documents placeholder today
-    # (their PDFs land in #13/#14). The checkpoint refuses to validate against
-    # zero shipped docs rather than passing on nothing.
-    result = _check(FakeSpark(), catalog="c", schema="security", volume="landing", domain="security")
+def test_no_committed_source_docs_for_empty_domain(tmp_path, monkeypatch):
+    # Empty-domain behaviour, asserted against an ISOLATED, guaranteed-empty
+    # source tree — never a real repo domain. Point the checkpoint's repo-root
+    # discovery at a tmp dir containing an existing-but-empty
+    # data/<domain>/documents folder, so the check derives an expected count of 0
+    # with no dependency on security/itsm/finance (all of which are, or will be,
+    # populated). This stays green even if every real domain has committed docs.
+    from workshop.checkpoints import bronze_docs as bd
+
+    (tmp_path / "data" / "emptydomain" / "documents").mkdir(parents=True)
+    monkeypatch.setattr(bd, "find_repo_root", lambda *a, **k: str(tmp_path))
+
+    result = _check(FakeSpark(), catalog="c", schema="s", volume="landing", domain="emptydomain")
     assert result.passed is False
     assert result.details["stage"] == "expected"
     assert result.details["expected"] == 0
