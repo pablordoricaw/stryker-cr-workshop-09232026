@@ -15,20 +15,24 @@ Two independent facts are asserted, each hardened against a false pass:
   expected ``synced_table`` name as a **required** input — there is deliberately
   no default, fixed, or shared name. It must sync from the expected gold table
   (Finance default ``gold_contract_performance``), carry the expected primary
-  key, and be **online** — Unity-Catalog-provisioned with a healthy, completed
-  sync. A missing synced table is RED; the wrong source or key is RED; a table
-  still provisioning, offline, or whose sync pipeline failed is RED (never-synced
-  or stale data cannot pass). When a served row count is obtainable (through the
-  client's ``count_rows`` or an observed ``served_row_count``) it must be
-  positive and, when the source count is known, equal to it — so an empty or
-  drifted synced table is RED.
+  key, be **owned by the caller** (its Unity Catalog owner must match the
+  required ``owner`` — so another participant's synced table is never adopted),
+  and be **online** — Unity-Catalog-provisioned with a healthy, completed sync.
+  A missing synced table is RED; the wrong source or key is RED; one owned by
+  someone else is RED; a table still provisioning, offline, or whose sync
+  pipeline failed is RED. Serving is verified **fail-closed**: the served row
+  count (through the client's ``count_rows`` or an observed ``served_row_count``)
+  must be **positive** and, when the source count is known, equal to it — and if
+  the count cannot be obtained at all the checkpoint stays RED, so an online-but-
+  empty/stale synced table can never pass on an unverified count.
 
 * **The caller's own app is deployed and running.** The app name is
-  per-participant too, so ``app_name`` is a **required** input with no default.
-  The app must exist, its latest deployment must have **succeeded**, and its
-  compute must be **running** — deploying an app can leave it stopped, and a
-  stopped app answers nothing, so a stopped/starting/errored app is RED (this is
-  the observable form of the "app start is handled explicitly" acceptance
+  per-participant too, so ``app_name`` is a **required** input with no default,
+  and the app must be **owned by the caller** (creator / service principal must
+  match ``owner``). It must exist, its latest deployment must have **succeeded**,
+  and its compute must be **running** — deploying an app can leave it stopped,
+  and a stopped app answers nothing, so a stopped/starting/errored app is RED
+  (the observable form of the "app start is handled explicitly" acceptance
   criterion). When the app exposes a reachable health endpoint it is probed
   best-effort; an explicit unhealthy response is RED.
 
@@ -54,6 +58,9 @@ Run it as::
         apps=WorkspaceClient(),             # or a normalized client / fake
         app_name=app_name,                  # per-participant, required
         synced_table=synced_table,          # per-participant, required (UC name)
+        owner=me,                           # required — binds both to YOU
+        lakebase_endpoint=endpoint,         # so served rows can be verified
+        lakebase_host=host,
     )
 
 Extras forwarded through ``ctx.extras``:
@@ -68,21 +75,24 @@ Extras forwarded through ``ctx.extras``:
   schema; a dotted name is treated as an explicit fully-qualified reference.
 * ``primary_key_columns`` — the primary key the synced table must carry (default
   ``("contract_id",)``); compared as an order-insensitive set.
-* ``expected_row_count`` / ``served_row_count`` — optional integers. When a served
-  count is obtainable it must be positive; when an expected count is known (given
-  here, or counted from the source table when ``spark`` is provided) the served
-  count must equal it.
-* ``owner`` — optional app-ownership guard: the app's creator / service principal
-  must match, so a same-named app owned by someone else is not adopted.
+* ``owner`` — **required** ownership binding (the caller's identity, e.g.
+  ``current_user()``). Both the app (creator / service principal) and the synced
+  table (Unity Catalog owner) must match it, so a same-named resource owned by
+  someone else is never adopted.
+* ``expected_row_count`` / ``served_row_count`` — optional integers. The served
+  count must be positive; when an expected count is known (given here, or counted
+  from the source table when ``spark`` is provided) the served count must equal
+  it. If no served count can be obtained at all, the checkpoint stays RED.
 * ``require_running`` — default ``True``; set ``False`` only to accept a
   successfully-deployed-but-stopped app (not recommended — a stopped app answers
   nothing).
 * ``probe_health`` — default ``True``; set ``False`` to skip the best-effort HTTP
   health probe.
 * ``lakebase_endpoint`` / ``lakebase_host`` / ``lakebase_user`` /
-  ``lakebase_database`` — optional connection hints the live SDK adapter uses to
-  count served rows directly from Lakebase Postgres. Absent, the served-row proof
-  falls back to ``served_row_count`` or to the online-state guarantee.
+  ``lakebase_database`` — connection hints the live SDK adapter uses to count
+  served rows directly from Lakebase Postgres in the real participant flow. The
+  normal invocation should pass ``lakebase_endpoint`` + ``lakebase_host`` (or an
+  observed ``served_row_count``) so the fail-closed serving check can pass.
 """
 
 from __future__ import annotations
@@ -110,10 +120,11 @@ _UNSET = object()
 
 
 # --- normalized client interface -------------------------------------------
-# The checkpoint speaks to the platform through two small, stable reads. The
-# live adapter (:class:`_SdkAppClient`) maps the Apps/Database SDK shapes onto
-# them; tests supply a fake implementing the same surface. Keeping the interface
-# narrow isolates all SDK-shape fragility to the adapter.
+# The checkpoint speaks to the platform through a few small, stable reads:
+# get_app, get_synced_table, get_table_owner (required), plus best-effort
+# count_rows and probe. The live adapter (:class:`_SdkAppClient`) maps the
+# Apps/Database/Tables SDK shapes onto them; tests supply a fake implementing the
+# same surface. Keeping the interface narrow isolates SDK-shape fragility here.
 
 
 @dataclass(frozen=True)
@@ -300,12 +311,26 @@ class _SdkAppClient:
             message=getattr(status, "message", None),
         )
 
+    def get_table_owner(self, name: str) -> str | None:
+        """The Unity Catalog owner of the synced table (its creator identity).
+
+        This is the ownership-scoped observable that binds the synced table to a
+        participant — the analog of a Genie agent's ``parent_path``. A missing
+        table or read error returns ``None`` (the checkpoint then refuses to treat
+        it as the caller's own).
+        """
+        try:
+            return getattr(self._w.tables.get(full_name=name), "owner", None)
+        except Exception:  # noqa: BLE001 - unverifiable ownership → None → RED
+            return None
+
     def count_rows(self, info: SyncedTableInfo) -> int | None:
         """Best-effort served-row count from Lakebase Postgres.
 
         Requires ``lakebase_endpoint`` (for the OAuth credential) plus a host, and
         an importable Postgres driver. Returns ``None`` on any missing hint or
-        failure so the checkpoint falls back to the online-state guarantee.
+        failure — and because serving is verified fail-closed, an unverifiable
+        count keeps the checkpoint RED rather than passing.
         """
         endpoint = self._pg.get("endpoint")
         host = self._pg.get("host")
@@ -367,13 +392,14 @@ def _resolve_client(ctx: CheckContext) -> Any:
         "database": ctx.extras.get("lakebase_database"),
     }
     if injected is not None:
-        if all(hasattr(injected, name) for name in ("get_app", "get_synced_table")):
+        normalized = ("get_app", "get_synced_table", "get_table_owner")
+        if all(hasattr(injected, name) for name in normalized):
             return injected
         if hasattr(injected, "apps") and hasattr(injected, "database"):
             return _SdkAppClient(injected, pg)
         raise TypeError(
             "the 'apps' extra must be a WorkspaceClient or a normalized app "
-            "client exposing get_app/get_synced_table"
+            "client exposing get_app/get_synced_table/get_table_owner"
         )
     # Lazy, live-only import so `import workshop` never needs databricks-sdk.
     from databricks.sdk import WorkspaceClient
@@ -389,18 +415,17 @@ def _expected_source(ctx: CheckContext) -> tuple[str, str]:
 
 
 def _source_matches(observed: str | None, expected_norm: str) -> bool:
-    """True when the synced table's source matches the expected gold table.
+    """True when the synced table's source is the caller's OWN gold table.
 
-    Compares the normalized fully-qualified reference, with a last-segment
-    fallback so a difference in catalog spelling or quoting still matches the
-    same object name.
+    Requires normalized **fully-qualified** equality (same quote/case/whitespace
+    normalization used elsewhere): a synced table sourced from another
+    participant's ``<other-catalog>.<other-schema>.gold_contract_performance``
+    shares the basename but is NOT a match — there is deliberately no
+    last-segment fallback, so it cannot be adopted.
     """
     if not observed:
         return False
-    observed_norm = _normalize_reference(observed)
-    if observed_norm == expected_norm:
-        return True
-    return observed_norm.rsplit(".", 1)[-1] == expected_norm.rsplit(".", 1)[-1]
+    return _normalize_reference(observed) == expected_norm
 
 
 def _served_rows(client: Any, ctx: CheckContext, info: SyncedTableInfo) -> int | None:
@@ -465,6 +490,15 @@ def check_app(ctx: CheckContext) -> CheckResult:
             "name): workshop.check('07_app', ..., synced_table=your_synced_table).",
             {"stage": "configuration", "reason": "missing_synced_table"},
         )
+    owner = _required_name(ctx, "owner")
+    if not owner:
+        return _fail(
+            "No owner given. The app and synced table are workspace-scoped and "
+            "shared across a team, so this checkpoint must confirm they are YOUR "
+            "own — pass your identity: workshop.check('07_app', ..., "
+            "owner=spark.sql('SELECT current_user()').collect()[0][0]).",
+            {"stage": "configuration", "reason": "missing_owner"},
+        )
 
     try:
         expected_source_display, expected_source_norm = _expected_source(ctx)
@@ -524,6 +558,30 @@ def check_app(ctx: CheckContext) -> CheckResult:
              "observed_primary_key": list(synced.primary_key_columns)},
         )
 
+    # Ownership: the synced table must be demonstrably YOURS. Its Unity Catalog
+    # owner (creator) is the ownership-scoped observable — a same-named table
+    # owned by another participant is never adopted.
+    owner_fn = getattr(client, "get_table_owner", None)
+    if not callable(owner_fn):
+        return _fail(
+            "This checkpoint cannot verify synced-table ownership with the given "
+            "client. Pass a WorkspaceClient (or a normalized client exposing "
+            "get_table_owner).",
+            {"stage": "client", "reason": "no_owner_probe"},
+        )
+    try:
+        synced_owner = owner_fn(synced_table)
+    except Exception:  # noqa: BLE001
+        synced_owner = None
+    if not synced_owner or synced_owner.strip().lower() != owner.strip().lower():
+        return _fail(
+            f"Synced table {synced_table!r} is not owned by {owner!r} (owner="
+            f"{synced_owner!r}); refusing to treat another participant's synced "
+            "table as yours. Create your own per-participant synced table.",
+            {"stage": "synced_ownership", "synced_table": synced_table,
+             "owner": owner, "observed_owner": synced_owner},
+        )
+
     if not _synced_online(synced):
         return _fail(
             f"Synced table {synced_table!r} is not online yet "
@@ -536,25 +594,35 @@ def check_app(ctx: CheckContext) -> CheckResult:
              "detailed_state": synced.detailed_state, "message": synced.message},
         )
 
+    # Serving proof — FAIL CLOSED. An online synced table can still be empty or
+    # stale, so the checkpoint must positively verify it serves rows; if the
+    # served count cannot be obtained it stays RED (never a structure-only pass).
     served = _served_rows(client, ctx, synced)
+    if served is None:
+        return _fail(
+            f"Could not verify that synced table {synced_table!r} is serving rows. "
+            "An online sync can still be empty or stale, so this checkpoint needs "
+            "a served-row count. Pass the Lakebase connection hints so the count "
+            "can be read (lakebase_endpoint + lakebase_host, or a served_row_count "
+            "observed from your synced table).",
+            {"stage": "synced_unverified", "synced_table": synced_table},
+        )
+    if served <= 0:
+        return _fail(
+            f"Synced table {synced_table!r} is online but serves 0 rows. The "
+            "sync produced no data — re-run it after the gold table is populated.",
+            {"stage": "synced_empty", "synced_table": synced_table,
+             "served_rows": served},
+        )
     expected_rows = _source_count(ctx)
-    if served is not None:
-        if served <= 0:
-            return _fail(
-                f"Synced table {synced_table!r} is online but serves 0 rows. The "
-                "sync produced no data — re-run it after the gold table is "
-                "populated.",
-                {"stage": "synced_empty", "synced_table": synced_table,
-                 "served_rows": served},
-            )
-        if expected_rows is not None and served != expected_rows:
-            return _fail(
-                f"Synced table {synced_table!r} serves {served:,} rows but the "
-                f"source {expected_source_display} has {expected_rows:,}; the "
-                "synced data is stale or incomplete. Re-run the sync.",
-                {"stage": "synced_parity", "synced_table": synced_table,
-                 "served_rows": served, "expected_rows": expected_rows},
-            )
+    if expected_rows is not None and served != expected_rows:
+        return _fail(
+            f"Synced table {synced_table!r} serves {served:,} rows but the "
+            f"source {expected_source_display} has {expected_rows:,}; the "
+            "synced data is stale or incomplete. Re-run the sync.",
+            {"stage": "synced_parity", "synced_table": synced_table,
+             "served_rows": served, "expected_rows": expected_rows},
+        )
 
     # --- 2. Databricks App: the caller's own, deployed, and running ------------
     try:
@@ -573,8 +641,9 @@ def check_app(ctx: CheckContext) -> CheckResult:
             {"stage": "app_missing", "app_name": app_name},
         )
 
-    owner = ctx.extras.get("owner")
-    if isinstance(owner, str) and owner.strip() and not _owned(app, owner):
+    # Ownership is required: the app must be demonstrably the caller's own, so a
+    # known app_name belonging to another participant is never adopted.
+    if not _owned(app, owner):
         return _fail(
             f"App {app_name!r} is not owned by {owner!r} (creator="
             f"{app.creator!r}, service principal="

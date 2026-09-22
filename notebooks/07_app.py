@@ -204,23 +204,36 @@ print(f"Gold source    : {gold_serving}")
 # MAGIC ## 5. Checkpoint: `07_app`
 # MAGIC
 # MAGIC The check reads only observable platform state: your **synced table** exists,
-# MAGIC syncs from `gold_contract_performance` on `contract_id`, is **online**, and
-# MAGIC serves rows; and your **app** is deployed and **running**. It fails if the
-# MAGIC synced table is missing/stale or the app is missing or stopped.
+# MAGIC syncs from **your** `gold_contract_performance` on `contract_id`, is **owned
+# MAGIC by you**, is **online**, and **serves rows**; and your **app** is deployed,
+# MAGIC **owned by you**, and **running**. It fails (RED) if the synced table is
+# MAGIC missing/someone else's/stale/empty or the app is missing/someone else's/stopped.
+# MAGIC
+# MAGIC `owner=me` binds both resources to you (no adopting a teammate's). The Lakebase
+# MAGIC connection hints let the check read the served-row count — serving is verified
+# MAGIC fail-closed, so an unverifiable/empty synced table stays RED.
 
 # COMMAND ----------
 
 from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+lakebase_endpoint = f"projects/{project_id}/branches/production/endpoints/primary"
+lakebase_host = w.postgres.get_endpoint(name=lakebase_endpoint).status.hosts.host
 
 result = workshop.check(
     "07_app",
     spark=spark,  # enables source-count parity for the synced table
     catalog=config.catalog,
     schema=config.schema,
-    apps=WorkspaceClient(),
+    apps=w,
     app_name=app_name,
     synced_table=synced_table,
-    owner=me,  # bind the app to YOU, not just the name
+    owner=me,  # required — binds the app AND synced table to YOU
+    lakebase_endpoint=lakebase_endpoint,  # so served rows can be verified
+    lakebase_host=lakebase_host,
+    lakebase_user=me,
+    lakebase_database="databricks_postgres",
 )
 print(result)
 assert result.passed, result.message

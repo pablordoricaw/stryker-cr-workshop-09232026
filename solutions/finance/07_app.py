@@ -212,21 +212,30 @@ databricks apps start {app_name} --profile <p>
 # MAGIC %md
 # MAGIC ## 5. Checkpoint: `07_app`
 # MAGIC
-# MAGIC Reads only observable state: your synced table exists, syncs from
-# MAGIC `gold_contract_performance` on `contract_id`, is online, and serves rows; and
-# MAGIC your app is deployed and running.
+# MAGIC Reads only observable state: your synced table exists, syncs from **your**
+# MAGIC `gold_contract_performance` on `contract_id`, is **owned by you**, is online,
+# MAGIC and **serves rows** (verified fail-closed via a live row count); and your app
+# MAGIC is deployed, **owned by you**, and running. Pass the Lakebase connection
+# MAGIC hints so the served-row count can be read.
 
 # COMMAND ----------
 
+lakebase_endpoint = f"{branch}/endpoints/primary"
+lakebase_host = w.postgres.get_endpoint(name=lakebase_endpoint).status.hosts.host
+
 result = workshop.check(
     "07_app",
-    spark=spark,
+    spark=spark,  # enables source-count parity
     catalog=config.catalog,
     schema=config.schema,
     apps=w,
     app_name=app_name,
     synced_table=synced_table,
-    owner=me,
+    owner=me,  # required — binds the app AND synced table to YOU
+    lakebase_endpoint=lakebase_endpoint,  # so served rows are verified (fail-closed)
+    lakebase_host=lakebase_host,
+    lakebase_user=me,
+    lakebase_database="databricks_postgres",
 )
 print(result)
 assert result.passed, result.message

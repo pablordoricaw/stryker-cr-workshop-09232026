@@ -3,8 +3,8 @@
 Every test drives the real ``workshop.check`` seam with an injected fake app
 client, so no Databricks SDK, notebook, or network is needed. The fake serves
 only observable platform state — a Databricks App's deploy/run state and a
-Lakebase synced table's source/key/sync state (and optionally its served row
-count) — which is exactly what the checkpoint is allowed to assert on.
+Lakebase synced table's source/key/owner/sync state (and its served row count) —
+which is exactly what the checkpoint is allowed to assert on.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ SCHEMA = "finance data"  # a space in the schema name exercises quoting
 APP = "stryker-finance-ada-lovelace"
 SYNCED = "lb_finance_ada.public.gold_contract_performance"
 OWNER = "ada@example.com"
+OTHER = "grace@example.com"
 
 
 def _synced(
@@ -64,12 +65,16 @@ def _app(
 
 
 class FakeApps:
-    """Serve one app's state and one synced table's state (+ optional counts)."""
+    """Serve one app + one synced table's observable state (owner, rows, probe)."""
 
-    def __init__(self, *, app=..., synced=..., rows=None, probe_status=None, raise_on=None):
+    def __init__(
+        self, *, app=..., synced=..., rows=3, synced_owner=OWNER,
+        probe_status=None, raise_on=None,
+    ):
         self._app = _app() if app is ... else app
         self._synced = _synced() if synced is ... else synced
         self._rows = rows
+        self._synced_owner = synced_owner
         self._probe = probe_status
         self.raise_on = raise_on
 
@@ -83,6 +88,9 @@ class FakeApps:
             raise RuntimeError("PERMISSION_DENIED reading synced table")
         return self._synced
 
+    def get_table_owner(self, name):
+        return self._synced_owner
+
     def count_rows(self, info):
         return self._rows
 
@@ -91,11 +99,16 @@ class FakeApps:
 
 
 class FakeAppsNoCounter:
-    """A minimal client without count_rows/probe (exercises the fallback path)."""
+    """A client that can verify ownership but NOT serve a row count.
 
-    def __init__(self, *, app=..., synced=...):
+    Exercises the fail-closed serving check: with no obtainable count, an
+    online synced table must still be RED (unverified), never a structure pass.
+    """
+
+    def __init__(self, *, app=..., synced=..., synced_owner=OWNER):
         self._app = _app() if app is ... else app
         self._synced = _synced() if synced is ... else synced
+        self._synced_owner = synced_owner
 
     def get_app(self, name):
         return self._app
@@ -103,10 +116,14 @@ class FakeAppsNoCounter:
     def get_synced_table(self, name):
         return self._synced
 
+    def get_table_owner(self, name):
+        return self._synced_owner
+
 
 def _check(client, **kwargs):
     kwargs.setdefault("app_name", APP)
     kwargs.setdefault("synced_table", SYNCED)
+    kwargs.setdefault("owner", OWNER)
     return workshop.check(
         APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=client, **kwargs
     )
@@ -121,7 +138,8 @@ def test_registered():
 
 def test_requires_catalog_and_schema():
     result = workshop.check(
-        APP_CHECKPOINT_ID, apps=FakeApps(), app_name=APP, synced_table=SYNCED
+        APP_CHECKPOINT_ID, apps=FakeApps(), app_name=APP, synced_table=SYNCED,
+        owner=OWNER,
     )
     assert result.passed is False
     assert "No catalog/schema" in result.message
@@ -130,7 +148,7 @@ def test_requires_catalog_and_schema():
 def test_requires_app_name():
     result = workshop.check(
         APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=FakeApps(),
-        synced_table=SYNCED,
+        synced_table=SYNCED, owner=OWNER,
     )
     assert result.passed is False
     assert result.details["reason"] == "missing_app_name"
@@ -145,18 +163,27 @@ def test_blank_app_name_is_red():
 def test_requires_synced_table():
     result = workshop.check(
         APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=FakeApps(),
-        app_name=APP,
+        app_name=APP, owner=OWNER,
     )
     assert result.passed is False
     assert result.details["reason"] == "missing_synced_table"
 
 
+def test_requires_owner():
+    # Ownership is not optional: without an owner the checkpoint cannot confirm
+    # the app and synced table are the caller's OWN.
+    result = workshop.check(
+        APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=FakeApps(),
+        app_name=APP, synced_table=SYNCED,
+    )
+    assert result.passed is False
+    assert result.details["reason"] == "missing_owner"
+
+
 def test_requires_a_workspace_when_no_client_injected():
-    # No client and no SDK off-platform: the lazy build fails and surfaces a
-    # clean RED rather than a traceback.
     result = workshop.check(
         APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, app_name=APP,
-        synced_table=SYNCED,
+        synced_table=SYNCED, owner=OWNER,
     )
     assert result.passed is False
     assert result.details["stage"] == "client"
@@ -171,24 +198,26 @@ def test_rejects_unusable_apps_extra():
 # --- happy path -------------------------------------------------------------
 
 
-def test_green_when_synced_online_and_app_running():
+def test_green_when_owned_synced_serving_and_app_running():
     result = _check(FakeApps())
     assert result.passed is True
     assert result.details["stage"] == "done"
     assert result.details["app_name"] == APP
     assert result.details["synced_table"] == SYNCED
-
-
-def test_green_without_counter_relies_on_online_state():
-    result = _check(FakeAppsNoCounter())
-    assert result.passed is True
-    assert result.details["stage"] == "done"
+    assert result.details["served_rows"] == 3
 
 
 def test_green_with_row_parity():
     result = _check(FakeApps(rows=42), expected_row_count=42)
     assert result.passed is True
     assert result.details["served_rows"] == 42
+
+
+def test_green_with_observed_served_row_count_extra():
+    # No counter on the client, but an observed served_row_count is supplied.
+    result = _check(FakeAppsNoCounter(), served_row_count=5)
+    assert result.passed is True
+    assert result.details["served_rows"] == 5
 
 
 def test_source_match_is_quoting_and_case_insensitive():
@@ -231,10 +260,48 @@ def test_wrong_source_table_is_red():
     assert result.details["stage"] == "synced_source"
 
 
+def test_same_basename_wrong_catalog_schema_is_red():
+    # Another participant's <other>.<other>.gold_contract_performance shares the
+    # basename but is NOT the caller's own — must be RED (no basename fallback).
+    other = "other-catalog.other-schema.gold_contract_performance"
+    result = _check(FakeApps(synced=_synced(source=other)))
+    assert result.passed is False
+    assert result.details["stage"] == "synced_source"
+
+
 def test_wrong_primary_key_is_red():
     result = _check(FakeApps(synced=_synced(pk=("order_id",))))
     assert result.passed is False
     assert result.details["stage"] == "synced_key"
+
+
+def test_synced_owned_by_other_is_red():
+    # A synced table whose Unity Catalog owner is someone else is not adopted.
+    result = _check(FakeApps(synced_owner=OTHER))
+    assert result.passed is False
+    assert result.details["stage"] == "synced_ownership"
+    assert result.details["observed_owner"] == OTHER
+
+
+def test_synced_owner_unverifiable_is_red():
+    result = _check(FakeApps(synced_owner=None))
+    assert result.passed is False
+    assert result.details["stage"] == "synced_ownership"
+
+
+def test_client_without_owner_probe_is_red():
+    # A normalized client is required to expose get_table_owner (enforced at
+    # resolution); one lacking it cannot verify ownership.
+    class NoOwner:
+        def get_app(self, name):
+            return _app()
+
+        def get_synced_table(self, name):
+            return _synced()
+
+    result = _check(NoOwner())
+    assert result.passed is False
+    assert result.details["stage"] == "client"
 
 
 def test_still_provisioning_is_red():
@@ -247,20 +314,24 @@ def test_still_provisioning_is_red():
 
 
 def test_offline_synced_is_red():
-    result = _check(
-        FakeApps(synced=_synced(detailed="synced_tabled_offline"))
-    )
+    result = _check(FakeApps(synced=_synced(detailed="synced_tabled_offline")))
     assert result.passed is False
     assert result.details["stage"] == "synced_offline"
 
 
 def test_pipeline_failed_is_red():
-    # An "online" state that carries a pipeline failure must not pass.
     result = _check(
         FakeApps(synced=_synced(detailed="synced_table_online_pipeline_failed"))
     )
     assert result.passed is False
     assert result.details["stage"] == "synced_offline"
+
+
+def test_unverifiable_served_count_is_red():
+    # Online + owned, but no served-row count can be obtained → FAIL CLOSED.
+    result = _check(FakeAppsNoCounter())
+    assert result.passed is False
+    assert result.details["stage"] == "synced_unverified"
 
 
 def test_empty_served_rows_is_red():
@@ -269,7 +340,7 @@ def test_empty_served_rows_is_red():
     assert result.details["stage"] == "synced_empty"
 
 
-def test_row_parity_mismatch_is_red():
+def test_stale_row_parity_mismatch_is_red():
     result = _check(FakeApps(rows=10), expected_row_count=99)
     assert result.passed is False
     assert result.details["stage"] == "synced_parity"
@@ -290,6 +361,13 @@ def test_missing_app_is_red():
     assert result.details["stage"] == "app_missing"
 
 
+def test_app_owned_by_other_is_red():
+    other = _app(creator=OTHER, sp="sp-someone-else")
+    result = _check(FakeApps(app=other))
+    assert result.passed is False
+    assert result.details["stage"] == "app_ownership"
+
+
 def test_stopped_app_is_red():
     # Deploying can leave the app stopped; a stopped app answers nothing.
     result = _check(FakeApps(app=_app(compute="stopped", app_state="unavailable")))
@@ -307,18 +385,6 @@ def test_failed_deployment_is_red():
     result = _check(FakeApps(app=_app(deployment="failed")))
     assert result.passed is False
     assert result.details["stage"] == "app_deployment"
-
-
-def test_ownership_guard_rejects_other_owner():
-    other = _app(creator="grace@example.com", sp="sp-someone-else")
-    result = _check(FakeApps(app=other), owner=OWNER)
-    assert result.passed is False
-    assert result.details["stage"] == "app_ownership"
-
-
-def test_ownership_guard_accepts_own_app():
-    result = _check(FakeApps(app=_app(creator=OWNER)), owner=OWNER)
-    assert result.passed is True
 
 
 def test_unhealthy_probe_is_red():

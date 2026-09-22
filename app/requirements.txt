@@ -2,5 +2,7 @@
 # FastAPI + uvicorn are pre-installed in the Databricks Apps runtime.
 # psycopg (Postgres driver) and the Databricks SDK are NOT guaranteed pre-installed,
 # so pin them here — a missing psycopg is the #1 cause of Lakebase app crashes.
-databricks-sdk>=0.81.0
-psycopg[binary]>=3.1
+# Compatible-release (`~=`) bounds keep deploys reproducible while allowing patch
+# updates within the tested major/minor line.
+databricks-sdk~=0.81
+psycopg[binary]~=3.2
