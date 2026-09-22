@@ -13,11 +13,15 @@ notebook's config.
 schema and UC Volume inside your team's **existing catalog**, runs seed hooks,
 and ends on the `00_setup` checkpoint. Start there.
 
-`01_bronze_txn.py` is the Finance transactional-ingestion starter. It offers a
-primary Lakebase CDF path (clearly marked as an admin-enabled Beta/Preview) and
-a no-admin Delta fallback; both land `bronze_sales_transactions` and finish at
-checkpoint `01_bronze_txn`.
+`01_bronze_docs.py` (added by #5) is the first medallion step: copy the committed
+source PDFs into your UC Volume and register a bronze documents table over the
+raw files. It ends on the `01_bronze_docs` checkpoint.
+
+`01_bronze_txn.py` (added by #7) is the Finance transactional-ingestion starter.
+It offers a primary Lakebase CDF path (clearly marked as an admin-enabled
+Beta/Preview) and a no-admin Delta fallback; both land
+`bronze_sales_transactions` and finish at checkpoint `01_bronze_txn`.
 
 > The remaining notebooks are added by later tickets: the rest of the medallion
-> + AI-functions build spine (#5–#9), metric views (#10), the Genie agent (#11),
-> and the app wiring (#12).
+> + AI-functions build spine (silver #6, gold #8, metadata #9), metric views
+> (#10), the Genie agent (#11), and the app wiring (#12).
