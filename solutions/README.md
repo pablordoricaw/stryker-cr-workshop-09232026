@@ -16,7 +16,8 @@ solutions/
 │   ├── 01_bronze_txn.py    # #7 — Lakebase CDF + Delta fallback to bronze txn
 │   ├── 02_silver_docs.py   # #6 — ai_parse_document/classify/extract to silver
 │   ├── 03_gold.py          # #8 — document-enriched sales + contract mart
-│   └── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
+│   ├── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
+│   └── 05_metric_views.py  # #10 — governed UC Metric Views over the gold tables
 ├── security/
 └── itsm/
 ```
@@ -33,3 +34,8 @@ staging metadata with `apply_ddl=false` and then applying comments, PI
 classification tags, and domain tags to the gold tables. Later solution notebooks
 are authored alongside each build-spine ticket and validated by maintainer CI
 (#17). This directory ships on both `dev` and the participant release.
+
+`05_metric_views` defines the Finance sales revenue/margin and contract-
+performance semantic layers as UC Metric Views in the participant's existing
+resolved schema. It also demonstrates the `MEASURE()` query syntax and documents
+the optional custom-metric stretch.

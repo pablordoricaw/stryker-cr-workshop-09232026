@@ -50,5 +50,12 @@ model). It ends on the `04_metadata` checkpoint, which reads only
 `information_schema` comments and tags and derives the expected columns from the
 live tables rather than hardcoding column names.
 
-> The remaining notebooks are added by later tickets: metric views (#10), the
-> Genie agent (#11), and the app wiring (#12).
+`05_metric_views.py` (added by #10) creates two governed Unity Catalog Metric
+Views in the same resolved participant schema: Finance sales revenue/margin
+metrics over `gold_sales`, and contract-performance metrics over
+`gold_contract_performance`. It includes a documented "add your own metric"
+stretch and ends at `05_metrics`, which validates the deployed metric-model
+definitions and their non-null aggregate query results.
+
+> The remaining notebooks are added by later tickets: the Genie agent (#11) and
+> the app wiring (#12).
