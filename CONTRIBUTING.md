@@ -14,13 +14,24 @@ Keep each contribution focused, use [Conventional Commits](https://www.conventio
 
 ## Promote a Workshop Release
 
-A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material.
+A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material and **swap in the participant hint ladder** as its root `AGENTS.md`.
+
+Merge without committing, strip the maintainer-only files, then move the participant hint ladder into the root as `AGENTS.md` (the `git rm` removes the maintainer `AGENTS.md`; the `git mv` puts the participant ladder in its place, where Genie Code auto-discovers it):
 
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
 git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
-test ! -e AGENTS.md
+git mv docs/participant/AGENTS.md AGENTS.md
+```
+
+Verify the swap: the root `AGENTS.md` must now exist and be the participant hint ladder (its sentinel present, the maintainer workflow's title absent), the participant source must no longer sit under `docs/`, and the other maintainer-only paths must be gone:
+
+```bash
+test -e AGENTS.md
+grep -q 'stryker-workshop:participant-hint-ladder' AGENTS.md
+! grep -q 'Repository Agent Workflow' AGENTS.md
+test ! -e docs/participant/AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
 test ! -e generators
@@ -49,7 +60,7 @@ Use a major version when a change breaks the participant experience, a minor ver
 
 Tag only the release commit on `main`.
 
-If the merge conflicts, preserve the participant-ready state on `main`: `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
+If the merge conflicts, preserve the participant-ready state on `main`: the root `AGENTS.md` must end up as the participant hint ladder (not the maintainer workflow), while `CLAUDE.md`, `docs/agents/`, `generators/`, and the `docs/participant/AGENTS.md` source must be absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
 
 ## Agent-Assisted Development
 
