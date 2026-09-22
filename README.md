@@ -20,6 +20,10 @@ Starter notebooks with `# TODO`s, a per-checkpoint validation seam
 (`workshop.check()`), and a Genie-Code hint agent make sure everyone finishes
 the whole thing — whether you use Databricks every day or have never opened it.
 
+## Workshop Architecture
+
+![Workshop architecture showing Finance, Security, and ITSM source domains flowing through bronze, silver, and gold medallion layers into governance metadata and UC Metric Views, then a Genie agent and Databricks data app.](assets/diagrams/workshop-architecture.svg)
+
 ## Everything runs in the Databricks Workspace UI — no local setup
 
 **You do not need a local development environment.** There is no terminal step,
