@@ -63,6 +63,19 @@ print(f"  volume : {config.volume}   (files land in {config.volume_path})")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## 🚀 From-scratch mode (optional stretch)
+# MAGIC
+# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
+# MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
+# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
+# MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
+# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 2. Copy the committed source PDFs into your UC Volume
 # MAGIC
 # MAGIC The workshop ships the source PDFs in the repo at

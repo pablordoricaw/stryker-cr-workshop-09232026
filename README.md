@@ -101,6 +101,22 @@ gives graded help — a nudge and a doc link first, then an API/skeleton, and on
 then a checkpoint solution — so you get unblocked without skipping the learning.
 A gated `solutions/` directory holds the full reference if you need it.
 
+## Optional Tier-3 stretch modules
+
+Finished early or want more? Three **optional** modules for strong engineers,
+strictly additive to the graded path (skip them and your workshop is still
+complete):
+
+1. **Package your work as a DAB** — split what you built into three
+   independently-deployable Databricks Asset Bundles.
+2. **Add your own metrics / Genie questions** — extend the semantic + Genie
+   layers with your own governed Metric View and benchmark questions.
+3. **From-scratch mode** — a uniform convention for flipping any build stage from
+   guided (`# TODO` + hints) to build-it-yourself, with the checkpoint unchanged.
+
+Start at [`docs/stretch/README.md`](docs/stretch/README.md); the starters live in
+`notebooks/stretch/`.
+
 ## Repository layout
 
 | Path          | What's here                                                        |
@@ -111,6 +127,7 @@ A gated `solutions/` directory holds the full reference if you need it.
 | `app/`        | The provided data app you wire to your Genie agent                 |
 | `solutions/`  | Gated reference solutions (top rung of the hint ladder)            |
 | `resources/`  | Databricks Asset Bundle (DAB) resource definitions                 |
+| `docs/stretch/` | Optional Tier-3 stretch modules (package-as-DAB, add-your-own)   |
 
 ## Prerequisites
 

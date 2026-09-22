@@ -1,0 +1,42 @@
+# Foundation bundle — the workshop's shared UC substrate (schema + UC Volume).
+#
+# ONE of three independently-deployable bundles (see ../README.md for the "why").
+# This one owns the longest-lived, widest-blast-radius resources: the schema and
+# volume every other bundle reads. It changes rarely and is deployed once, before
+# the pipeline and app bundles.
+#
+# Bring-your-own-catalog: `catalog` names an EXISTING catalog. This bundle defines
+# only the schema and volume INSIDE it — never a `catalogs:` resource.
+#
+# Namespace-aware: `schema` defaults to a placeholder; pass your identity-derived
+# schema (the `workshop_<you>` value 00_setup / the notebook prints) with
+# `--var schema=workshop_<you>` so your foundation never collides with a teammate's.
+#
+# Deterministic names: targets deliberately do NOT set `mode: development`.
+# Dev-mode name-prefixing (`[dev you] ...`) injects characters that are not legal
+# Unity Catalog identifiers and would drift from what your notebooks created.
+#
+# Validate offline:
+#   databricks bundle validate --strict            # from this directory
+
+bundle:
+  name: stryker-workshop-foundation
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog to target (never created by this bundle).
+    default: main
+  schema:
+    description: Your per-participant schema (pass --var schema=workshop_<you>).
+    default: workshop_finance
+  volume:
+    description: UC Volume where source documents land.
+    default: landing
+
+targets:
+  dev:
+    default: true
+  prod: {}

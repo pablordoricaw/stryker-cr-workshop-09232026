@@ -4,6 +4,21 @@ Participant-facing starter notebooks — one per workshop module — with `# TOD
 cells, collapsible hints, and "build from scratch" stretch toggles. Each module
 ends with a `workshop.check("<checkpoint_id>")` validation cell.
 
+Every graded **build** stage (`01_bronze_docs` … `07_app`) carries an identical
+**"🚀 From-scratch mode (optional stretch)"** markdown cell right after its config
+cell — the uniform, default-off convention for flipping a stage from guided to
+build-it-yourself. It is markdown only (no widget, no code), so it cannot change
+what the checkpoint asserts. `00_setup` is excluded (it provisions rather than
+teaches a build). The convention is documented once in
+[`../docs/stretch/README.md`](../docs/stretch/README.md).
+
+The optional **Tier-3 stretch** starters live in [`stretch/`](stretch/):
+`package_as_dab.py` (package your built infra/app as a set of independently-
+deployable DABs) and `add_your_own.py` (add your own Metric View + Genie
+benchmark questions, validated through the existing checkpoint knobs). Both are
+additive and ungraded; their gated solutions are under
+`solutions/finance/stretch/`.
+
 The curriculum is **one shared spine** across all three domains (Finance,
 Security, ITSM); only the dataset and pre-authored semantic content differ, so
 notebooks are domain-agnostic and read your selected domain from the setup

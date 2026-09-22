@@ -1,0 +1,53 @@
+# Pipeline bundle — the medallion + governance + semantic build, as one Lakeflow Job.
+#
+# ONE of three independently-deployable bundles (see ../README.md for the "why").
+# This one owns the data-engineering lifecycle: a serverless Lakeflow Job that
+# re-runs the workshop's build notebooks (bronze -> silver -> gold -> metadata ->
+# metric views). It changes on the DE cadence (new transforms, new columns) and
+# is redeployed/rerun WITHOUT touching the foundation or the app.
+#
+# Cross-bundle reference by NAME, not coupling: the job's notebooks write into the
+# `${var.catalog}.${var.schema}` the FOUNDATION bundle created. There is no
+# in-bundle handle to the foundation — deploy the foundation first (see the
+# runbook in ../README.md). The medallion notebooks themselves live in your
+# cloned Git folder; the job points at them by workspace path (`notebooks_root`),
+# so this bundle carries no copy of them to drift.
+#
+# Namespace-aware & CREATE-CATALOG-free: same `catalog`/`schema` variables as the
+# foundation; no catalog resource. Metric views (05) are created by the notebook's
+# SQL inside the job — UC Metric Views are not a DAB resource type, so they ride
+# the pipeline rather than getting a bundle of their own.
+#
+# Validate offline:
+#   databricks bundle validate --strict            # from this directory
+
+bundle:
+  name: stryker-workshop-pipeline
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog (never created here).
+    default: main
+  schema:
+    description: Your per-participant schema (pass --var schema=workshop_<you>).
+    default: workshop_finance
+  volume:
+    description: UC Volume where source documents land.
+    default: landing
+  domain:
+    description: Workshop domain the notebooks run against.
+    default: finance
+  notebooks_root:
+    description: >-
+      Workspace path of your cloned workshop Git folder's notebooks/ directory.
+      Absolute workspace path so the job reuses the notebooks already in your
+      workspace rather than a bundled copy.
+    default: /Workspace/Users/${workspace.current_user.userName}/stryker-cr-workshop/notebooks
+
+targets:
+  dev:
+    default: true
+  prod: {}
