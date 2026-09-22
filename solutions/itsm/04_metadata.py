@@ -223,6 +223,7 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    tables=["gold_incidents", "gold_service_performance"],
     # Verify the same tag keys generation wrote — never the defaults if overridden.
     domain_tag_name=domain_tag_name,
     pi_tag_name=pi_classification_tag_name,

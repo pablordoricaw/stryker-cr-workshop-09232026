@@ -70,6 +70,7 @@ from pyspark.sql.window import Window
 
 TICKET_COLUMNS = [
     "ticket_id",
+    "incident_id",
     "opened_at",
     "resolved_at",
     "priority",

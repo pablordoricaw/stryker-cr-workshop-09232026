@@ -1,10 +1,17 @@
 # Databricks notebook source
-# ruff: noqa: F821
+# ruff: noqa: F821, I001
 # MAGIC # 05 · Governed Metric Views — SOLUTION (ITSM)
-import os,sys
-_root=os.path.abspath(os.getcwd())
-while not os.path.isfile(os.path.join(_root,"workshop","__init__.py")): _root=os.path.dirname(_root)
-if _root not in sys.path: sys.path.insert(0,_root)
+import os
+import sys
+
+_root = os.path.abspath(os.getcwd())
+while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
+    _parent = os.path.dirname(_root)
+    if _parent == _root:
+        raise RuntimeError("workshop repo root not found; open this notebook inside the cloned workshop Git folder.")
+    _root = _parent
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 import workshop
 dbutils.widgets.text("catalog","","Catalog (your existing catalog — required)")
 dbutils.widgets.text("schema","","Schema (blank = your workshop_<you> schema)")

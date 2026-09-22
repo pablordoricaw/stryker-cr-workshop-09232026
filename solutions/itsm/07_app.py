@@ -108,7 +108,7 @@ databricks postgres create-project {project_id} \\
 databricks postgres create-synced-table {synced_table} \\
   --json '{{"spec": {{
     "source_table_full_name": "{gold_serving}",
-    "primary_key_columns": ["service", "priority", "assignment_group"],
+    "primary_key_columns": ["incident_id"],
     "scheduling_policy": "SNAPSHOT",
     "branch": "{branch}",
     "postgres_database": "databricks_postgres",
@@ -150,7 +150,7 @@ synced = w.postgres.create_synced_table(
     synced_table=SyncedTable(
         spec=SyncedTableSyncedTableSpec(
             source_table_full_name=gold_serving,
-            primary_key_columns=["service", "priority", "assignment_group"],
+            primary_key_columns=["incident_id"],
             scheduling_policy=SyncedTableSyncedTableSpecSyncedTableSchedulingPolicy.SNAPSHOT,
             branch=branch,
             postgres_database="databricks_postgres",
@@ -274,7 +274,7 @@ result = workshop.check(
     lakebase_database="databricks_postgres",
     serving_base="gold_service_performance_served",
     source_table="gold_service_performance",
-    primary_key_columns=("service", "priority", "assignment_group"),
+    primary_key_columns=("incident_id",),
 )
 print(result)
 assert result.passed, result.message

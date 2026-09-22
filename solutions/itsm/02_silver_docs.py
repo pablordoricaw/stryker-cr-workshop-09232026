@@ -53,7 +53,7 @@ import workshop
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "itsm", ["itsm", "security", "itsm"], "Domain")
+dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
@@ -131,7 +131,7 @@ parsed = (
 # MAGIC `ai_classify` routes each parsed document to exactly one of a fixed label
 # MAGIC set. We derive that label set from the ground-truth class folders present
 # MAGIC in bronze (`SELECT DISTINCT source_class`), so this stage stays
-# MAGIC domain-generic — the same code classifies ITSM, Security, or ITSM. We
+# MAGIC domain-generic — the same code classifies Finance, Security, or ITSM. We
 # MAGIC read the predicted label out of the returned VARIANT (`:response[0]`) and
 # MAGIC write the consolidated one-row-per-document `silver_docs` table.
 
@@ -196,9 +196,9 @@ display(
 # MAGIC ## 4. Extract structured fields (`ai_extract`) → `silver_<class>`
 # MAGIC
 # MAGIC Each class carries different fields, so we route each class to its own
-# MAGIC `ai_extract` schema (the extraction-field performance in
+# MAGIC `ai_extract` schema (the extraction-field specification in
 # MAGIC `data/itsm/README.md`) and write one `silver_<class>` table per class.
-# MAGIC Scalar fields are cast to their performance types; nested `line_items` /
+# MAGIC Scalar fields are cast to their contract types; nested `line_items` /
 # MAGIC `covered_products` stay as VARIANT. An `instructions` option keeps dates
 # MAGIC ISO `YYYY-MM-DD`, money numeric USD, and rates decimal. We create a table
 # MAGIC for **every** class — even one with zero classified documents — so the
@@ -211,113 +211,14 @@ display(
 
 # COMMAND ----------
 
-# Per-class ai_extract schemas — the issue #6 extraction-field performance.
+# Per-class ai_extract schemas — the ITSM extraction-field specification.
 EXTRACTION_SCHEMAS: dict[str, dict] = {
-    "incident_report": {
-        "invoice_number": {"type": "string"},
-        "vendor_name": {"type": "string"},
-        "invoice_date": {"type": "string"},
-        "due_date": {"type": "string"},
-        "post_incident_review_number": {"type": "string"},
-        "currency": {"type": "string"},
-        "subtotal": {"type": "number"},
-        "tax_amount": {"type": "number"},
-        "freight_amount": {"type": "number"},
-        "total_amount": {"type": "number"},
-        "line_items": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "item": {"type": "string"},
-                    "description": {"type": "string"},
-                    "quantity": {"type": "number"},
-                    "unit_price": {"type": "number"},
-                    "line_amount": {"type": "number"},
-                },
-            },
-        },
-    },
-    "post_incident_review": {
-        "post_incident_review_number": {"type": "string"},
-        "buyer_name": {"type": "string"},
-        "vendor_name": {"type": "string"},
-        "order_date": {"type": "string"},
-        "requested_delivery_date": {"type": "string"},
-        "ship_to": {"type": "string"},
-        "payment_terms": {"type": "string"},
-        "currency": {"type": "string"},
-        "total_amount": {"type": "number"},
-        "line_items": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "line_number": {"type": "string"},
-                    "description": {"type": "string"},
-                    "quantity": {"type": "number"},
-                    "unit_price": {"type": "number"},
-                    "line_amount": {"type": "number"},
-                },
-            },
-        },
-    },
-    "incident_performance_pricing_agreement": {
-        "agreement_id": {"type": "string"},
-        "customer_name": {"type": "string"},
-        "effective_date": {"type": "string"},
-        "expiration_date": {"type": "string"},
-        "currency": {"type": "string"},
-        "minimum_procedure_commitment": {"type": "string"},
-        "rebate_terms": {"type": "string"},
-        "governing_law": {"type": "string"},
-        "covered_products": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "sku": {"type": "string"},
-                    "product_family": {"type": "string"},
-                    "list_price": {"type": "number"},
-                    "discount_pct": {"type": "number"},
-                    "performance_price": {"type": "number"},
-                },
-            },
-        },
-    },
-    "kb_article_sop": {
-        "entity_name": {"type": "string"},
-        "reporting_period": {"type": "string"},
-        "period_end_date": {"type": "string"},
-        "currency_scale": {"type": "string"},
-        "net_incident": {"type": "number"},
-        "cost_of_incident": {"type": "number"},
-        "gross_profit": {"type": "number"},
-        "operating_income": {"type": "number"},
-        "net_income": {"type": "number"},
-        "cash_and_equivalents": {"type": "number"},
-    },
-    "other": {
-        "document_subtype": {"type": "string"},
-        "document_number": {"type": "string"},
-        "document_date": {"type": "string"},
-        "issuer_or_preparer": {"type": "string"},
-        "counterparty_or_cost_center": {"type": "string"},
-        "amount": {"type": "number"},
-        "currency": {"type": "string"},
-        "referenced_documents": {"type": "array", "items": {"type": "string"}},
-    },
-}
-
-# ITSM's four operational document contracts override the Finance-shaped
-# starter dictionary above. Keeping this mapping adjacent to the ai_extract
-# call makes the taxonomy auditable and lets each class evolve independently.
-EXTRACTION_SCHEMAS.update({
     "incident_report": {"incident_id": {"type": "string"}, "priority": {"type": "string"}, "service": {"type": "string"}, "configuration_item": {"type": "string"}, "opened_at": {"type": "string"}, "resolved_at": {"type": "string"}, "impact": {"type": "string"}},
     "post_incident_review": {"incident_id": {"type": "string"}, "root_cause": {"type": "string"}, "severity": {"type": "string"}, "corrective_action": {"type": "string"}, "owner_team": {"type": "string"}, "review_date": {"type": "string"}},
     "change_request": {"change_id": {"type": "string"}, "service": {"type": "string"}, "risk": {"type": "string"}, "implementation_window": {"type": "string"}, "rollback_plan": {"type": "string"}, "approval_status": {"type": "string"}},
     "kb_article_sop": {"kb_id": {"type": "string"}, "title": {"type": "string"}, "applies_to": {"type": "string"}, "procedure_steps": {"type": "string"}, "escalation_path": {"type": "string"}},
-})
+    "other": {"document_subtype": {"type": "string"}, "document_number": {"type": "string"}, "document_date": {"type": "string"}, "issuer_or_preparer": {"type": "string"}},
+}
 
 # VARIANT -> SQL cast for scalar fields; arrays/objects stay VARIANT.
 _TYPE_TO_SQL = {
@@ -342,7 +243,7 @@ def extract_projection(schema: dict) -> list[str]:
 
 # COMMAND ----------
 
-# Guide the model on the performance's formats — cheap, and it keeps dates ISO and
+# Guide the model on the document formats — cheap, and it keeps dates ISO and
 # money/rates numeric. Escaped for embedding in the SQL expression below.
 EXTRACT_INSTRUCTIONS = (
     "Dates as ISO YYYY-MM-DD. Monetary amounts as numeric USD (no symbols or "

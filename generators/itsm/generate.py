@@ -36,7 +36,9 @@ def _pdf(path: Path, title: str, lines: list[str]) -> None:
     pdf.save()
 
 def _document_lines(kind: str, n: int) -> list[str]:
-    incident = f"INC-{202600+n:07d}"
+    # The five incident-report documents deliberately reference a subset of the
+    # ticket lifecycle's conformed incident IDs, enabling a real gold join.
+    incident = f"INC-{202600000 + n - 1:07d}"
     if kind == "incident_report": return [f"Incident ID: {incident}", "Priority: P1", "Service: Patient Operations Portal", "Configuration Item: svc-patient-portal", "Opened: 2026-04-14T08:00:00Z", "Resolved: 2026-04-14T12:30:00Z", "Impact: Clinicians could not access scheduling."]
     if kind == "post_incident_review": return [f"Post-Incident Review: {incident}", "Root cause: expired OAuth signing certificate", "Severity: SEV-1", "Corrective action: automate certificate rotation", "Owner team: Digital Operations", "Review date: 2026-04-16"]
     if kind == "change_request": return [f"Change ID: CHG-{202600+n:07d}", "Service: Patient Operations Portal", "Risk: medium", "Implementation window: 2026-05-10T02:00:00Z", "Rollback plan: restore previous certificate", "Approval status: approved"]
@@ -52,7 +54,8 @@ def _rows() -> list[dict[str, object]]:
         resolved = opened + timedelta(hours=hours)
         service = ("Patient Operations Portal", "Order Management", "Identity Gateway")[i % 3]
         ci = ("svc-patient-portal", "svc-order-mgmt", "svc-identity-gateway")[i % 3]
-        rows.append({"ticket_id":f"INC-{202600000+i:07d}","opened_at":opened.isoformat(),"resolved_at":resolved.isoformat(),"priority":priority,"status":"resolved","assignment_group":("Digital Operations" if i%3==0 else "Service Desk"),"service":service,"configuration_item":ci,"category":("authentication" if i%3==2 else "availability"),"resolution_hours":round(hours,2),"sla_breached":priority=="P1" and i%5==0,"root_cause_code":("certificate_expiry" if i%17==0 else "application_error"),"source_updated_at":resolved.isoformat()})
+        ticket_id = f"INC-{202600000+i:07d}"
+        rows.append({"ticket_id":ticket_id,"incident_id":ticket_id,"opened_at":opened.isoformat(),"resolved_at":resolved.isoformat(),"priority":priority,"status":"resolved","assignment_group":("Digital Operations" if i%3==0 else "Service Desk"),"service":service,"configuration_item":ci,"category":("authentication" if i%3==2 else "availability"),"resolution_hours":round(hours,2),"sla_breached":priority=="P1" and i%5==0,"root_cause_code":("certificate_expiry" if i%17==0 else "application_error"),"source_updated_at":resolved.isoformat()})
     return rows
 
 def _write(target: Path) -> None:
@@ -61,13 +64,13 @@ def _write(target: Path) -> None:
         for n in range(1,6):
             name=f"{kind}_{n:02d}.pdf"; _pdf(docs/kind/name, kind.replace("_"," ").title(), _document_lines(kind,n)); manifest.append((name,kind,kind))
     with (docs/"document_manifest.csv").open("w",newline="") as f:
-        w=csv.writer(f); w.writerow(["filename","source_class","document_subtype"]); w.writerows(manifest)
+        w=csv.writer(f, lineterminator="\n"); w.writerow(["filename","source_class","document_subtype"]); w.writerows(manifest)
     rows=_rows(); txn=target/"transactional"; lake=txn/"lakebase"; lake.mkdir(parents=True,exist_ok=True)
     fields=list(rows[0]);
-    with (lake/"service_tickets.csv").open("w",newline="") as f: w=csv.DictWriter(f,fields); w.writeheader(); w.writerows(rows)
+    with (lake/"service_tickets.csv").open("w",newline="") as f: w=csv.DictWriter(f,fields,lineterminator="\n"); w.writeheader(); w.writerows(rows)
     with (lake/"cmdb_configuration_items.csv").open("w",newline="") as f:
-        w=csv.DictWriter(f,["configuration_item","service","environment","owner_team","criticality"]); w.writeheader(); w.writerows([{"configuration_item":"svc-patient-portal","service":"Patient Operations Portal","environment":"production","owner_team":"Digital Operations","criticality":"critical"},{"configuration_item":"svc-order-mgmt","service":"Order Management","environment":"production","owner_team":"Service Desk","criticality":"high"},{"configuration_item":"svc-identity-gateway","service":"Identity Gateway","environment":"production","owner_team":"Digital Operations","criticality":"critical"}])
-    (lake/"schema.sql").write_text("CREATE SCHEMA IF NOT EXISTS itsm_seed;\nCREATE TABLE IF NOT EXISTS itsm_seed.service_tickets (ticket_id varchar(20) PRIMARY KEY, opened_at timestamptz NOT NULL, resolved_at timestamptz NOT NULL, priority varchar(2) NOT NULL, status varchar(20) NOT NULL, assignment_group varchar(80) NOT NULL, service varchar(100) NOT NULL, configuration_item varchar(100) NOT NULL, category varchar(60) NOT NULL, resolution_hours numeric(8,2) NOT NULL, sla_breached boolean NOT NULL, root_cause_code varchar(80) NOT NULL, source_updated_at timestamptz NOT NULL);\nALTER TABLE itsm_seed.service_tickets REPLICA IDENTITY FULL;\n")
+        w=csv.DictWriter(f,["configuration_item","service","environment","owner_team","criticality"],lineterminator="\n"); w.writeheader(); w.writerows([{"configuration_item":"svc-patient-portal","service":"Patient Operations Portal","environment":"production","owner_team":"Digital Operations","criticality":"critical"},{"configuration_item":"svc-order-mgmt","service":"Order Management","environment":"production","owner_team":"Service Desk","criticality":"high"},{"configuration_item":"svc-identity-gateway","service":"Identity Gateway","environment":"production","owner_team":"Digital Operations","criticality":"critical"}])
+    (lake/"schema.sql").write_text("CREATE SCHEMA IF NOT EXISTS itsm_seed;\nCREATE TABLE IF NOT EXISTS itsm_seed.service_tickets (ticket_id varchar(20) PRIMARY KEY, incident_id varchar(20) NOT NULL UNIQUE, opened_at timestamptz NOT NULL, resolved_at timestamptz NOT NULL, priority varchar(2) NOT NULL, status varchar(20) NOT NULL, assignment_group varchar(80) NOT NULL, service varchar(100) NOT NULL, configuration_item varchar(100) NOT NULL, category varchar(60) NOT NULL, resolution_hours numeric(8,2) NOT NULL, sla_breached boolean NOT NULL, root_cause_code varchar(80) NOT NULL, source_updated_at timestamptz NOT NULL);\nALTER TABLE itsm_seed.service_tickets REPLICA IDENTITY FULL;\n")
     (lake/"load.sql").write_text("\\set ON_ERROR_STOP on\nTRUNCATE itsm_seed.service_tickets;\n\\copy itsm_seed.service_tickets FROM 'data/itsm/transactional/lakebase/service_tickets.csv' WITH (FORMAT csv, HEADER true);\n")
     delta = txn / "delta" / "service_tickets"
     write_deltalake(str(delta), pa.Table.from_pylist(rows), mode="overwrite", configuration={"delta.enableChangeDataFeed":"true"})

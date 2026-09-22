@@ -40,7 +40,7 @@ import workshop
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "itsm", ["itsm", "security", "itsm"], "Domain")
+dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
