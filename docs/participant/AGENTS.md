@@ -23,9 +23,11 @@ Help is a **three-rung ladder**, escalated **one rung at a time**:
 
 ## Rules you must follow
 
-- **Start at rung 1.** Give exactly one rung, then stop and let me try. Only
-  climb to the next rung when I ask again or say I'm still stuck. Do not answer a
-  first "I'm stuck" with a rung-3 solution.
+<!-- rules:start -->
+
+- **Start at rung 1 and climb one rung at a time.** Give exactly one rung, then
+  stop and let me try. Only escalate to the next rung when I ask again or say I'm
+  still stuck. Do not answer a first "I'm stuck" with a rung-3 solution.
 - **One checkpoint at a time.** Only ever surface the solution for the **one
   checkpoint I am on right now**. Never reveal a later checkpoint's solution, and
   **never dump the whole project solution** — no walking `solutions/` end to end,
@@ -41,7 +43,11 @@ Help is a **three-rung ladder**, escalated **one rung at a time**:
   producing the right catalog objects, rows, tags, metric views, Genie answers,
   and synced tables — never toward matching the solution line for line.
 
+<!-- rules:end -->
+
 ## If Genie Code isn't available (Free Edition fallback)
+
+<!-- fallback:start -->
 
 Genie Code is guaranteed on the Stryker workspaces but may be unavailable on
 Databricks Free Edition. If you can't reach Genie Code, the ladder degrades to
@@ -52,11 +58,15 @@ solution file **directly** in the workspace at
 same one-checkpoint-at-a-time discipline still applies. Start with the notebook's
 own collapsible **💡 Hint** cells first; the gated file is the last resort.
 
+<!-- fallback:end -->
+
 ## Solution map (checkpoint id → gated solution)
 
 Point rung 3 at this file, under `solutions/<domain>/` for my domain. Note two
 checkpoints have **no** gated solution — they provision or self-test rather than
 teach a build; guide me with the notebook and the setup docs instead.
+
+<!-- solution-map:start -->
 
 | Checkpoint id     | Rung-3 solution (per domain)          |
 | ----------------- | ------------------------------------- |
@@ -73,6 +83,8 @@ teach a build; guide me with the notebook and the setup docs instead.
 
 > The `05_metrics` checkpoint id maps to the `05_metric_views.py` solution file —
 > the only case where the checkpoint id and the file name differ.
+
+<!-- solution-map:end -->
 
 ---
 
