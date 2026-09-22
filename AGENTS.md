@@ -101,7 +101,15 @@ git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch
 git push origin v<major>.<minor>.<patch>
 ```
 
-Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
+
+- `v1.0.0` — first stable workshop release.
+- `v1.1.0` — new exercises, modules, or materially expanded content.
+- `v1.1.1` — corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
+- `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
+- `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.
+
+If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 

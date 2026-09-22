@@ -123,4 +123,10 @@ Your facilitator will confirm any workspace toggles needed on the day.
 
 ## Workshop release versions
 
-Workshop releases on `main` are identified by annotated [Semantic Version](https://semver.org/) tags such as `v1.2.0`. A major version signals a participant-breaking change, a minor version adds workshop content, and a patch version delivers compatible corrections. Release candidates use a suffix such as `v1.2.0-rc.1`.
+Workshop releases on `main` are identified by annotated [Semantic Version](https://semver.org/) tags. The version reflects the participant-facing impact:
+
+- `v1.0.0` — first stable workshop release.
+- `v1.1.0` — new exercises, modules, or materially expanded content.
+- `v1.1.1` — corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
+- `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
+- `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.

@@ -39,7 +39,15 @@ git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch
 git push origin v<major>.<minor>.<patch>
 ```
 
-Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates. Tag only the release commit on `main`.
+Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
+
+- `v1.0.0` — first stable workshop release.
+- `v1.1.0` — new exercises, modules, or materially expanded content.
+- `v1.1.1` — corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
+- `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
+- `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.
+
+Tag only the release commit on `main`.
 
 If the merge conflicts, preserve the participant-ready state on `main`: `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
 
