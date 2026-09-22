@@ -86,14 +86,15 @@ From the main worktree:
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents
+git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
 test ! -e AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
+test ! -e generators
 git commit -m "chore(release): promote dev to main"
 ```
 
-Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, and `docs/agents/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 
