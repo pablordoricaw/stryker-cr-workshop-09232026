@@ -180,7 +180,10 @@ import json
 # MAGIC
 # MAGIC Your domain's target fields per class are the **extraction-field contract**
 # MAGIC in `data/<your-domain>/README.md`. Use ISO `YYYY-MM-DD` dates, numeric USD
-# MAGIC amounts, and decimal rates; leave missing fields null.
+# MAGIC amounts, and decimal rates; leave missing fields null. Also keep
+# MAGIC `ai_extract`'s `error_message` as an **`extract_error`** column — the
+# MAGIC checkpoint fails if any row has a non-null `extract_error`, so a failed
+# MAGIC extraction can't slip through as "done".
 
 # COMMAND ----------
 
@@ -188,7 +191,8 @@ import json
 #   1. Define an ai_extract JSON schema per class (see data/<domain>/README.md).
 #   2. For each class: filter silver_docs to that predicted doc_class, add
 #      ai_extract(parsed_text, <schema>, ...), select the fields out of
-#      `extracted:response:<field>`, and write `silver_<class>` (overwrite).
+#      `extracted:response:<field>` PLUS `extracted:error_message::string AS
+#      extract_error`, and write `silver_<class>` (overwrite).
 
 
 # COMMAND ----------
@@ -213,6 +217,7 @@ import json
 # MAGIC     .where(F.col("doc_class") == "vendor_invoice")
 # MAGIC     .withColumn("extracted", F.expr(f"ai_extract(parsed_text, '{json.dumps(schema)}', map('version','2.0'))"))
 # MAGIC     .selectExpr("path", "filename", "doc_class",
+# MAGIC                 "extracted:error_message::string AS extract_error",  # null on success
 # MAGIC                 "extracted:response:invoice_number::string AS invoice_number",
 # MAGIC                 "extracted:response:total_amount::double AS total_amount",
 # MAGIC                 "extracted:response:line_items AS line_items")  # nested stays VARIANT
@@ -221,7 +226,8 @@ import json
 # MAGIC ```
 # MAGIC
 # MAGIC The gated `solutions/finance/02_silver_docs.py` has all five Finance
-# MAGIC schemas and a loop that writes a table for every class.
+# MAGIC schemas, an `instructions` option for the contract's formats, and a loop
+# MAGIC that writes a table (with `extract_error`) for every class.
 # MAGIC </details>
 
 # COMMAND ----------

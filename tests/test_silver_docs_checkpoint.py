@@ -1,40 +1,37 @@
 """Tests for the 02_silver_docs checkpoint, off-platform via a fake Spark session.
 
-The checkpoint asserts externally-observable state only: the consolidated
-``silver_docs`` table (row count == shipped documents, every row has parsed text
-and a valid predicted class) and one ``silver_<class>`` extraction table per
-shipped class whose row counts sum to the shipped document count. Expected
-classes and count are derived from the committed ``data/<domain>/documents``
-tree, never hardcoded. The fake below answers exactly the three query shapes the
-checkpoint issues (the ``silver_docs`` integrity aggregate, the DISTINCT-class
-probe, and each per-class ``count(*)``) and records nothing else.
+The checkpoint asserts externally-observable state only: ``silver_docs`` covers
+the shipped document *identity set* exactly (one row per ``<class>/<filename>``,
+non-blank parsed text, valid predicted class) and one ``silver_<class>`` table
+per class extracts every document once with no ``ai_extract`` errors.
+
+Behavioral tests inject the expected shape by **mocking the source-discovery
+seam** (``_source_doc_keys``) or via the ``expected_doc_keys`` override, so they
+never depend on which PDFs a domain happens to ship in the repo today — when #13
+adds Security documents, none of these tests change. One test exercises the real
+discovery function against this ticket's committed Finance tree, and one uses a
+temp tree to pin the non-recursive globbing.
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
+
+import pytest
 
 import workshop
+from workshop.checkpoints import silver_docs as mod
 from workshop.checkpoints.silver_docs import (
     SILVER_DOCS_CHECKPOINT_ID,
-    _source_class_counts,
-    silver_class_table,
+    _source_doc_keys,
 )
 
-# The committed Finance source ships these five classes, five PDFs each.
-FINANCE_CLASSES = {
-    "vendor_invoice",
-    "purchase_order",
-    "sales_contract_pricing_agreement",
-    "quarterly_financial_statement",
-    "other",
-}
-FINANCE_EXPECTED_DOCS = 25
+# A small, domain-neutral mocked source tree: two classes, three documents.
+MOCK_KEYS = {"alpha/a1.pdf", "alpha/a2.pdf", "beta/b1.pdf"}
 
 
 class _Row:
-    """Positional row: ``row[i]`` returns the i-th configured value."""
-
     def __init__(self, values: list) -> None:
         self._values = values
 
@@ -51,85 +48,92 @@ class _DF:
 
 
 class FakeSpark:
-    """Answers the three query shapes the checkpoint issues.
-
-    Test identifiers carry no backticks, so stripping backticks recovers the
-    fully-qualified table names the checkpoint built.
+    """Answers the four query shapes the checkpoint issues, from configured state.
 
     Args:
-        total/blank_text/null_class: the ``silver_docs`` integrity aggregate.
-        distinct_classes: the DISTINCT predicted-class values in ``silver_docs``.
-        per_class_rows: row count for each per-class ``silver_<class>`` table;
-            a class absent from this map models a missing table (query raises).
-        docs_table_missing: model ``silver_docs`` itself being absent.
+        observed_keys: distinct ``source_class/filename`` identities in silver_docs.
+        total/blank_text/null_class/distinct_keys: the silver_docs integrity
+            aggregate (default consistent with ``observed_keys``).
+        predicted_classes: distinct ``doc_class`` values (default = key prefixes).
+        per_class: ``{table_name: (row_count, error_count, distinct_paths)}``; a
+            class whose table is absent models a missing table (query raises).
+        docs_missing: model ``silver_docs`` itself being absent.
     """
 
     def __init__(
         self,
         *,
-        total: int = FINANCE_EXPECTED_DOCS,
+        observed_keys: set[str] | None = None,
+        total: int | None = None,
         blank_text: int = 0,
         null_class: int = 0,
-        distinct_classes: set[str] | None = None,
-        per_class_rows: dict[str, int] | None = None,
-        docs_table_missing: bool = False,
+        distinct_keys: int | None = None,
+        predicted_classes: set[str] | None = None,
+        per_class: dict[str, tuple[int, int, int]] | None = None,
+        docs_missing: bool = False,
     ) -> None:
-        self.total = total
+        self.observed_keys = set(observed_keys) if observed_keys is not None else set()
+        self.total = total if total is not None else len(self.observed_keys)
         self.blank_text = blank_text
         self.null_class = null_class
-        self.distinct_classes = (
-            distinct_classes if distinct_classes is not None else set(FINANCE_CLASSES)
+        self.distinct_keys = (
+            distinct_keys if distinct_keys is not None else len(self.observed_keys)
         )
-        self.per_class_rows = per_class_rows or {}
-        self.docs_table_missing = docs_table_missing
+        self.predicted_classes = (
+            set(predicted_classes)
+            if predicted_classes is not None
+            else {k.split("/", 1)[0] for k in self.observed_keys}
+        )
+        self.per_class = per_class or {}
+        self.docs_missing = docs_missing
         self.queries: list[str] = []
 
     def sql(self, query: str) -> _DF:
         self.queries.append(query)
         q = " ".join(query.replace("`", "").split())
-        lowered = q.lower()
+        ql = q.lower()
 
-        # silver_docs integrity aggregate: count(*), count_if(...text...), count_if(...class...)
-        if "count_if" in lowered and lowered.startswith("select count(*)"):
-            if self.docs_table_missing:
+        if ql.startswith("select distinct concat_ws"):  # observed identity set
+            return _DF([_Row([k]) for k in sorted(self.observed_keys)])
+        if ql.startswith("select distinct"):  # predicted classes
+            return _DF([_Row([c]) for c in sorted(self.predicted_classes)])
+        if "as total" in ql:  # silver_docs integrity aggregate
+            if self.docs_missing:
                 raise RuntimeError("TABLE_OR_VIEW_NOT_FOUND: silver_docs")
-            return _DF([_Row([self.total, self.blank_text, self.null_class])])
-
-        # DISTINCT predicted classes.
-        if lowered.startswith("select distinct"):
-            return _DF([_Row([c]) for c in sorted(self.distinct_classes)])
-
-        # Per-class count(*) FROM <...silver_class>.
-        if lowered.startswith("select count(*) from "):
-            table = q[len("SELECT count(*) FROM ") :].strip()
-            cls = table.split(".")[-1]  # silver_<class>
-            if cls not in self.per_class_rows:
+            return _DF([_Row([self.total, self.blank_text, self.null_class, self.distinct_keys])])
+        if "distinct_paths" in ql:  # per-class extraction aggregate
+            table = q.rsplit(" FROM ", 1)[-1].strip()
+            cls_table = table.split(".")[-1]
+            if cls_table not in self.per_class:
                 raise RuntimeError(f"TABLE_OR_VIEW_NOT_FOUND: {table}")
-            return _DF([_Row([self.per_class_rows[cls]])])
+            n, errs, distinct_paths = self.per_class[cls_table]
+            return _DF([_Row([n, errs, distinct_paths])])
 
         raise AssertionError(f"unexpected SQL: {query!r}")
+
+
+def _healthy(keys: set[str], *, prefix: str = "silver_") -> FakeSpark:
+    """A FakeSpark whose state exactly satisfies the checkpoint for ``keys``."""
+    by_class = Counter(k.split("/", 1)[0] for k in keys)
+    per_class = {f"{prefix}{c}": (n, 0, n) for c, n in by_class.items()}
+    return FakeSpark(observed_keys=set(keys), per_class=per_class)
+
+
+@pytest.fixture
+def mock_source(monkeypatch):
+    """Patch the source-discovery seam to return a controlled identity set."""
+
+    def _set(keys):
+        monkeypatch.setattr(mod, "_source_doc_keys", lambda domain: keys)
+
+    return _set
 
 
 def _check(spark, **kwargs):
     return workshop.check(SILVER_DOCS_CHECKPOINT_ID, spark=spark, **kwargs)
 
 
-def _all_class_tables(counts: dict[str, int]) -> dict[str, int]:
-    """Map each ``silver_<class>`` table name to a per-class row count."""
-    return {silver_class_table(cls): n for cls, n in counts.items()}
-
-
-# A well-formed Finance silver layer: 5 docs per class, tables named silver_<class>.
-_FINANCE_PER_CLASS = _all_class_tables(dict.fromkeys(FINANCE_CLASSES, 5))
-
-
-def test_finance_source_shape():
-    # Anchors the domain-derived expectations to the committed tree, grounding
-    # the rest of the Finance tests (25 docs across the five classes).
-    counts = _source_class_counts("finance")
-    assert counts is not None
-    assert {c for c, n in counts.items() if n > 0} == FINANCE_CLASSES
-    assert sum(counts.values()) == FINANCE_EXPECTED_DOCS
+# --- framework wiring -------------------------------------------------------
 
 
 def test_registered():
@@ -142,155 +146,259 @@ def test_requires_a_workspace():
     assert "needs a Databricks workspace" in result.message
 
 
-def test_missing_catalog_or_schema_args():
-    result = _check(FakeSpark(), catalog=None, schema=None, domain="finance")
+def test_missing_catalog_or_schema_args(mock_source):
+    mock_source(MOCK_KEYS)
+    result = _check(FakeSpark(), catalog=None, schema=None, domain="demo")
     assert result.passed is False
     assert "No catalog/schema to check" in result.message
 
 
 def test_missing_domain_and_no_override():
-    result = _check(FakeSpark(), catalog="c", schema="finance")
+    result = _check(FakeSpark(), catalog="c", schema="s")
     assert result.passed is False
     assert result.details["stage"] == "expected"
     assert "domain=config.domain" in result.message
 
 
-def test_no_committed_source_docs_for_empty_domain():
-    # security/itsm ship empty data/<domain>/documents placeholders today (their
-    # PDFs land in #13/#14). The checkpoint refuses to validate against zero
-    # shipped docs rather than passing on nothing.
-    result = _check(FakeSpark(), catalog="c", schema="security", domain="security")
+def test_source_seam_returns_none(mock_source):
+    # Repo root / source tree not locatable -> distinct "cannot locate" failure.
+    mock_source(None)
+    result = _check(FakeSpark(), catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "expected"
+    assert "Could not locate" in result.message
+
+
+def test_empty_source_tree(mock_source):
+    # A domain that ships no documents yet (e.g. Security/ITSM before #13/#14):
+    # refuse to validate against nothing rather than pass on zero docs.
+    mock_source(set())
+    result = _check(FakeSpark(), catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "expected"
     assert result.details["expected_docs"] == 0
     assert "No committed source PDFs found" in result.message
 
 
-def test_silver_docs_missing_is_targeted():
-    spark = FakeSpark(docs_table_missing=True)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+# --- silver_docs integrity / identity ---------------------------------------
+
+
+def test_silver_docs_missing_is_targeted(mock_source):
+    mock_source(MOCK_KEYS)
+    result = _check(FakeSpark(docs_missing=True), catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "silver_docs"
     assert "missing or unreadable" in result.message
     assert result.details["error_type"] == "RuntimeError"
 
 
-def test_silver_docs_wrong_row_count():
-    spark = FakeSpark(total=FINANCE_EXPECTED_DOCS - 1)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_blank_parsed_text_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.blank_text = 1
+    result = _check(spark, catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "silver_docs"
-    assert result.details["row_count"] == FINANCE_EXPECTED_DOCS - 1
-    assert result.details["expected_docs"] == FINANCE_EXPECTED_DOCS
+    assert result.details["blank_text"] == 1
+    assert "blank parsed text" in result.message
 
 
-def test_blank_parsed_text_fails():
-    spark = FakeSpark(blank_text=2)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_integrity_query_uses_trim(mock_source):
+    # Blocking #3: whitespace-only text must fail, so the predicate must trim.
+    # Assert the issued SQL actually trims (the live test proves the behavior on
+    # a real "   " row); count_if(... trim(text) = '' ...) feeds blank_text.
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    _check(spark, catalog="c", schema="s", domain="demo")
+    integrity_q = next(q for q in spark.queries if "AS total" in q)
+    assert "trim(" in integrity_q.lower()
+
+
+def test_null_class_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.null_class = 2
+    result = _check(spark, catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "silver_docs"
-    assert result.details["blank_text"] == 2
-    assert "no parsed text" in result.message
-
-
-def test_null_class_fails():
-    spark = FakeSpark(null_class=3)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
-    assert result.passed is False
-    assert result.details["stage"] == "silver_docs"
-    assert result.details["null_class"] == 3
+    assert result.details["null_class"] == 2
     assert "no predicted class" in result.message
 
 
-def test_unexpected_class_label_fails():
-    spark = FakeSpark(distinct_classes=FINANCE_CLASSES | {"hallucinated_class"})
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_duplicate_document_fails(mock_source):
+    # Blocking #2: a missing doc + a duplicate doc keeps TOTAL correct but must
+    # still fail. Here alpha/a1 is duplicated and alpha/a2 is missing: total=3
+    # but only 2 distinct identities.
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.observed_keys = {"alpha/a1.pdf", "beta/b1.pdf"}  # a2 missing, a1 duped
+    spark.total = 3
+    spark.distinct_keys = 2
+    result = _check(spark, catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "silver_docs"
-    assert "hallucinated_class" in result.details["unexpected_classes"]
+    assert result.details["row_count"] == 3
+    assert result.details["distinct_keys"] == 2
+    assert "duplicate" in result.message
 
 
-def test_missing_per_class_table_fails():
-    # Drop one class's extraction table; the rest are present.
-    per_class = dict(_FINANCE_PER_CLASS)
-    del per_class[silver_class_table("other")]
-    spark = FakeSpark(per_class_rows=per_class)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_missing_document_fails(mock_source):
+    # A document simply absent (no duplicate): total/distinct agree but the
+    # observed identity set != expected.
+    mock_source(MOCK_KEYS)
+    spark = FakeSpark(
+        observed_keys={"alpha/a1.pdf", "beta/b1.pdf"},  # alpha/a2 missing
+        per_class={"silver_alpha": (1, 0, 1), "silver_beta": (1, 0, 1)},
+    )
+    result = _check(spark, catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "silver_docs"
+    assert "alpha/a2.pdf" in result.details["missing"]
+    assert result.details["expected_docs"] == 3
+
+
+def test_unexpected_document_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.observed_keys = MOCK_KEYS | {"gamma/g1.pdf"}
+    spark.total = 4
+    spark.distinct_keys = 4
+    result = _check(spark, catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "silver_docs"
+    assert "gamma/g1.pdf" in result.details["unexpected"]
+
+
+def test_unexpected_class_label_fails(mock_source):
+    # Identity is fine, but ai_classify produced a label off the fixed set.
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.predicted_classes = {"alpha", "beta", "hallucinated"}
+    result = _check(spark, catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "silver_docs"
+    assert "hallucinated" in result.details["unexpected_classes"]
+
+
+# --- per-class extraction ----------------------------------------------------
+
+
+def test_missing_per_class_table_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    del spark.per_class["silver_beta"]
+    result = _check(spark, catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "extract"
-    assert silver_class_table("other") in result.details["missing_tables"]
+    assert "silver_beta" in result.details["missing_tables"]
 
 
-def test_per_class_row_total_mismatch_fails():
-    # All tables present, but one is short a row -> total 24, expected 25.
-    per_class = dict(_FINANCE_PER_CLASS)
-    per_class[silver_class_table("other")] = 4
-    spark = FakeSpark(per_class_rows=per_class)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_extraction_error_fails(mock_source):
+    # Blocking #1: row count is correct, but a row carries a non-null
+    # extract_error (ai_extract failed) -> must NOT pass.
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.per_class["silver_alpha"] = (2, 1, 2)  # 2 rows, 1 with an error
+    result = _check(spark, catalog="c", schema="s", domain="demo")
     assert result.passed is False
     assert result.details["stage"] == "extract"
-    assert result.details["per_class_total"] == FINANCE_EXPECTED_DOCS - 1
-    assert result.details["expected_docs"] == FINANCE_EXPECTED_DOCS
+    assert result.details["extract_errors"] == 1
+    assert "extraction error" in result.message.lower() or "non-null" in result.message
 
 
-def test_green_when_parsed_classified_and_extracted():
-    spark = FakeSpark(per_class_rows=_FINANCE_PER_CLASS)
-    result = _check(spark, catalog="c", schema="finance", domain="finance")
+def test_per_class_duplicate_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.per_class["silver_alpha"] = (2, 0, 1)  # 2 rows, 1 distinct path
+    result = _check(spark, catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "extract"
+    assert "duplicate" in result.message
+
+
+def test_per_class_row_total_mismatch_fails(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    spark.per_class["silver_beta"] = (0, 0, 0)  # beta lost its row -> total 2, want 3
+    result = _check(spark, catalog="c", schema="s", domain="demo")
+    assert result.passed is False
+    assert result.details["stage"] == "extract"
+    assert result.details["per_class_total"] == 2
+    assert result.details["expected_docs"] == 3
+
+
+# --- green paths -------------------------------------------------------------
+
+
+def test_green_when_parsed_classified_and_extracted(mock_source):
+    mock_source(MOCK_KEYS)
+    result = _check(_healthy(MOCK_KEYS), catalog="c", schema="s", domain="demo")
     assert result.passed is True
     assert result.details["stage"] == "done"
-    assert result.details["row_count"] == FINANCE_EXPECTED_DOCS
-    assert sorted(result.details["expected_classes"]) == sorted(FINANCE_CLASSES)
-    assert sum(result.details["per_class_counts"].values()) == FINANCE_EXPECTED_DOCS
+    assert result.details["expected_docs"] == 3
+    assert sorted(result.details["expected_classes"]) == ["alpha", "beta"]
+    assert sum(result.details["per_class_counts"].values()) == 3
 
 
-def test_green_quotes_identifiers():
-    # Catalog/schema with a hyphen and a space must be backtick-quoted in every
-    # query the checkpoint issues.
-    spark = FakeSpark(per_class_rows=_FINANCE_PER_CLASS)
-    result = _check(
-        spark, catalog="team-catalog", schema="finance data", domain="finance"
-    )
+def test_green_quotes_identifiers(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS)
+    result = _check(spark, catalog="team-catalog", schema="finance data", domain="demo")
     assert result.passed is True
-    docs_query = next(q for q in spark.queries if "count_if" in q)
-    assert "`team-catalog`.`finance data`.`silver_docs`" in docs_query
-    # Every per-class table is fully backtick-quoted too.
-    per_class_queries = [
-        q for q in spark.queries if q.strip().lower().startswith("select count(*) from")
-    ]
+    integrity_q = next(q for q in spark.queries if "AS total" in q)
+    assert "`team-catalog`.`finance data`.`silver_docs`" in integrity_q
+    per_class_queries = [q for q in spark.queries if "distinct_paths" in q]
     assert per_class_queries
     for q in per_class_queries:
         assert re.search(r"`team-catalog`\.`finance data`\.`silver_[a-z_]+`", q)
 
 
-def test_expected_overrides_bypass_source_and_domain():
-    # The documented fallback: explicit classes + count, no domain needed.
-    per_class = _all_class_tables({"a": 2, "b": 1})
-    spark = FakeSpark(
-        total=3,
-        distinct_classes={"a", "b"},
-        per_class_rows=per_class,
-    )
-    result = _check(
-        spark,
-        catalog="c",
-        schema="finance",
-        expected_classes=["a", "b"],
-        expected_docs=3,
-    )
+def test_expected_doc_keys_override_bypasses_domain():
+    # The documented fallback: explicit identity set, no domain / filesystem.
+    keys = {"x/one.pdf", "x/two.pdf", "y/three.pdf"}
+    result = _check(_healthy(keys), catalog="c", schema="s", expected_doc_keys=keys)
     assert result.passed is True
-    assert result.details["row_count"] == 3
-    assert sorted(result.details["expected_classes"]) == ["a", "b"]
+    assert result.details["expected_docs"] == 3
+    assert sorted(result.details["expected_classes"]) == ["x", "y"]
 
 
-def test_custom_class_table_prefix_extra():
-    per_class = {f"slv_{cls}": 5 for cls in FINANCE_CLASSES}
-    spark = FakeSpark(per_class_rows=per_class)
+def test_custom_class_table_prefix_extra(mock_source):
+    mock_source(MOCK_KEYS)
+    spark = _healthy(MOCK_KEYS, prefix="slv_")
     result = _check(
-        spark,
-        catalog="c",
-        schema="finance",
-        domain="finance",
-        class_table_prefix="slv_",
+        spark, catalog="c", schema="s", domain="demo", class_table_prefix="slv_"
     )
     assert result.passed is True
     assert result.details["stage"] == "done"
+
+
+# --- source discovery (real committed data + non-recursive globbing) ---------
+
+
+def test_source_discovery_reads_committed_finance_tree():
+    # This ticket ships the Finance tree; anchor the discovery seam to it. Stable
+    # regardless of future domains (Security/ITSM live under their own folders).
+    keys = _source_doc_keys("finance")
+    assert keys is not None
+    classes = {k.split("/", 1)[0] for k in keys}
+    assert classes == {
+        "vendor_invoice",
+        "purchase_order",
+        "sales_contract_pricing_agreement",
+        "quarterly_financial_statement",
+        "other",
+    }
+    assert len(keys) == 25
+    assert "vendor_invoice/vendor_invoice_01.pdf" in keys
+
+
+def test_source_discovery_is_nonrecursive(tmp_path, monkeypatch):
+    # Fold-in #5: only direct <class>/*.pdf count; a nested PDF must be ignored.
+    docs = tmp_path / "data" / "demo" / "documents"
+    (docs / "alpha").mkdir(parents=True)
+    (docs / "alpha" / "a1.pdf").write_bytes(b"%PDF-1.4")
+    (docs / "alpha" / "nested").mkdir()
+    (docs / "alpha" / "nested" / "buried.pdf").write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(mod, "find_repo_root", lambda start=None: str(tmp_path))
+    keys = _source_doc_keys("demo")
+    assert keys == {"alpha/a1.pdf"}  # buried.pdf under nested/ is excluded

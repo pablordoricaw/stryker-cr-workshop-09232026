@@ -114,7 +114,9 @@ parsed = (
     .drop("parse_error")
 )
 
-print(f"Parsed {parsed.count()} documents from {bronze_docs}")
+# `parsed` is lazy — we deliberately do NOT force it here. ai_parse_document is a
+# billed LLM call, so we let parsing run exactly once, when silver_docs is
+# written below, and read counts back from the persisted table afterward.
 
 # COMMAND ----------
 
@@ -162,7 +164,9 @@ silver = (
 )
 
 silver.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_docs)
-print(f"Registered {silver_docs}")
+# Count the PERSISTED table (cheap Delta metadata) — this does not re-run parse
+# or classify, which already ran once during the write above.
+print(f"Registered {silver_docs} ({spark.table(silver_docs).count()} rows)")
 
 # COMMAND ----------
 
@@ -190,10 +194,15 @@ display(
 # MAGIC `ai_extract` schema (the extraction-field contract in
 # MAGIC `data/finance/README.md`) and write one `silver_<class>` table per class.
 # MAGIC Scalar fields are cast to their contract types; nested `line_items` /
-# MAGIC `covered_products` stay as VARIANT. Dates are ISO strings, money is a
-# MAGIC numeric USD amount, and rates are decimals. We create a table for **every**
-# MAGIC class — even one with zero classified documents — so the silver schema is
-# MAGIC complete and stable.
+# MAGIC `covered_products` stay as VARIANT. An `instructions` option keeps dates
+# MAGIC ISO `YYYY-MM-DD`, money numeric USD, and rates decimal. We create a table
+# MAGIC for **every** class — even one with zero classified documents — so the
+# MAGIC silver schema is complete and stable.
+# MAGIC
+# MAGIC We also persist `ai_extract`'s `error_message` as an **`extract_error`**
+# MAGIC column (null on success). The `02_silver_docs` checkpoint fails if any row
+# MAGIC carries a non-null `extract_error`, so a silently-failed extraction that
+# MAGIC still wrote a row cannot pass as done.
 
 # COMMAND ----------
 
@@ -318,6 +327,14 @@ def extract_projection(schema: dict) -> list[str]:
 
 # COMMAND ----------
 
+# Guide the model on the contract's formats — cheap, and it keeps dates ISO and
+# money/rates numeric. Escaped for embedding in the SQL expression below.
+EXTRACT_INSTRUCTIONS = (
+    "Dates as ISO YYYY-MM-DD. Monetary amounts as numeric USD (no symbols or "
+    "commas). Rates as decimals (0.18 for 18%). Leave a field null if absent; "
+    "do not infer it from another document class."
+).replace("'", "''")
+
 for cls, schema in EXTRACTION_SCHEMAS.items():
     schema_json = json.dumps(schema)
     extracted = (
@@ -325,13 +342,28 @@ for cls, schema in EXTRACTION_SCHEMAS.items():
         .where(F.col("doc_class") == cls)
         .withColumn(
             "extracted",
-            F.expr(f"ai_extract(parsed_text, '{schema_json}', map('version', '2.0'))"),
+            F.expr(
+                f"ai_extract(parsed_text, '{schema_json}', "
+                f"map('version', '2.0', 'instructions', '{EXTRACT_INSTRUCTIONS}'))"
+            ),
         )
-        .selectExpr("path", "filename", "doc_class", *extract_projection(schema))
+        # Preserve ai_extract's error_message: a failed extraction is null on a
+        # clean run and a JSON payload on failure. The 02_silver_docs checkpoint
+        # fails if any row carries a non-null extract_error, so a silently-failed
+        # (all-null) extraction cannot pass as "extracted".
+        .selectExpr(
+            "path",
+            "filename",
+            "doc_class",
+            "extracted:error_message::string AS extract_error",
+            *extract_projection(schema),
+        )
     )
     target = silver_class_table(cls)
     extracted.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(target)
-    print(f"Registered {target} ({extracted.count()} row(s))")
+    # Count the PERSISTED table so ai_extract runs exactly once (not again for a
+    # separate .count() on the lazy DataFrame).
+    print(f"Registered {target} ({spark.table(target).count()} row(s))")
 
 # COMMAND ----------
 
