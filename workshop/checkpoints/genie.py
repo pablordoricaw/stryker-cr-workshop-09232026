@@ -482,7 +482,9 @@ def _under(parent_path: str | None, owner_path: str) -> bool:
     return bool(owner) and (parent == owner or parent.startswith(owner + "/"))
 
 
-def _locate_space(client: Any, ctx: CheckContext, agent_name: str) -> GenieSpace | CheckResult:
+def _locate_space(
+    client: Any, ctx: CheckContext, agent_name: str, owner_path: str | None
+) -> GenieSpace | CheckResult:
     """Resolve the caller's OWN agent — never adopt another participant's.
 
     Identity is the per-participant ``agent_name`` (identity-derived, so two
@@ -494,11 +496,10 @@ def _locate_space(client: Any, ctx: CheckContext, agent_name: str) -> GenieSpace
     of owned same-title agents is rejected rather than picked arbitrarily.
 
     ``owner_path`` is optional for backward compatibility, but callers should
-    always pass it in a shared workspace. When #22's namespacing helper lands it
-    can supply the same value without changing this interface.
+    always pass it in a shared workspace. #22's namespacing helper supplies both
+    ``agent_name`` and ``owner_path`` from one identity (see ``check_genie``).
     """
     agent = agent_name.strip()
-    owner_path = ctx.extras.get("owner_path")
     explicit_id = ctx.extras.get("genie_space_id")
 
     if explicit_id:
@@ -586,14 +587,26 @@ def check_genie(ctx: CheckContext) -> CheckResult:
             {"catalog": ctx.catalog, "schema": ctx.schema},
         )
 
+    # Resolve the per-participant namespace once (see workshop.namespace). When a
+    # namespace is supplied the agent name and owner_path are derived from it, so
+    # the check resolves the SAME name the notebook created; an explicit
+    # agent_name/owner_path still wins for a custom setup. Passing a namespace is
+    # what makes a fixed/shared name impossible — the name is identity-derived.
+    ns = ctx.extras.get("namespace")
     agent_name = ctx.extras.get("agent_name")
+    if (not isinstance(agent_name, str) or not agent_name.strip()) and ns is not None:
+        agent_name = ns.genie_agent_name()
     if not isinstance(agent_name, str) or not agent_name.strip():
         return _fail(
             "No agent_name given. A Genie Agent is workspace-scoped and shared "
-            "across a team, so pass your per-participant agent name: "
-            "workshop.check('06_genie', ..., agent_name=your_agent_name).",
+            "across a team, so pass your per-participant agent name (or a "
+            "namespace to derive it): workshop.check('06_genie', ..., "
+            "agent_name=your_agent_name)  # or namespace=ns.",
             {"stage": "configuration", "reason": "missing_agent_name"},
         )
+    owner_path = ctx.extras.get("owner_path")
+    if not owner_path and ns is not None:
+        owner_path = ns.owner_path()
 
     try:
         expected = _expected_sources(ctx)
@@ -617,7 +630,7 @@ def check_genie(ctx: CheckContext) -> CheckResult:
             {"stage": "client", "error_type": type(exc).__name__},
         )
 
-    located = _locate_space(client, ctx, agent_name)
+    located = _locate_space(client, ctx, agent_name, owner_path)
     if isinstance(located, CheckResult):
         return located
     space = located

@@ -60,35 +60,43 @@ import workshop
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+
+# Your identity resolves the SAME per-participant schema 00_setup created, and
+# your namespace — the one source of truth for every unique name in the shared
+# workspace (schema, Genie agent, app, Lakebase project, synced table).
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,
 )
+
+ns = workshop.namespace(me, domain=config.domain)
 
 # The gold serving table synced into Lakebase (one denormalized table).
 gold_serving = workshop.fully_qualified(
     config.catalog, config.schema, "gold_contract_performance"
 )
 
-me = spark.sql("SELECT current_user()").collect()[0][0]
-suffix = "".join(c if c.isalnum() else "-" for c in me.split("@")[0]).strip("-").lower()
-
-# Per-participant identifiers (App names allow [a-z0-9-]; Lakebase ids are RFC 1123).
-app_name = f"stryker-{config.domain}-{suffix}"[:30].rstrip("-")
-project_id = f"lb-{config.domain}-{suffix}"[:63].rstrip("-")
+# Per-participant identifiers, all derived from your namespace so the checkpoint
+# resolves the SAME names (pass namespace=ns). App names allow [a-z0-9-] (<=30);
+# Lakebase project ids are RFC 1123 (<=63); the digest is always kept, so
+# uniqueness survives the length limits.
+app_name = ns.app_name()
+project_id = ns.lakebase_project()
 branch = f"projects/{project_id}/branches/production"
 
 # The synced table lands in YOUR existing catalog + schema — no catalog is
 # created. Its Unity Catalog id (`<catalog>.<schema>.<table>`) doubles as a
 # Postgres table `<table>` in schema `<schema>`, so the app reads
 # `<schema>.<table>` from Postgres directly — no Lakebase catalog to register.
-target_table = f"gold_contract_performance_served_{suffix.replace('-', '_')}"
-synced_table = f"{config.catalog}.{config.schema}.{target_table}"
+synced_table = ns.synced_table_fqn(config.catalog, config.schema)
+target_table = ns.synced_table_name()
 serving_table = f"{config.schema}.{target_table}"  # the app's SERVING_TABLE (Postgres name)
 
 print(f"Signed in as    : {me}")
@@ -236,9 +244,10 @@ print(f"Gold source     : {gold_serving}")
 # MAGIC **owned by you**, and **running**. It fails (RED) if the synced table is
 # MAGIC missing/someone else's/stale/empty or the app is missing/someone else's/stopped.
 # MAGIC
-# MAGIC `owner=me` binds both resources to you (no adopting a teammate's). The Lakebase
-# MAGIC connection hints let the check read the served-row count — serving is verified
-# MAGIC fail-closed, so an unverifiable/empty synced table stays RED.
+# MAGIC `namespace=ns` binds both resources to you — it derives your app name,
+# MAGIC synced-table name, and owner from your identity (no adopting a teammate's).
+# MAGIC The Lakebase connection hints let the check read the served-row count —
+# MAGIC serving is verified fail-closed, so an unverifiable/empty synced table stays RED.
 
 # COMMAND ----------
 
@@ -254,9 +263,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     apps=w,
-    app_name=app_name,
-    synced_table=synced_table,
-    owner=me,  # required — binds the app AND synced table to YOU
+    namespace=ns,  # derives your app name, synced-table name, and owner (one source)
     lakebase_endpoint=lakebase_endpoint,  # so served rows can be verified
     lakebase_host=lakebase_host,
     lakebase_user=me,

@@ -41,14 +41,19 @@ import workshop
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+
+# Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
+# created in the shared team catalog. Leave the schema blank to use it.
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,
 )
 
 print("Your workshop environment:")

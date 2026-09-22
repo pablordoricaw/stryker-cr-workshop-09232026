@@ -556,29 +556,42 @@ def check_app(ctx: CheckContext) -> CheckResult:
             {"catalog": ctx.catalog, "schema": ctx.schema},
         )
 
+    # Resolve the per-participant namespace once (see workshop.namespace). When a
+    # namespace is supplied the app name, synced-table name, and owner are derived
+    # from it — the SAME values the notebook used to create them — so a fixed or
+    # shared name is impossible; explicit extras still win for a custom setup.
+    ns = ctx.extras.get("namespace")
     app_name = _required_name(ctx, "app_name")
+    if not app_name and ns is not None:
+        app_name = ns.app_name()
     if not app_name:
         return _fail(
             "No app_name given. A Databricks App is workspace-scoped and shared "
-            "across a team, so pass your per-participant app name: "
-            "workshop.check('07_app', ..., app_name=your_app_name).",
+            "across a team, so pass your per-participant app name (or a namespace "
+            "to derive it): workshop.check('07_app', ..., app_name=your_app_name)"
+            "  # or namespace=ns.",
             {"stage": "configuration", "reason": "missing_app_name"},
         )
     synced_table = _required_name(ctx, "synced_table")
+    if not synced_table and ns is not None:
+        synced_table = ns.synced_table_fqn(ctx.catalog, ctx.schema)
     if not synced_table:
         return _fail(
             "No synced_table given. A Lakebase synced table is workspace-scoped, "
             "so pass your per-participant synced-table name (the Unity Catalog "
-            "name): workshop.check('07_app', ..., synced_table=your_synced_table).",
+            "name), or a namespace to derive it: workshop.check('07_app', ..., "
+            "synced_table=your_synced_table)  # or namespace=ns.",
             {"stage": "configuration", "reason": "missing_synced_table"},
         )
     owner = _required_name(ctx, "owner")
+    if not owner and ns is not None:
+        owner = ns.owner
     if not owner:
         return _fail(
             "No owner given. The app and synced table are workspace-scoped and "
             "shared across a team, so this checkpoint must confirm they are YOUR "
-            "own — pass your identity: workshop.check('07_app', ..., "
-            "owner=spark.sql('SELECT current_user()').collect()[0][0]).",
+            "own — pass your identity (or a namespace): workshop.check('07_app', "
+            "..., owner=spark.sql('SELECT current_user()').collect()[0][0]).",
             {"stage": "configuration", "reason": "missing_owner"},
         )
 

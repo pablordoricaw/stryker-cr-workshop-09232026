@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import pytest
 
-from workshop import resolve_config
+from workshop import namespace, resolve_config
 from workshop.config import DEFAULT_VOLUME, DOMAINS
+from workshop.namespace import WORKSHOP_SCHEMA_PREFIX
 
 
 def test_defaults_with_a_catalog():
@@ -73,6 +74,41 @@ def test_suffix_is_appended_to_schema_and_sanitized():
     assert cfg.catalog == "my_catalog"
     assert cfg.schema == "finance_val_9f_2"
     assert cfg.volume == "landing"
+
+
+def test_identity_derives_namespaced_schema_when_no_explicit_schema():
+    # The whole team shares one catalog, so with an identity and no explicit
+    # schema, resolve_config derives the per-participant workshop_<...> schema.
+    cfg = resolve_config(catalog="team_cat", domain="finance", identity="ada@a.com")
+    assert cfg.schema.startswith(WORKSHOP_SCHEMA_PREFIX)
+    assert cfg.schema == namespace("ada@a.com", domain="finance").schema
+
+
+def test_two_identities_resolve_to_distinct_schemas_same_catalog():
+    # The two-participant no-collision criterion at the config level.
+    a = resolve_config(catalog="team_cat", domain="finance", identity="ada@a.com")
+    b = resolve_config(catalog="team_cat", domain="finance", identity="grace@b.com")
+    assert a.catalog == b.catalog
+    assert a.schema != b.schema
+
+
+def test_explicit_schema_overrides_identity():
+    cfg = resolve_config(
+        catalog="team_cat", domain="finance", schema="chosen", identity="ada@a.com"
+    )
+    assert cfg.schema == "chosen"
+
+
+def test_no_identity_keeps_domain_default():
+    # Off-platform callers (and the pre-namespacing default) resolve the domain.
+    assert resolve_config(catalog="c", domain="security").schema == "security"
+
+
+def test_identity_schema_still_accepts_isolation_suffix():
+    cfg = resolve_config(
+        catalog="c", domain="finance", identity="ada@a.com", suffix="run9"
+    )
+    assert cfg.schema == namespace("ada@a.com", domain="finance").schema + "_run9"
 
 
 def test_quoted_helpers_and_volume_path():

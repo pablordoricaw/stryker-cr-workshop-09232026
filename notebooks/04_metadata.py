@@ -78,17 +78,22 @@ import workshop
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("model_endpoint", "databricks-claude-sonnet-4-6", "FM endpoint")
 dbutils.widgets.text("domain_tag_name", "domain", "Domain tag key")
 dbutils.widgets.text("pi_classification_tag_name", "data_classification", "PI tag key")
+
+# Your identity gives you a unique schema in the shared team catalog
+# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,
 )
 model_endpoint = dbutils.widgets.get("model_endpoint") or "databricks-claude-sonnet-4-6"
 domain_tag_name = dbutils.widgets.get("domain_tag_name") or "domain"

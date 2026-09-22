@@ -33,16 +33,24 @@ import workshop
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("warehouse_id", "", "SQL warehouse id (blank = auto-detect)")
+
+# Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
+# created, and your namespace — the one source of truth for every unique name in
+# the shared workspace (here, your Genie agent title).
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,
 )
+
+ns = workshop.namespace(me, domain=config.domain)
 
 gold_sales = f"{config.catalog}.{config.schema}.gold_sales"
 gold_contracts = f"{config.catalog}.{config.schema}.gold_contract_performance"
@@ -59,9 +67,9 @@ contract_metrics = f"{config.catalog}.{config.schema}.finance_contract_metrics"
 
 # COMMAND ----------
 
-me = spark.sql("SELECT current_user()").collect()[0][0]
-suffix = "".join(c if c.isalnum() else "_" for c in me.split("@")[0]).strip("_").lower()
-agent_name = f"workshop_genie_{config.domain}_{suffix}"
+# The agent title comes from your namespace, so it is unique per participant and
+# the checkpoint (below, via namespace=ns) resolves the exact same name.
+agent_name = ns.genie_agent_name()
 print(f"Agent name: {agent_name}")
 print(f"Signed in as: {me}")
 
@@ -180,7 +188,7 @@ if not warehouse_id:
         "warehouse_id widget."
     )
 
-home = f"/Workspace/Users/{me}"  # your own workspace namespace
+home = ns.owner_path()  # your own workspace namespace (/Workspace/Users/<me>)
 parent_path = f"{home}/genie_spaces"
 w.workspace.mkdirs(parent_path)
 
@@ -267,8 +275,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     genie=w,
-    agent_name=agent_name,
-    owner_path=home,  # bind the check to YOUR namespace, not just the title
+    namespace=ns,  # derives your agent title AND owner_path — one source of truth
     genie_space_id=space_id,
 )
 print(result)

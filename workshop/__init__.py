@@ -23,6 +23,12 @@ from .bootstrap import bootstrap, find_repo_root
 from .config import DOMAINS, WorkshopConfig, resolve_config
 from .context import CheckContext
 from .identifiers import fully_qualified, quote_identifier
+from .namespace import (
+    WORKSHOP_SCHEMA_PREFIX,
+    Namespace,
+    namespace,
+    sanitize_identity,
+)
 from .provisioning import ProvisionReport, provision
 from .registry import (
     Checkpoint,
@@ -88,6 +94,11 @@ __all__ = [
     "ProvisionReport",
     "quote_identifier",
     "fully_qualified",
+    # Per-participant namespacing (ticket #22)
+    "namespace",
+    "Namespace",
+    "sanitize_identity",
+    "WORKSHOP_SCHEMA_PREFIX",
     # Seed hooks (ticket #3; later data tickets extend)
     "run_seeds",
     "seed_hook",

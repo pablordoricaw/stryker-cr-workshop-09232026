@@ -414,3 +414,66 @@ def test_list_spaces_permission_error_is_red():
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "list_spaces"
+
+
+# --- namespace resolution (#22): the check resolves the caller's own name ---
+
+
+def _ns_space(ns, sources=None):
+    return {
+        "title": ns.genie_agent_name(),
+        "sources": _default_sources() if sources is None else sources,
+        "parent_path": f"{ns.owner_path()}/genie_spaces",
+    }
+
+
+def test_resolves_agent_and_owner_path_from_namespace():
+    # No explicit agent_name/owner_path: both are derived from the namespace, so
+    # the check resolves the SAME identity-derived name the notebook created.
+    ns = workshop.namespace("ada@a.com", domain="finance")
+    genie = FakeGenie(spaces={"sp-ns": _ns_space(ns)})
+    result = workshop.check(
+        GENIE_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, genie=genie, namespace=ns
+    )
+    assert result.passed is True
+    assert result.details["agent_name"] == ns.genie_agent_name()
+
+
+def test_namespace_resolves_callers_own_name_not_a_fixed_one():
+    # Two participants sharing the workspace derive distinct agent names, and each
+    # check resolves ITS caller's name — so B's check does not adopt A's agent.
+    ns_a = workshop.namespace("ada@a.com", domain="finance")
+    ns_b = workshop.namespace("grace@b.com", domain="finance")
+    assert ns_a.genie_agent_name() != ns_b.genie_agent_name()
+    genie = FakeGenie(spaces={"sp-a": _ns_space(ns_a)})  # only A's agent exists
+    result_a = workshop.check(
+        GENIE_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, genie=genie, namespace=ns_a
+    )
+    result_b = workshop.check(
+        GENIE_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, genie=genie, namespace=ns_b
+    )
+    assert result_a.passed is True
+    assert result_b.passed is False  # resolves B's own name; B's agent is absent
+    assert result_b.details["expected_title"] == ns_b.genie_agent_name()
+
+
+def test_namespace_owner_path_rejects_teammates_same_title():
+    # A same-title agent living under a teammate's path is not adopted, because
+    # the namespace supplies the caller's own owner_path.
+    ns = workshop.namespace("ada@a.com", domain="finance")
+    foreign = _ns_space(ns)
+    foreign["parent_path"] = f"{OTHER_OWNER}/genie_spaces"  # someone else's namespace
+    genie = FakeGenie(spaces={"sp-x": foreign})
+    result = workshop.check(
+        GENIE_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, genie=genie, namespace=ns
+    )
+    assert result.passed is False
+    assert result.details["stage"] == "ownership"
+
+
+def test_explicit_agent_name_overrides_namespace():
+    # A custom setup can still pass an explicit name; it wins over the namespace.
+    ns = workshop.namespace("someone-else@z.com", domain="finance")
+    result = _check(FakeGenie(), namespace=ns)  # _check sets agent_name=AGENT
+    assert result.passed is True
+    assert result.details["agent_name"] == AGENT

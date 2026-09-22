@@ -62,15 +62,23 @@ import workshop
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+
+# Your identity resolves the SAME per-participant schema 00_setup created, and
+# your namespace — the single source of truth for every unique name in the shared
+# workspace (your schema, and here your Genie agent name).
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,
 )
+
+ns = workshop.namespace(me, domain=config.domain)
 
 gold_sales = workshop.fully_qualified(config.catalog, config.schema, "gold_sales")
 gold_contracts = workshop.fully_qualified(
@@ -83,11 +91,9 @@ contract_metrics = workshop.fully_qualified(
     config.catalog, config.schema, "finance_contract_metrics"
 )
 
-# TODO: Build your per-participant agent name from your Databricks identity, so
-# TODO: it never collides with a teammate's. Something like:
-# TODO:   me = spark.sql("SELECT current_user()").collect()[0][0]
-# TODO:   suffix = "".join(c if c.isalnum() else "_" for c in me.split("@")[0]).strip("_").lower()
-# TODO:   agent_name = f"workshop_genie_{config.domain}_{suffix}"
+# TODO: Name your agent from your namespace, so it never collides with a
+# TODO: teammate's and the checkpoint resolves the exact same name:
+# TODO:   agent_name = ns.genie_agent_name()
 agent_name = None
 
 # COMMAND ----------
@@ -97,14 +103,14 @@ agent_name = None
 # MAGIC <summary>💡 Hint — a unique, identity-derived agent name</summary>
 # MAGIC
 # MAGIC ```python
-# MAGIC me = spark.sql("SELECT current_user()").collect()[0][0]        # you@company.com
-# MAGIC suffix = "".join(c if c.isalnum() else "_" for c in me.split("@")[0]).strip("_").lower()
-# MAGIC agent_name = f"workshop_genie_{config.domain}_{suffix}"
+# MAGIC agent_name = ns.genie_agent_name()   # workshop_genie_<domain>_<you>
 # MAGIC ```
 # MAGIC
-# MAGIC The checkpoint asserts **your own** agent by this exact name — there is no
-# MAGIC shared default. Two participants in the same workspace each pass with their
-# MAGIC own agent.
+# MAGIC `ns = workshop.namespace(me, domain=config.domain)` (built above) is the one
+# MAGIC source of truth: it derives your agent name from your identity, and the
+# MAGIC checkpoint resolves that **same** name (pass `namespace=ns`) — so generation
+# MAGIC and verification always agree. There is no shared default; two participants
+# MAGIC in the same workspace each pass with their own agent.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -201,8 +207,9 @@ agent_name = None
 # MAGIC by someone else (same title, different namespace), or answers with
 # MAGIC no/irrelevant SQL.
 # MAGIC
-# MAGIC `owner_path` binds the check to **your** workspace namespace so a teammate's
-# MAGIC same-titled agent is never adopted. The agent must actually answer, so if
+# MAGIC `namespace=ns` binds the check to **your** workspace namespace (deriving both
+# MAGIC your agent name and owner_path) so a teammate's same-titled agent is never
+# MAGIC adopted. The agent must actually answer, so if
 # MAGIC the Conversation API is gated the checkpoint stays **RED** — enable
 # MAGIC Partner-powered AI rather than skipping the answer check.
 
@@ -215,8 +222,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     genie=WorkspaceClient(),
-    agent_name=agent_name,
-    owner_path=f"/Workspace/Users/{me}",  # your namespace (me from step 1)
+    namespace=ns,  # derives your agent name AND owner_path (one source of truth)
     genie_space_id=space_id,  # optional; omit to resolve by name
 )
 print(result)

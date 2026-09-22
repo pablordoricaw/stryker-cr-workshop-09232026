@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .identifiers import fully_qualified, quote_identifier
+from .namespace import namespace as _namespace
 
 #: The domains the workshop ships. A participant picks one in the setup notebook.
 DOMAINS: tuple[str, ...] = ("finance", "security", "itsm")
@@ -89,6 +90,7 @@ def resolve_config(
     schema: str | None = None,
     volume: str | None = None,
     suffix: str | None = None,
+    identity: str | None = None,
 ) -> WorkshopConfig:
     """Resolve a :class:`WorkshopConfig`, applying defaults for anything omitted.
 
@@ -97,13 +99,21 @@ def resolve_config(
             workshop never creates a catalog; a blank/omitted value is an error.
         domain: ``finance`` (default), ``security``, or ``itsm``. Case- and
             whitespace-insensitive.
-        schema: Schema name; defaults to the resolved ``domain`` so one catalog
-            can hold all three domains side by side.
+        schema: Schema name. When given (non-blank) it wins — a participant can
+            override. When omitted, it defaults to the per-participant
+            identity-derived schema (``workshop_<suffix>``) if ``identity`` is
+            supplied, else to the resolved ``domain`` (the pre-namespacing
+            behavior, so off-platform callers with no identity still resolve).
         volume: Volume name; defaults to :data:`DEFAULT_VOLUME`.
         suffix: Optional token appended to the *schema* name (``<schema>_<suffix>``).
             For maintainer/validation isolation only — participants never set it.
             It suffixes the schema (not the catalog) because the catalog is a
             pre-existing shared resource.
+        identity: The caller's identity (``current_user()``). A whole team shares
+            one catalog, so when no explicit ``schema`` is given the schema is
+            derived from this identity via :func:`workshop.namespace` — unique
+            per participant, with a common ``workshop_`` prefix. Blank/omitted
+            keeps the domain default.
 
     Raises:
         ValueError: If ``catalog`` is blank, or ``domain`` is not in :data:`DOMAINS`.
@@ -122,9 +132,16 @@ def resolve_config(
             "it, and does not create the catalog itself."
         )
     resolved_catalog = catalog.strip()
-    # Strip *before* the fallback so a whitespace-only widget value ("   ") uses
-    # the default instead of collapsing to an empty identifier.
-    resolved_schema = schema.strip() if schema and schema.strip() else resolved_domain
+    # Schema precedence: an explicit (non-blank) schema always wins; otherwise a
+    # supplied identity gives the per-participant namespaced schema; otherwise
+    # the domain (the original default). Strip *before* the fallback so a
+    # whitespace-only widget value ("   ") uses a fallback, not an empty name.
+    if schema and schema.strip():
+        resolved_schema = schema.strip()
+    elif identity and identity.strip():
+        resolved_schema = _namespace(identity, domain=resolved_domain).schema
+    else:
+        resolved_schema = resolved_domain
     resolved_volume = volume.strip() if volume and volume.strip() else DEFAULT_VOLUME
 
     if suffix:

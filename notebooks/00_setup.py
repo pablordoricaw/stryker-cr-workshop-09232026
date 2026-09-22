@@ -52,29 +52,38 @@ import workshop
 # MAGIC | `security` | Infrastructure security documents + transactions |
 # MAGIC | `itsm`     | IT-Ops incidents + transactions                |
 # MAGIC
-# MAGIC The schema defaults to the domain name and the volume to `landing` — leave
-# MAGIC them as-is unless you have a reason to change them. Later notebooks read
-# MAGIC this same config, so whatever you choose here is what the whole workshop uses.
+# MAGIC Your **whole team shares one catalog**, so the schema is derived from
+# MAGIC **your identity** — every participant gets their own `workshop_<you>`
+# MAGIC schema, so two teammates never collide and all workshop schemas sort
+# MAGIC together in Catalog Explorer. Leave the schema blank to use it (recommended);
+# MAGIC the volume defaults to `landing`. Later notebooks derive the **same** schema
+# MAGIC from your identity, so what you set here is what the whole workshop uses.
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
+dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+
+# Your Databricks identity. It makes your schema (and, later, your Genie agent,
+# app, and Lakebase objects) unique in the shared team catalog/workspace.
+me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
     domain=dbutils.widgets.get("domain"),
     schema=dbutils.widgets.get("schema") or None,
     volume=dbutils.widgets.get("volume") or None,
+    identity=me,  # blank schema -> your per-participant workshop_<you> schema
 )
 
 print("Your workshop environment:")
-print(f"  domain : {config.domain}")
-print(f"  catalog: {config.catalog}   (existing — not created)")
-print(f"  schema : {config.schema}")
-print(f"  volume : {config.volume}   (files land in {config.volume_path})")
+print(f"  identity: {me}")
+print(f"  domain  : {config.domain}")
+print(f"  catalog : {config.catalog}   (existing — not created)")
+print(f"  schema  : {config.schema}   (per-participant — unique to you)")
+print(f"  volume  : {config.volume}   (files land in {config.volume_path})")
 
 # COMMAND ----------
 

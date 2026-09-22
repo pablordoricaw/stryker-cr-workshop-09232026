@@ -586,3 +586,39 @@ def test_sdk_adapter_count_rows_without_hints_is_none():
     client = _SdkAppClient(_FakeWorkspace(_FakePostgres()), pg={})
     info = SyncedTableInfo(name="cat.sch.tbl")
     assert client.count_rows(info) is None
+
+
+# --- namespace resolution (#22): the check resolves the caller's own names ---
+
+
+def test_resolves_app_and_synced_table_from_namespace():
+    # No explicit app_name/synced_table/owner: all three are derived from the
+    # namespace, so the check resolves the SAME names the notebook created.
+    ns = workshop.namespace(OWNER, domain="finance")
+    result = workshop.check(
+        APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=FakeApps(), namespace=ns
+    )
+    assert result.passed is True
+    assert result.details["app_name"] == ns.app_name()
+    assert result.details["synced_table"] == ns.synced_table_fqn(CATALOG, SCHEMA)
+
+
+def test_namespace_binds_ownership_to_the_caller():
+    # A different participant's namespace derives a different owner, so the check
+    # refuses to adopt objects owned by someone else — the two-participant guard.
+    other = workshop.namespace(OTHER, domain="finance")
+    result = workshop.check(
+        APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA,
+        apps=FakeApps(),  # app + synced table owned by OWNER (ada), not OTHER (grace)
+        namespace=other,
+    )
+    assert result.passed is False
+    assert result.details["stage"] == "synced_ownership"
+    assert result.details["owner"] == other.owner
+
+
+def test_explicit_names_override_namespace():
+    ns = workshop.namespace("someone-else@z.com", domain="finance")
+    result = _check(FakeApps(), namespace=ns)  # _check sets app/synced/owner explicitly
+    assert result.passed is True
+    assert result.details["app_name"] == APP
