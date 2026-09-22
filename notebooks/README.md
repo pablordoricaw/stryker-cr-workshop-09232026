@@ -57,5 +57,15 @@ metrics over `gold_sales`, and contract-performance metrics over
 stretch and ends at `05_metrics`, which validates the deployed metric-model
 definitions and their non-null aggregate query results.
 
-> The remaining notebooks are added by later tickets: the Genie agent (#11) and
-> the app wiring (#12).
+`06_genie.py` (added by #11) builds a curated **Genie agent** — a natural-language
+interface — over the gold tables and Metric Views. It attaches all four Finance
+data assets (`gold_sales`, `gold_contract_performance`, `finance_sales_metrics`,
+`finance_contract_metrics`), gives the agent a **per-participant, identity-derived
+name** so teammates sharing the workspace do not collide, and adds pre-authored
+sample questions. It opens with a Partner-powered AI (Databricks Assistant)
+pre-check and ends on `06_genie`, which finds the caller's own agent by name,
+confirms the expected sources are attached, and asks benchmark questions —
+requiring each to return SQL grounded in the curated data. Pass
+`ask_benchmarks=False` if the Conversation API is gated on your workspace.
+
+> The remaining notebook is added by a later ticket: the app wiring (#12).

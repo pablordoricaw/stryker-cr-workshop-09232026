@@ -17,7 +17,8 @@ solutions/
 │   ├── 02_silver_docs.py   # #6 — ai_parse_document/classify/extract to silver
 │   ├── 03_gold.py          # #8 — document-enriched sales + contract mart
 │   ├── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
-│   └── 05_metric_views.py  # #10 — governed UC Metric Views over the gold tables
+│   ├── 05_metric_views.py  # #10 — governed UC Metric Views over the gold tables
+│   └── 06_genie.py         # #11 — per-participant Genie agent over gold + metrics
 ├── security/
 └── itsm/
 ```
@@ -39,3 +40,10 @@ are authored alongside each build-spine ticket and validated by maintainer CI
 performance semantic layers as UC Metric Views in the participant's existing
 resolved schema. It also demonstrates the `MEASURE()` query syntax and documents
 the optional custom-metric stretch.
+
+`06_genie` creates (idempotently, create-or-update) a per-participant Genie agent
+over the two gold tables and two Metric Views, with an identity-derived name,
+pre-authored sample questions, short text instructions, and benchmark Q&A. It
+uses the Databricks SDK (`WorkspaceClient().genie`), asks a sample question to
+show the generated SQL, and ends on the `06_genie` checkpoint, which validates
+the agent by observable Genie state only.
