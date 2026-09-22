@@ -1,7 +1,12 @@
 # The provided data app (FastAPI) participants wire to their Genie agent and a
-# Lakebase-synced gold table. The app code is added by a later ticket (#12); this
+# Lakebase-synced gold table. The app code lives in ../app (added by #12); this
 # resource declares and versions the app so the bundle packages the same app the
 # workshop ships. `source_code_path` points at the app directory in this repo.
+#
+# Note: participants deploy their OWN per-participant app (identity-suffixed name)
+# from notebooks/07_app.py — this maintainer-owned resource uses a fixed name for
+# reproducibility. The Lakebase synced table is created via the CLI/SDK, not the
+# DAB (`synced_database_tables` maps to a deprecated resource; see databricks-lakebase).
 resources:
   apps:
     workshop_app:

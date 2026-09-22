@@ -23,7 +23,7 @@ inside it, plus the **app**.
 | `../databricks.yml`    | Bundle name, variables, and targets                  |
 | `workshop.schema.yml`  | The workshop schema, in the (existing) catalog       |
 | `workshop.volume.yml`  | The UC Volume where source documents land            |
-| `workshop.app.yml`     | The provided data app (code added by a later ticket) |
+| `workshop.app.yml`     | The provided data app (code in `../app`, added by #12) |
 
 Validate with:
 

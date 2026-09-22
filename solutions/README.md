@@ -18,7 +18,8 @@ solutions/
 │   ├── 03_gold.py          # #8 — document-enriched sales + contract mart
 │   ├── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
 │   ├── 05_metric_views.py  # #10 — governed UC Metric Views over the gold tables
-│   └── 06_genie.py         # #11 — per-participant Genie agent over gold + metrics
+│   ├── 06_genie.py         # #11 — per-participant Genie agent over gold + metrics
+│   └── 07_app.py           # #12 — provided FastAPI app + Lakebase synced table
 ├── security/
 └── itsm/
 ```
@@ -47,3 +48,12 @@ pre-authored sample questions, short text instructions, and benchmark Q&A. It
 uses the Databricks SDK (`WorkspaceClient().genie`), asks a sample question to
 show the generated SQL, and ends on the `06_genie` checkpoint, which validates
 the agent by observable Genie state only.
+
+`07_app` ships the provided FastAPI app (`app/`) wired to a per-participant
+Lakebase synced table (created from `gold_contract_performance`) and the
+participant's Genie agent. It shows the complete code for the two participant
+gaps in `app/backend.py` (the Genie Conversation API call and the Lakebase read),
+the Lakebase project/catalog/synced-table + app deploy/start commands, and the
+`07_app` checkpoint, which validates the deployed slice by observable platform
+state only (synced table serving the expected gold data + app deployed and
+running).

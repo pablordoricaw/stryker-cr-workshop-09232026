@@ -1,0 +1,22 @@
+# Databricks Apps runtime config for the provided workshop data app (FastAPI).
+#
+# Deploy with uvicorn (never a dev server). The app binds 0.0.0.0:8000 — the
+# Apps runtime routes DATABRICKS_APP_PORT to it.
+command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Resource ids come from wired app resources via `valueFrom` — never hardcoded.
+# Add these resources to the app (Apps UI → Edit → Resources, or via the CLI):
+#   * a Genie space  → key `genie-space`  (permission: Can run)   → GENIE_SPACE_ID
+#   * a Lakebase DB  → key `postgres`     (Can connect and create) → auto-injects
+#                      PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD + LAKEBASE_ENDPOINT
+#
+# SERVING_TABLE / SERVING_LIMIT are plain config: point them at YOUR synced
+# serving table (as <schema>.<table> in Postgres; synced tables land in `public`
+# by default). Finance defaults are baked into backend.py.
+env:
+  - name: GENIE_SPACE_ID
+    valueFrom: genie-space
+  - name: SERVING_TABLE
+    value: "public.gold_contract_performance"
+  - name: SERVING_LIMIT
+    value: "100"

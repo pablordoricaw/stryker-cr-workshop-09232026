@@ -71,4 +71,15 @@ the curated data (a source name in a string, comment, alias, or CTE name does
 not count). The agent must actually answer, so if the Conversation API is gated
 the checkpoint stays RED (enable Partner-powered AI) rather than passing.
 
-> The remaining notebook is added by a later ticket: the app wiring (#12).
+`07_app.py` (added by #12) ships the **provided FastAPI data app** (`app/`) wired
+to a **Lakebase synced table** created from the `gold_contract_performance` gold
+table (#8) and the participant's **Genie agent** (#11). It has the participant
+create a per-participant Lakebase project + synced table, deploy and explicitly
+**start** the app (deploying can leave it stopped), and fill the app's **two
+gaps** (the Genie Conversation API call and the Lakebase read) in
+`app/backend.py`. It ends on `07_app`, which asserts observable platform state
+only: the caller's own synced table exists, syncs from the expected gold table on
+the expected key, is online and serving rows, and the caller's own app is
+deployed and running. On Free Edition, one denormalized serving table is synced.
+The app name, Lakebase project, and synced table are all namespaced per
+participant.
