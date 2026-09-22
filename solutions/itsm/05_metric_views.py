@@ -1,0 +1,54 @@
+# Databricks notebook source
+# ruff: noqa: F821
+# MAGIC # 05 · Governed Metric Views — SOLUTION (ITSM)
+import os,sys
+_root=os.path.abspath(os.getcwd())
+while not os.path.isfile(os.path.join(_root,"workshop","__init__.py")): _root=os.path.dirname(_root)
+if _root not in sys.path: sys.path.insert(0,_root)
+import workshop
+dbutils.widgets.text("catalog","","Catalog (your existing catalog — required)")
+dbutils.widgets.text("schema","","Schema (blank = your workshop_<you> schema)")
+me=spark.sql("SELECT current_user()").collect()[0][0]
+config=workshop.resolve_config(catalog=dbutils.widgets.get("catalog") or None,domain="itsm",schema=dbutils.widgets.get("schema") or None,identity=me)
+incidents=workshop.fully_qualified(config.catalog,config.schema,"gold_incidents")
+services=workshop.fully_qualified(config.catalog,config.schema,"gold_service_performance")
+incident_metrics=workshop.fully_qualified(config.catalog,config.schema,"itsm_incident_metrics")
+service_metrics=workshop.fully_qualified(config.catalog,config.schema,"itsm_service_metrics")
+spark.sql(f'''CREATE OR REPLACE VIEW {incident_metrics} WITH METRICS LANGUAGE YAML AS $$
+version: 1.1
+source: "{incidents}"
+comment: "ITSM incident volume, SLA and MTTR metrics"
+dimensions:
+  - name: Priority
+    expr: priority
+  - name: Service
+    expr: service
+  - name: Assignment Group
+    expr: assignment_group
+measures:
+  - name: Incident Volume
+    expr: COUNT(1)
+  - name: MTTR Hours
+    expr: AVG(resolution_hours)
+  - name: SLA Breach Count
+    expr: SUM(CASE WHEN sla_breached THEN 1 ELSE 0 END)
+$$''')
+spark.sql(f'''CREATE OR REPLACE VIEW {service_metrics} WITH METRICS LANGUAGE YAML AS $$
+version: 1.1
+source: "{services}"
+comment: "ITSM service performance metrics"
+dimensions:
+  - name: Service
+    expr: service
+  - name: Priority
+    expr: priority
+measures:
+  - name: Incident Volume
+    expr: SUM(incident_count)
+  - name: MTTR Hours
+    expr: AVG(mttr_hours)
+  - name: SLA Breach Count
+    expr: SUM(sla_breach_count)
+$$''')
+result=workshop.check("05_metrics",spark=spark,catalog=config.catalog,schema=config.schema,metric_views={"itsm_incident_metrics":{"source_table":"gold_incidents","dimensions":["Priority","Service","Assignment Group"],"measures":["Incident Volume","MTTR Hours","SLA Breach Count"]},"itsm_service_metrics":{"source_table":"gold_service_performance","dimensions":["Service","Priority"],"measures":["Incident Volume","MTTR Hours","SLA Breach Count"]}})
+print(result); assert result.passed,result.message
