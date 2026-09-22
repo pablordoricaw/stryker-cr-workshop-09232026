@@ -22,6 +22,14 @@ It offers a primary Lakebase CDF path (clearly marked as an admin-enabled
 Beta/Preview) and a no-admin Delta fallback; both land
 `bronze_sales_transactions` and finish at checkpoint `01_bronze_txn`.
 
+`02_silver_docs.py` (added by #6) is the document-intelligence silver step. Using
+Databricks AI Functions, it parses each bronze document (`ai_parse_document`),
+classifies it into one of your domain's classes (`ai_classify`) in a consolidated
+`silver_docs` table, and extracts class-specific fields (`ai_extract`) into one
+`silver_<class>` table per class. It ends on the `02_silver_docs` checkpoint.
+`ai_parse_document` needs DBR 17.3+ / serverless env v3+ and a region that
+supports AI Functions (not SQL Warehouse Classic) — see the notebook callout.
+
 > The remaining notebooks are added by later tickets: the rest of the medallion
-> + AI-functions build spine (silver #6, gold #8, metadata #9), metric views
-> (#10), the Genie agent (#11), and the app wiring (#12).
+> + AI-functions build spine (gold #8, metadata #9), metric views (#10), the
+> Genie agent (#11), and the app wiring (#12).
