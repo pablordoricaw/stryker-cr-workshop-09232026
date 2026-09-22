@@ -120,3 +120,7 @@ A gated `solutions/` directory holds the full reference if you need it.
 - A GitHub account (only for **Option A**).
 
 Your facilitator will confirm any workspace toggles needed on the day.
+
+## Workshop release versions
+
+Workshop releases on `main` are identified by annotated [Semantic Version](https://semver.org/) tags such as `v1.2.0`. A major version signals a participant-breaking change, a minor version adds workshop content, and a patch version delivers compatible corrections. Release candidates use a suffix such as `v1.2.0-rc.1`.

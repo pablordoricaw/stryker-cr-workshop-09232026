@@ -32,7 +32,16 @@ Review the complete staged diff and run the workshop validation relevant to the 
 git commit -m "chore(release): promote dev to main"
 ```
 
-If the merge conflicts, preserve the participant-ready state on `main`: `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
+Then create an annotated Semantic Version tag on the release commit and push it:
+
+```bash
+git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
+git push origin v<major>.<minor>.<patch>
+```
+
+Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates. Tag only the release commit on `main`.
+
+If the merge conflicts, preserve the participant-ready state on `main`: `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
 
 ## Agent-Assisted Development
 

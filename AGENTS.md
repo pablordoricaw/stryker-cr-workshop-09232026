@@ -94,7 +94,14 @@ test ! -e generators
 git commit -m "chore(release): promote dev to main"
 ```
 
-Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. After committing, create an annotated Semantic Version tag on that `main` commit and push the tag:
+
+```bash
+git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
+git push origin v<major>.<minor>.<patch>
+```
+
+Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates. If the merge conflicts, preserve the participant-ready state on `main`; in particular, `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, and `generators/` must remain absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 
