@@ -30,6 +30,13 @@ classifies it into one of your domain's classes (`ai_classify`) in a consolidate
 `ai_parse_document` needs DBR 17.3+ / serverless env v3+ and a region that
 supports AI Functions (not SQL Warehouse Classic) — see the notebook callout.
 
+`03_gold.py` (added by #8) is the Finance gold medallion step. It joins the
+transaction fact to extracted commercial-agreement documents on the conformed
+`contract_id = agreement_id` key, producing transaction-grain `gold_sales` and
+contract-grain `gold_contract_performance`. It ends on `03_gold`, which derives
+the expected grains, identities, enrichment coverage, and aggregate measures
+from the upstream tables rather than hardcoding seed counts.
+
 > The remaining notebooks are added by later tickets: the rest of the medallion
-> + AI-functions build spine (gold #8, metadata #9), metric views (#10), the
+> + AI-functions build spine (metadata #9), metric views (#10), the
 > Genie agent (#11), and the app wiring (#12).
