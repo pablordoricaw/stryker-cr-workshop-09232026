@@ -65,8 +65,14 @@ import workshop
 # MAGIC   Functions in `02_silver_docs` (`ai_parse_document` / `ai_classify` /
 # MAGIC   `ai_extract`) use Databricks' built-in system model with no endpoint to
 # MAGIC   select.
-# MAGIC - **`metadata_schema`** is where dbxmetagen writes its own review/log
-# MAGIC   tables (created if absent), inside your existing catalog.
+# MAGIC - **`domain_tag_name`** / **`pi_classification_tag_name`** are the UC tag
+# MAGIC   keys dbxmetagen writes (defaults `domain` / `data_classification`). Change
+# MAGIC   them here if your metastore enforces a tag policy on the defaults (see §4).
+# MAGIC   The same values flow to dbxmetagen *and* the checkpoint, so they stay in
+# MAGIC   sync.
+# MAGIC
+# MAGIC dbxmetagen writes its review/log tables into your **resolved schema** — the
+# MAGIC single schema `00_setup` provisioned. No second schema is created.
 
 # COMMAND ----------
 
@@ -75,7 +81,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("model_endpoint", "databricks-claude-sonnet-4-6", "FM endpoint")
-dbutils.widgets.text("metadata_schema", "dbxmetagen_meta", "dbxmetagen review schema")
+dbutils.widgets.text("domain_tag_name", "domain", "Domain tag key")
+dbutils.widgets.text("pi_classification_tag_name", "data_classification", "PI tag key")
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
@@ -84,7 +91,10 @@ config = workshop.resolve_config(
     volume=dbutils.widgets.get("volume") or None,
 )
 model_endpoint = dbutils.widgets.get("model_endpoint") or "databricks-claude-sonnet-4-6"
-metadata_schema = dbutils.widgets.get("metadata_schema") or "dbxmetagen_meta"
+domain_tag_name = dbutils.widgets.get("domain_tag_name") or "domain"
+pi_classification_tag_name = (
+    dbutils.widgets.get("pi_classification_tag_name") or "data_classification"
+)
 
 # The gold tables to document (built by 03_gold). dbxmetagen takes a
 # comma-separated list of fully-qualified table names.
@@ -95,7 +105,8 @@ table_names = ",".join(
 
 print(f"Documenting: {table_names}")
 print(f"Model endpoint: {model_endpoint}   (confirm it exists in Serving)")
-print(f"dbxmetagen review schema: {config.catalog}.{metadata_schema}")
+print(f"dbxmetagen output schema: {config.catalog}.{config.schema}")
+print(f"Tag keys: domain={domain_tag_name}, pi={pi_classification_tag_name}")
 
 # COMMAND ----------
 
@@ -114,13 +125,15 @@ from dbxmetagen.main import main
 # TODO: Stage all three modes with apply_ddl=false.
 #
 # For each mode in ("comment", "pi", "domain"), call dbxmetagen's main() with:
-#   - catalog_name        = config.catalog        (the catalog being documented)
-#   - schema_name         = metadata_schema       (where review tables are written)
-#   - table_names         = table_names           (the gold tables, comma-separated)
-#   - table_names_source  = "parameter"
-#   - model               = model_endpoint
-#   - mode                = the mode
-#   - apply_ddl           = False                 (stage only — do not apply yet)
+#   - catalog_name                = config.catalog   (the catalog being documented)
+#   - schema_name                 = config.schema    (your ONE resolved schema)
+#   - table_names                 = table_names      (gold tables, comma-separated)
+#   - table_names_source          = "parameter"
+#   - model                       = model_endpoint
+#   - mode                        = the mode
+#   - apply_ddl                   = False            (stage only — do not apply yet)
+#   - domain_tag_name             = domain_tag_name          (keep keys in sync)
+#   - pi_classification_tag_name  = pi_classification_tag_name
 
 
 # COMMAND ----------
@@ -133,17 +146,20 @@ from dbxmetagen.main import main
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
 # MAGIC         "catalog_name": config.catalog,
-# MAGIC         "schema_name": metadata_schema,
+# MAGIC         "schema_name": config.schema,
 # MAGIC         "table_names": table_names,
 # MAGIC         "table_names_source": "parameter",
 # MAGIC         "model": model_endpoint,
 # MAGIC         "mode": mode,
 # MAGIC         "apply_ddl": False,
+# MAGIC         "domain_tag_name": domain_tag_name,
+# MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
 # MAGIC ```
 # MAGIC
 # MAGIC dbxmetagen generates one mode at a time. `comment` first is a good habit —
-# MAGIC the other modes reuse its context.
+# MAGIC the other modes reuse its context. `schema_name` is your single resolved
+# MAGIC schema, so the review tables land beside the gold tables.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -152,13 +168,13 @@ from dbxmetagen.main import main
 # MAGIC ## 3. Review the staged metadata
 # MAGIC
 # MAGIC dbxmetagen wrote the generated comments, PI classifications, and domain
-# MAGIC tags to review/log tables in `<catalog>.<metadata_schema>` (e.g.
-# MAGIC `metadata_generation_log`, `column_knowledge_base`). Inspect them and
-# MAGIC confirm the descriptions and classifications look right before applying.
+# MAGIC tags to review/log tables in your resolved schema `<catalog>.<schema>`
+# MAGIC (e.g. `metadata_generation_log`, `column_knowledge_base`), beside the gold
+# MAGIC tables. Inspect them and confirm the output looks right before applying.
 
 # COMMAND ----------
 
-display(spark.sql(f"SHOW TABLES IN {config.catalog}.{metadata_schema}"))
+display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 
 # COMMAND ----------
 
@@ -172,16 +188,16 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{metadata_schema}"))
 # MAGIC
 # MAGIC > **If your metastore enforces a UC tag policy** on the `domain` or
 # MAGIC > `data_classification` tag keys, `SET TAGS` fails with
-# MAGIC > `UC_TAG_POLICY_VALUE_NOT_ALLOWED` unless the generated value is in the
-# MAGIC > policy's allowed list. Ask a governance admin to allow the values, or
-# MAGIC > point dbxmetagen at permitted tag keys (`pi_classification_tag_name` /
-# MAGIC > `domain_tag_name`) — the checkpoint accepts matching `pi_tag_name` /
-# MAGIC > `domain_tag_name` overrides so it observes the keys you actually used.
+# MAGIC > `UC_TAG_POLICY_VALUE_NOT_ALLOWED`. The fix is executable here: set the
+# MAGIC > **`domain_tag_name`** / **`pi_classification_tag_name`** widgets in §1 to a
+# MAGIC > key your metastore permits (e.g. `business_domain`) and re-run. Those
+# MAGIC > values flow to both dbxmetagen and the checkpoint, so they stay in sync.
 
 # COMMAND ----------
 
 # TODO: Apply all three modes with apply_ddl=true and apply_tags=true.
-# Same calls as the staging step, but with apply_ddl=True and apply_tags=True.
+# Same main() calls as the staging step (still passing schema_name=config.schema
+# and the two *_tag_name options), but with apply_ddl=True and apply_tags=True.
 
 
 # COMMAND ----------
@@ -194,13 +210,15 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{metadata_schema}"))
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
 # MAGIC         "catalog_name": config.catalog,
-# MAGIC         "schema_name": metadata_schema,
+# MAGIC         "schema_name": config.schema,
 # MAGIC         "table_names": table_names,
 # MAGIC         "table_names_source": "parameter",
 # MAGIC         "model": model_endpoint,
 # MAGIC         "mode": mode,
 # MAGIC         "apply_ddl": True,
 # MAGIC         "apply_tags": True,
+# MAGIC         "domain_tag_name": domain_tag_name,
+# MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
 # MAGIC ```
 # MAGIC </details>
@@ -222,6 +240,9 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    # Verify the same tag keys you generated with, so the two never drift.
+    domain_tag_name=domain_tag_name,
+    pi_tag_name=pi_classification_tag_name,
 )
 print(result)
 assert result.passed, result.message

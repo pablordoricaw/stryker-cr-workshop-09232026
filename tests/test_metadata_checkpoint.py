@@ -234,6 +234,16 @@ def test_blank_pi_tag_value_fails():
     assert f"{DEFAULT_TABLES[0]}.customer_name" in result.details["blank_value_columns"]
 
 
+def test_whitespace_only_pi_tag_value_fails():
+    # A whitespace-only tag value is not a classification — _is_blank() trims it.
+    result = _check(
+        FakeSpark(pi_tags=[(DEFAULT_TABLES[0], "customer_name", "   ")])
+    )
+    assert result.passed is False
+    assert result.details["stage"] == "pi_tag"
+    assert f"{DEFAULT_TABLES[0]}.customer_name" in result.details["blank_value_columns"]
+
+
 def test_min_pi_columns_threshold_is_enforced():
     result = _check(FakeSpark(), min_pi_columns=2)  # only one column tagged
     assert result.passed is False
