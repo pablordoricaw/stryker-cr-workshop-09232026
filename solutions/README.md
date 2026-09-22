@@ -16,6 +16,8 @@ solutions/
 └── itsm/
 ```
 
-> Placeholder. Solution notebooks are authored alongside each build-spine ticket
-> and validated by maintainer CI (#17). This directory ships on both `dev` and
-> the participant release.
+The Finance solution for checkpoint `01_bronze_txn` implements both the
+admin-enabled Lakebase CDF path and the no-admin Delta fallback. Later solution
+notebooks are authored alongside each build-spine ticket and validated by
+maintainer CI (#17). This directory ships on both `dev` and the participant
+release.

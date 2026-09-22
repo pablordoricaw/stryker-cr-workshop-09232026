@@ -54,6 +54,13 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f data/finance/transactional/lakebase/load.sql
 ```
 
+`schema.sql` also sets `REPLICA IDENTITY FULL`, which Lakebase Lakehouse Sync /
+CDF requires to capture complete update and delete row images. The CDF path is
+a Beta/Preview dependency: a workspace admin must enable it in **Previews**, use
+a Lakebase Autoscaling Postgres 17 project, and configure the `finance_seed`
+schema to sync into the participant's existing Unity Catalog catalog/schema.
+Participants without that setup should use the committed Delta fallback.
+
 For Lakebase OAuth connectivity, the same files can be passed through the
 Databricks psql wrapper (choose the project and CLI profile explicitly):
 

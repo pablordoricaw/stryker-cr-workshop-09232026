@@ -1076,6 +1076,10 @@ CREATE INDEX IF NOT EXISTS sales_transactions_customer_idx
     ON finance_seed.sales_transactions (customer_id, sale_date);
 CREATE INDEX IF NOT EXISTS sales_transactions_source_updated_idx
     ON finance_seed.sales_transactions (source_updated_at);
+
+-- Required by Lakebase Lakehouse Sync / CDF so updates and deletes carry the
+-- complete row image into the Unity Catalog history table.
+ALTER TABLE finance_seed.sales_transactions REPLICA IDENTITY FULL;
 """
     (lakebase / "schema.sql").write_text(schema_sql, encoding="utf-8", newline="\n")
     copy_columns = ", ".join(TXN_FIELDS)
@@ -1298,10 +1302,12 @@ def validate(output_root: Path) -> dict[str, Any]:
 
     schema_path = output_root / "transactional" / "lakebase" / "schema.sql"
     parsed = sqlglot.parse(schema_path.read_text(encoding="utf-8"), read="postgres")
-    if len(parsed) != 5:
+    if len(parsed) != 6:
         raise AssertionError(
-            f"expected five PostgreSQL DDL statements, parsed {len(parsed)}"
+            f"expected six PostgreSQL DDL statements, parsed {len(parsed)}"
         )
+    if "REPLICA IDENTITY FULL" not in schema_path.read_text(encoding="utf-8"):
+        raise AssertionError("Lakebase CDF source must use REPLICA IDENTITY FULL")
     load_sql = (output_root / "transactional" / "lakebase" / "load.sql").read_text(
         encoding="utf-8"
     )
