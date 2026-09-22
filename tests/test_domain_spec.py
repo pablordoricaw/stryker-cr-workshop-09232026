@@ -23,12 +23,12 @@ from __future__ import annotations
 import os
 
 import workshop
+from workshop.checkpoints import app as app_cp
 from workshop.checkpoints import bronze_txn as bronze_txn_cp
+from workshop.checkpoints import genie as genie_cp
 from workshop.checkpoints import gold as gold_cp
 from workshop.checkpoints import metadata as metadata_cp
 from workshop.checkpoints import metrics as metrics_cp
-from workshop.checkpoints import genie as genie_cp
-from workshop.checkpoints import app as app_cp
 from workshop.namespace import DEFAULT_SERVING_BASE
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(workshop.__file__)))
@@ -93,8 +93,9 @@ def _shared_code(text: str) -> str:
     per-line ``#`` comments/TODOs, so a name only counts if it is real code."""
     lines = []
     for line in text.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("# MAGIC") or stripped.startswith("#"):
+        # Every `# MAGIC` markdown line also starts with `#`, so one test covers
+        # both markdown hints and ordinary comments/TODOs.
+        if line.lstrip().startswith("#"):
             continue
         lines.append(line)
     return "\n".join(lines)
