@@ -79,7 +79,7 @@ Do not use a regular merge or create a merge commit when integrating a feature i
 
 ## Promote a Workshop Release
 
-Only the coordinating agent promotes `dev` to `main`. Release promotion is intentionally different from feature integration: `main` permanently omits maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge.
+The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` permanently omits maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge.
 
 From the main worktree:
 
