@@ -13,8 +13,8 @@
 # MAGIC Lakebase project** — no catalog is created, and no second schema.
 # MAGIC
 # MAGIC You will:
-# MAGIC 1. create a **Lakebase project** and register it as a UC catalog (per participant);
-# MAGIC 2. create a **synced table** from `gold_contract_performance`;
+# MAGIC 1. create a per-participant **Lakebase project**;
+# MAGIC 2. create a **synced table** from `gold_contract_performance` into your existing catalog/schema;
 # MAGIC 3. **deploy and start** the app (Apps UI or CLI) with its Genie + Lakebase resources;
 # MAGIC 4. fill the **two gaps** in `app/backend.py`; and
 # MAGIC 5. pass the **`07_app`** checkpoint.
@@ -62,7 +62,6 @@ dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = domain name)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
-dbutils.widgets.text("lakebase_catalog", "", "Lakebase UC catalog (blank = derive)")
 
 config = workshop.resolve_config(
     catalog=dbutils.widgets.get("catalog") or None,
@@ -82,14 +81,22 @@ suffix = "".join(c if c.isalnum() else "-" for c in me.split("@")[0]).strip("-")
 # Per-participant identifiers (App names allow [a-z0-9-]; Lakebase ids are RFC 1123).
 app_name = f"stryker-{config.domain}-{suffix}"[:30].rstrip("-")
 project_id = f"lb-{config.domain}-{suffix}"[:63].rstrip("-")
-lakebase_catalog = dbutils.widgets.get("lakebase_catalog") or f"lb_{config.domain}_{suffix.replace('-', '_')}"
-synced_table = f"{lakebase_catalog}.public.gold_contract_performance"
+branch = f"projects/{project_id}/branches/production"
 
-print(f"Signed in as   : {me}")
-print(f"App name       : {app_name}")
+# The synced table lands in YOUR existing catalog + schema — no catalog is
+# created. Its Unity Catalog id (`<catalog>.<schema>.<table>`) doubles as a
+# Postgres table `<table>` in schema `<schema>`, so the app reads
+# `<schema>.<table>` from Postgres directly — no Lakebase catalog to register.
+target_table = f"gold_contract_performance_served_{suffix.replace('-', '_')}"
+synced_table = f"{config.catalog}.{config.schema}.{target_table}"
+serving_table = f"{config.schema}.{target_table}"  # the app's SERVING_TABLE (Postgres name)
+
+print(f"Signed in as    : {me}")
+print(f"App name        : {app_name}")
 print(f"Lakebase project: {project_id}")
-print(f"Synced table   : {synced_table}")
-print(f"Gold source    : {gold_serving}")
+print(f"Synced table    : {synced_table}")
+print(f"App SERVING_TABLE: {serving_table}")
+print(f"Gold source     : {gold_serving}")
 
 # COMMAND ----------
 
@@ -109,33 +116,47 @@ print(f"Gold source    : {gold_serving}")
 # MAGIC
 # MAGIC Sync `gold_contract_performance` (one denormalized row per contract) into
 # MAGIC Lakebase so the app reads it at low latency. Two steps: create a Lakebase
-# MAGIC project + register it as a UC catalog, then create the synced table.
+# MAGIC **project**, then create the **synced table** straight into your existing
+# MAGIC catalog/schema. There is **no catalog to create or register** — the
+# MAGIC synced-table id is a Unity Catalog name in *your own* catalog, and Lakebase
+# MAGIC creates the matching Postgres table for you.
 # MAGIC
 # MAGIC <details>
-# MAGIC <summary>Hint: create the project + catalog (CLI, run in a terminal)</summary>
+# MAGIC <summary>Hint: create the project (CLI, run in a terminal)</summary>
 # MAGIC
 # MAGIC ```bash
 # MAGIC databricks postgres create-project <project_id> \
 # MAGIC   --json '{"spec": {"display_name": "<project_id>"}}' --profile <p>
-# MAGIC # register the Lakebase DB as a UC catalog (one-time per project):
-# MAGIC databricks postgres create-catalog <lakebase_catalog> \
-# MAGIC   --json '{"spec": {"postgres_database": "databricks_postgres",
-# MAGIC     "branch": "projects/<project_id>/branches/production"}}' --profile <p>
 # MAGIC ```
+# MAGIC The project auto-creates a `production` branch + `primary` endpoint
+# MAGIC (scale-to-zero). You do **not** run `databricks postgres create-catalog`.
 # MAGIC </details>
 
 # COMMAND ----------
 
-# TODO: Create the Lakebase synced table from `gold_serving` into your Lakebase
-# TODO: catalog's `public` schema, primary key `contract_id`. Snapshot mode is
-# TODO: simplest on Free Edition. You can use the CLI or the SDK; capture the
-# TODO: synced-table UC name in `synced_table` (already derived above).
+# TODO: Create the Lakebase synced table from `gold_serving` into `synced_table`
+# TODO: (your existing catalog/schema, already derived above), primary key
+# TODO: `contract_id`. Snapshot mode is simplest on Free Edition. You can use the
+# TODO: CLI or the SDK; the synced-table id is a UC name in YOUR catalog — there
+# TODO: is no Lakebase catalog to create.
 #
 # SDK sketch (see solutions/finance/07_app.py for the complete, waited version):
 #   from databricks.sdk import WorkspaceClient
+#   from databricks.sdk.service.postgres import (
+#       SyncedTable, SyncedTableSyncedTableSpec, NewPipelineSpec,
+#       SyncedTableSyncedTableSpecSyncedTableSchedulingPolicy as Policy,
+#   )
 #   w = WorkspaceClient()
-#   w.database.create_synced_database_table(... source_table_full_name=...,
-#       primary_key_columns=["contract_id"], scheduling_policy="SNAPSHOT", ...)
+#   w.postgres.create_synced_table(
+#       synced_table_id=synced_table,
+#       synced_table=SyncedTable(spec=SyncedTableSyncedTableSpec(
+#           source_table_full_name=gold_serving,
+#           primary_key_columns=["contract_id"], scheduling_policy=Policy.SNAPSHOT,
+#           branch=branch, postgres_database="databricks_postgres",
+#           create_database_objects_if_missing=True,
+#           new_pipeline_spec=NewPipelineSpec(
+#               storage_catalog=config.catalog, storage_schema=config.schema))),
+#   ).wait()
 
 # COMMAND ----------
 
@@ -144,7 +165,7 @@ print(f"Gold source    : {gold_serving}")
 # MAGIC <summary>Hint: create the synced table (CLI)</summary>
 # MAGIC
 # MAGIC ```bash
-# MAGIC databricks postgres create-synced-table <lakebase_catalog>.public.gold_contract_performance \
+# MAGIC databricks postgres create-synced-table <catalog>.<schema>.gold_contract_performance_served_<suffix> \
 # MAGIC   --json '{"spec": {
 # MAGIC     "source_table_full_name": "<catalog>.<schema>.gold_contract_performance",
 # MAGIC     "primary_key_columns": ["contract_id"],
@@ -155,8 +176,12 @@ print(f"Gold source    : {gold_serving}")
 # MAGIC     "new_pipeline_spec": {"storage_catalog": "<your_catalog>", "storage_schema": "<your_schema>"}
 # MAGIC   }}' --profile <p>
 # MAGIC ```
-# MAGIC `storage_catalog` must be a **regular UC catalog** (your existing one), not
-# MAGIC the Lakebase catalog. Wait for the sync to be **online** before deploying.
+# MAGIC The synced-table id is a UC name **in your own catalog** — there is no
+# MAGIC `create-catalog`. `storage_catalog` / `storage_schema` (DLT pipeline
+# MAGIC metadata) are a **regular UC catalog/schema** — your existing ones are fine.
+# MAGIC Check status with `databricks postgres get-synced-table
+# MAGIC "synced_tables/<catalog>.<schema>.gold_contract_performance_served_<suffix>"`
+# MAGIC and wait for it to be **online** before deploying.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -170,7 +195,9 @@ print(f"Gold source    : {gold_serving}")
 # MAGIC
 # MAGIC Add resources (Apps UI → Edit → Resources, or CLI): a **Genie space** (key
 # MAGIC `genie-space`, *Can run*) and your **Lakebase database** (key `postgres`,
-# MAGIC *Can connect and create*). Set `SERVING_TABLE=public.gold_contract_performance`.
+# MAGIC *Can connect and create*). Set `SERVING_TABLE` to your synced table's
+# MAGIC Postgres name — `<schema>.<table>`, the `serving_table` printed above
+# MAGIC (e.g. `finance.gold_contract_performance_served_<suffix>`).
 # MAGIC
 # MAGIC <details>
 # MAGIC <summary>Hint: deploy + start (CLI)</summary>

@@ -14,12 +14,16 @@ from workshop.checkpoints.app import (
     APP_CHECKPOINT_ID,
     AppInfo,
     SyncedTableInfo,
+    _SdkAppClient,
+    _synced_online,
 )
 
 CATALOG = "team-catalog"
 SCHEMA = "finance data"  # a space in the schema name exercises quoting
 APP = "stryker-finance-ada-lovelace"
-SYNCED = "lb_finance_ada.public.gold_contract_performance"
+# The synced table lives in the participant's OWN existing catalog/schema (no
+# Lakebase catalog is created/registered), with a per-participant table name.
+SYNCED = f"{CATALOG}.{SCHEMA}.gold_contract_performance_served_ada"
 OWNER = "ada@example.com"
 OTHER = "grace@example.com"
 
@@ -413,3 +417,141 @@ def test_invalid_primary_key_is_red():
     result = _check(FakeApps(), primary_key_columns=[""])
     assert result.passed is False
     assert result.details["stage"] == "configuration"
+
+
+# --- live SDK adapter (w.postgres synced-table surface) ---------------------
+# These exercise `_SdkAppClient.get_synced_table` against a fake WorkspaceClient
+# shaped like the modern Lakebase Autoscaling SDK — no network. The synced-table
+# GET returns ONLY status (no spec), so the adapter reads the source table from
+# the Unity Catalog table entry's `source_table` property and the primary key
+# from Postgres. These guard that multi-source mapping and pin the retired legacy
+# `w.database` surface out. (The Postgres primary-key/count reads are proven live;
+# here, with no Lakebase hints, they degrade to () / None as designed.)
+
+
+class _Enum:
+    """A stand-in for an SDK enum member (has `.value`, like SyncedTableState)."""
+
+    def __init__(self, value: str):
+        self.value = value
+
+
+class _FakeStatus:
+    def __init__(self, detailed_state, provisioning_state, message=None):
+        self.detailed_state = detailed_state
+        self.unity_catalog_provisioning_state = provisioning_state
+        self.message = message
+
+
+class _FakeSyncedTable:
+    """Shaped like databricks.sdk.service.postgres.SyncedTable (status only).
+
+    The real GET response carries NO ``.spec`` — a ``spec`` here would be a trap:
+    the adapter must not read source/PK from it.
+    """
+
+    def __init__(self, status):
+        self.status = status
+
+
+class _FakeUCTable:
+    def __init__(self, properties):
+        self.properties = properties
+
+
+class _FakePostgres:
+    def __init__(self, *, table=None, error=None):
+        self._table = table
+        self._error = error
+        self.names: list[str] = []
+
+    def get_synced_table(self, name):
+        self.names.append(name)
+        if self._error is not None:
+            raise self._error
+        return self._table
+
+
+class _FakeTables:
+    def __init__(self, uc_table=None):
+        self._uc_table = uc_table
+        self.full_names: list[str] = []
+
+    def get(self, full_name):
+        self.full_names.append(full_name)
+        return self._uc_table
+
+
+class _FakeWorkspace:
+    def __init__(self, postgres, tables=None):
+        self.postgres = postgres
+        self.tables = tables or _FakeTables()
+
+
+def test_sdk_adapter_maps_postgres_synced_table():
+    pg = _FakePostgres(
+        table=_FakeSyncedTable(
+            status=_FakeStatus(
+                detailed_state=_Enum("SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE"),
+                provisioning_state=_Enum("ACTIVE"),
+            ),
+        )
+    )
+    tables = _FakeTables(
+        _FakeUCTable({"source_table": "cat.sch.gold_contract_performance"})
+    )
+    # No Lakebase hints (pg={}) → the primary key read degrades to ().
+    client = _SdkAppClient(_FakeWorkspace(pg, tables), pg={})
+    info = client.get_synced_table("cat.sch.gold_contract_performance_served_ada")
+
+    # The synced-table GET name is the "synced_tables/" prefixed UC name.
+    assert pg.names == ["synced_tables/cat.sch.gold_contract_performance_served_ada"]
+    # Status maps from the nested .status; source comes from the UC table property.
+    assert info.name == "cat.sch.gold_contract_performance_served_ada"
+    assert tables.full_names == ["cat.sch.gold_contract_performance_served_ada"]
+    assert info.source_table == "cat.sch.gold_contract_performance"
+    assert info.provisioning_state == "active"
+    assert info.detailed_state == "synced_table_online_no_pending_update"
+    assert _synced_online(info) is True
+    # Without Lakebase hints the PK is unobservable here (proven live otherwise).
+    assert info.primary_key_columns == ()
+
+
+def test_sdk_adapter_source_table_missing_property_is_none():
+    # A synced table whose UC entry has no source_table property → source None →
+    # the checkpoint's source guard goes RED (never a false adopt).
+    pg = _FakePostgres(
+        table=_FakeSyncedTable(
+            status=_FakeStatus(_Enum("SYNCED_TABLE_ONLINE"), _Enum("ACTIVE"))
+        )
+    )
+    client = _SdkAppClient(
+        _FakeWorkspace(pg, _FakeTables(_FakeUCTable({}))), pg={}
+    )
+    info = client.get_synced_table("cat.sch.tbl")
+    assert info.source_table is None
+
+
+def test_sdk_adapter_synced_not_found_returns_none():
+    pg = _FakePostgres(error=RuntimeError("RESOURCE_DOES_NOT_EXIST: no such table"))
+    client = _SdkAppClient(_FakeWorkspace(pg))
+    assert client.get_synced_table("cat.sch.tbl") is None
+
+
+def test_sdk_adapter_synced_read_error_propagates():
+    pg = _FakePostgres(error=RuntimeError("PERMISSION_DENIED"))
+    client = _SdkAppClient(_FakeWorkspace(pg))
+    try:
+        client.get_synced_table("cat.sch.tbl")
+    except RuntimeError as exc:
+        assert "PERMISSION_DENIED" in str(exc)
+    else:  # pragma: no cover - explicit failure if no raise
+        raise AssertionError("expected a non-not-found error to propagate")
+
+
+def test_sdk_adapter_count_rows_without_hints_is_none():
+    # Fail-closed: with no Lakebase endpoint/host hints, the served-row count is
+    # unobtainable and must be None (keeps the checkpoint RED, never a false pass).
+    client = _SdkAppClient(_FakeWorkspace(_FakePostgres()), pg={})
+    info = SyncedTableInfo(name="cat.sch.tbl")
+    assert client.count_rows(info) is None

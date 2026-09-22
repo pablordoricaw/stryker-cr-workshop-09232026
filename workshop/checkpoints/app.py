@@ -67,7 +67,11 @@ Extras forwarded through ``ctx.extras``:
 
 * ``app_name`` — the expected per-participant Databricks App name (**required**).
 * ``synced_table`` — the fully-qualified Unity Catalog name of the caller's own
-  Lakebase synced table (**required**; e.g. ``lb_cat.public.gold_contract_perf``).
+  Lakebase synced table (**required**), created in the participant's *existing*
+  catalog/schema (e.g. ``my_catalog.finance.gold_contract_performance_served_ada``).
+  No Lakebase-registered catalog is involved: the synced-table id doubles as a UC
+  entity in the participant's catalog and a Postgres table ``{table}`` in schema
+  ``{schema}``, so no ``CREATE CATALOG`` / ``create-catalog`` is ever required.
 * ``apps`` — a normalized app client, a raw ``WorkspaceClient``, or ``None`` to
   build one from ambient workspace credentials.
 * ``source_table`` — the gold table the synced table must sync from (default
@@ -89,10 +93,12 @@ Extras forwarded through ``ctx.extras``:
 * ``probe_health`` — default ``True``; set ``False`` to skip the best-effort HTTP
   health probe.
 * ``lakebase_endpoint`` / ``lakebase_host`` / ``lakebase_user`` /
-  ``lakebase_database`` — connection hints the live SDK adapter uses to count
-  served rows directly from Lakebase Postgres in the real participant flow. The
-  normal invocation should pass ``lakebase_endpoint`` + ``lakebase_host`` (or an
-  observed ``served_row_count``) so the fail-closed serving check can pass.
+  ``lakebase_database`` — connection hints the live SDK adapter uses to read
+  directly from Lakebase Postgres in the real participant flow: both the
+  served-row count and the synced table's primary key (the synced-table GET
+  echoes neither). The normal invocation should pass ``lakebase_endpoint`` +
+  ``lakebase_host`` (or an observed ``served_row_count``) so the fail-closed
+  serving check can pass.
 """
 
 from __future__ import annotations
@@ -123,7 +129,7 @@ _UNSET = object()
 # The checkpoint speaks to the platform through a few small, stable reads:
 # get_app, get_synced_table, get_table_owner (required), plus best-effort
 # count_rows and probe. The live adapter (:class:`_SdkAppClient`) maps the
-# Apps/Database/Tables SDK shapes onto them; tests supply a fake implementing the
+# Apps/Postgres/Tables SDK shapes onto them; tests supply a fake implementing the
 # same surface. Keeping the interface narrow isolates SDK-shape fragility here.
 
 
@@ -250,7 +256,7 @@ def _owned(info: AppInfo, owner: str) -> bool:
 
 
 class _SdkAppClient:
-    """Normalize the Databricks Apps + Database SDK surfaces onto our interface.
+    """Normalize the Databricks Apps + Postgres SDK surfaces onto our interface.
 
     Only ever constructed on a live workspace, so importing the SDK errors here
     is safe. Every read is defensive: a missing object comes back as ``None`` (a
@@ -290,26 +296,51 @@ class _SdkAppClient:
         )
 
     def get_synced_table(self, name: str) -> SyncedTableInfo | None:
+        # Lakebase Autoscaling surface. ``w.postgres.get_synced_table`` takes the
+        # resource name ``synced_tables/{catalog}.{schema}.{table}`` and returns a
+        # ``SyncedTable`` whose **status** (``detailed_state`` +
+        # ``unity_catalog_provisioning_state``) is all it echoes — the request
+        # spec (source table, primary key) is *not* returned on a GET. So the
+        # source table is read from the Unity Catalog table entry's
+        # ``source_table`` property, and the primary key from the Postgres table
+        # itself (both are the real observable state). The legacy Provisioned
+        # ``w.database`` surface is retired.
         try:
-            table = self._w.database.get_synced_database_table(name=name)
+            table = self._w.postgres.get_synced_table(name=f"synced_tables/{name}")
         except Exception as exc:
             if self._not_found(exc):
                 return None
             raise
-        spec = getattr(table, "spec", None)
-        status = getattr(table, "data_synchronization_status", None)
-        pk = getattr(spec, "primary_key_columns", None) or ()
+        status = getattr(table, "status", None)
         return SyncedTableInfo(
-            name=getattr(table, "name", name) or name,
-            source_table=getattr(spec, "source_table_full_name", None),
-            primary_key_columns=tuple(str(c) for c in pk),
-            scheduling_policy=_enum_str(getattr(spec, "scheduling_policy", None)),
+            # The plain UC name the caller asked about (never the
+            # ``synced_tables/`` resource prefix) so the Postgres schema/table
+            # derive from its last two dotted segments.
+            name=name,
+            source_table=self._synced_source_table(name),
+            primary_key_columns=self._synced_primary_key(name),
+            # The GET does not echo the scheduling policy; it is display-only and
+            # not asserted, so leave it unset rather than guess.
+            scheduling_policy=None,
             provisioning_state=_enum_str(
-                getattr(table, "unity_catalog_provisioning_state", None)
+                getattr(status, "unity_catalog_provisioning_state", None)
             ),
             detailed_state=_enum_str(getattr(status, "detailed_state", None)),
             message=getattr(status, "message", None),
         )
+
+    def _synced_source_table(self, name: str) -> str | None:
+        """The gold source a synced table syncs from.
+
+        The synced-table GET omits the spec, so the observable source reference
+        is the Unity Catalog table entry's ``source_table`` property. An
+        unreadable table returns ``None`` (the source guard then goes RED).
+        """
+        try:
+            props = getattr(self._w.tables.get(full_name=name), "properties", None)
+        except Exception:  # noqa: BLE001 - unreadable → None → source guard RED
+            return None
+        return (props or {}).get("source_table")
 
     def get_table_owner(self, name: str) -> str | None:
         """The Unity Catalog owner of the synced table (its creator identity).
@@ -324,6 +355,69 @@ class _SdkAppClient:
         except Exception:  # noqa: BLE001 - unverifiable ownership → None → RED
             return None
 
+    def _pg_target(self, name: str) -> tuple[str, str] | None:
+        """The Postgres ``(schema, table)`` for a synced-table UC name.
+
+        ``w.postgres.create_synced_table`` maps the id ``{catalog}.{schema}.{table}``
+        to a Postgres table ``{table}`` in schema ``{schema}`` — i.e. the last two
+        dotted segments of the UC name.
+        """
+        parts = name.split(".")
+        if len(parts) < 2:
+            return None
+        return parts[-2], parts[-1]
+
+    def _pg_connect(self):
+        """Open a Lakebase Postgres connection from the injected hints.
+
+        Returns ``None`` when the endpoint/host hints are missing (so the caller
+        falls back to ``None``). Live-only: mints a short-lived OAuth credential
+        and imports the Postgres driver lazily.
+        """
+        endpoint = self._pg.get("endpoint")
+        host = self._pg.get("host")
+        if not endpoint or not host:
+            return None
+        import psycopg
+
+        token = self._w.postgres.generate_database_credential(endpoint=endpoint).token
+        user = self._pg.get("user") or self._w.current_user.me().user_name
+        database = self._pg.get("database") or "databricks_postgres"
+        return psycopg.connect(
+            host=host, dbname=database, user=user, password=token, sslmode="require",
+        )
+
+    def _synced_primary_key(self, name: str) -> tuple[str, ...]:
+        """The synced table's primary key, read from the Postgres table itself.
+
+        Neither the synced-table GET nor the Unity Catalog table constraints
+        expose the primary key, but the Postgres side carries the real
+        primary-key index. Best-effort: returns ``()`` when Lakebase hints are
+        absent or the read fails (the real participant flow always passes them,
+        since serving verification needs the same connection).
+        """
+        target = self._pg_target(name)
+        if target is None:
+            return ()
+        pg_schema, pg_table = target
+        try:
+            conn = self._pg_connect()
+            if conn is None:
+                return ()
+            with conn, conn.cursor() as cur:
+                # Identifiers are the fixed synced-table name (not user input).
+                cur.execute(
+                    "SELECT a.attname FROM pg_index i "
+                    "JOIN pg_attribute a ON a.attrelid = i.indrelid "
+                    "AND a.attnum = ANY(i.indkey) "
+                    "WHERE i.indrelid = %s::regclass AND i.indisprimary "
+                    "ORDER BY a.attnum",
+                    (f'"{pg_schema}"."{pg_table}"',),
+                )
+                return tuple(r[0] for r in cur.fetchall())
+        except Exception:  # noqa: BLE001 - best-effort; unknown PK → ()
+            return ()
+
     def count_rows(self, info: SyncedTableInfo) -> int | None:
         """Best-effort served-row count from Lakebase Postgres.
 
@@ -332,27 +426,15 @@ class _SdkAppClient:
         failure — and because serving is verified fail-closed, an unverifiable
         count keeps the checkpoint RED rather than passing.
         """
-        endpoint = self._pg.get("endpoint")
-        host = self._pg.get("host")
-        if not endpoint or not host:
+        target = self._pg_target(info.name)
+        if target is None:
             return None
-        parts = info.name.split(".")
-        if len(parts) < 2:
-            return None
-        pg_schema, pg_table = parts[-2], parts[-1]
+        pg_schema, pg_table = target
         try:
-            token = self._w.postgres.generate_database_credential(
-                endpoint=endpoint
-            ).token
-            # Live-only, best-effort: import the driver lazily.
-            import psycopg
-
-            user = self._pg.get("user") or self._w.current_user.me().user_name
-            database = self._pg.get("database") or "databricks_postgres"
-            with psycopg.connect(
-                host=host, dbname=database, user=user, password=token,
-                sslmode="require",
-            ) as conn, conn.cursor() as cur:
+            conn = self._pg_connect()
+            if conn is None:
+                return None
+            with conn, conn.cursor() as cur:
                 # Identifiers are the fixed synced-table name (not user input).
                 cur.execute(f'SELECT count(*) FROM "{pg_schema}"."{pg_table}"')
                 row = cur.fetchone()

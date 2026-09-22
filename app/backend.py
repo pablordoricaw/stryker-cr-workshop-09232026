@@ -30,9 +30,12 @@ import os
 # The Genie space id is injected from the app's `genie-space` resource (app.yaml).
 GENIE_SPACE_ID = os.getenv("GENIE_SPACE_ID", "")
 
-# The Lakebase-synced serving table, as <schema>.<table> in Postgres. Defaults to
-# the Finance serving table; a domain overrides it via the SERVING_TABLE env var.
-SERVING_TABLE = os.getenv("SERVING_TABLE", "public.gold_contract_performance")
+# The Lakebase-synced serving table, as <schema>.<table> in Postgres. A synced
+# table lands in a Postgres schema matching its Unity Catalog schema (your
+# participant schema), so this is `<your_schema>.<your_served_table>`. Each
+# participant sets SERVING_TABLE via the app's env (see notebooks/07_app.py); the
+# default below is only a placeholder for local/dev runs.
+SERVING_TABLE = os.getenv("SERVING_TABLE", "finance.gold_contract_performance_served")
 
 # Max rows the serving screen reads.
 SERVING_LIMIT = int(os.getenv("SERVING_LIMIT", "100"))

@@ -47,8 +47,10 @@ Resource ids are never hardcoded — they come from wired app resources via
 - **Genie space** resource → key `genie-space` (permission *Can run*) → `GENIE_SPACE_ID`
 - **Lakebase database** resource → key `postgres` (*Can connect and create*) →
   `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD` + `LAKEBASE_ENDPOINT`
-- `SERVING_TABLE` / `SERVING_LIMIT` — point at **your** synced serving table
-  (`<schema>.<table>` in Postgres; synced tables land in `public` by default).
+- `SERVING_TABLE` / `SERVING_LIMIT` — point at **your** synced serving table as
+  `<schema>.<table>` in Postgres. A synced table lands in a Postgres schema
+  matching its Unity Catalog schema (your participant schema), so this is
+  `<your_schema>.<your_served_table>`.
 
 ## Run it
 

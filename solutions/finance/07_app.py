@@ -60,27 +60,34 @@ usuffix = suffix.replace("-", "_")
 app_name = f"stryker-{config.domain}-{suffix}"[:30].rstrip("-")
 project_id = f"lb-{config.domain}-{suffix}"[:63].rstrip("-")
 branch = f"projects/{project_id}/branches/production"
-lakebase_catalog = f"lb_{config.domain}_{usuffix}"
-synced_table = f"{lakebase_catalog}.public.gold_contract_performance"
 gold_serving = f"{config.catalog}.{config.schema}.gold_contract_performance"
+
+# The synced table lands in YOUR existing catalog + schema — no catalog is
+# created, and none is registered. The synced-table id `<catalog>.<schema>.<table>`
+# doubles as a Unity Catalog virtual table AND a Postgres table `<table>` in
+# schema `<schema>`, so the app reads `<schema>.<table>` from Postgres directly.
+target_table = f"gold_contract_performance_served_{usuffix}"
+synced_table = f"{config.catalog}.{config.schema}.{target_table}"
+serving_table = f"{config.schema}.{target_table}"  # the app's SERVING_TABLE (Postgres name)
 
 print(f"me             : {me}")
 print(f"app_name       : {app_name}")
 print(f"project_id     : {project_id}")
-print(f"lakebase_catalog: {lakebase_catalog}")
 print(f"synced_table   : {synced_table}")
+print(f"serving_table  : {serving_table}")
 print(f"gold_serving   : {gold_serving}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create the Lakebase project, catalog, and synced table (CLI)
+# MAGIC ## 2. Create the Lakebase project and synced table (CLI)
 # MAGIC
 # MAGIC Run these in a terminal with your `--profile`. The project auto-creates a
-# MAGIC `production` branch + `primary` endpoint (scale-to-zero). Registering the
-# MAGIC Lakebase DB as a UC catalog is one-time per project. Then create the synced
-# MAGIC table (Snapshot mode — simplest on Free Edition; Triggered/Continuous need
-# MAGIC Change Data Feed on the gold table).
+# MAGIC `production` branch + `primary` endpoint (scale-to-zero). Then create the
+# MAGIC synced table straight into your **existing** catalog/schema — there is **no
+# MAGIC catalog to create or register** (`create-catalog` is not used). Snapshot
+# MAGIC mode is simplest on Free Edition; Triggered/Continuous need Change Data Feed
+# MAGIC on the gold table.
 
 # COMMAND ----------
 
@@ -88,11 +95,8 @@ print(f"""# 2a. Create the per-participant Lakebase project (waits until ready)
 databricks postgres create-project {project_id} \\
   --json '{{"spec": {{"display_name": "Stryker workshop — {me}"}}}}' --profile <p>
 
-# 2b. Register the Lakebase database as a UC catalog (one-time per project)
-databricks postgres create-catalog {lakebase_catalog} \\
-  --json '{{"spec": {{"postgres_database": "databricks_postgres", "branch": "{branch}"}}}}' --profile <p>
-
-# 2c. Create the synced table from the gold serving table (Snapshot mode)
+# 2b. Create the synced table from the gold serving table (Snapshot mode). The id
+#     is a UC name in YOUR existing catalog/schema — there is NO create-catalog.
 databricks postgres create-synced-table {synced_table} \\
   --json '{{"spec": {{
     "source_table_full_name": "{gold_serving}",
@@ -104,7 +108,7 @@ databricks postgres create-synced-table {synced_table} \\
     "new_pipeline_spec": {{"storage_catalog": "{config.catalog}", "storage_schema": "{config.schema}"}}
   }}}}' --profile <p>
 
-# 2d. Wait for the sync to be ONLINE
+# 2c. Wait for the sync to be ONLINE
 databricks postgres get-synced-table "synced_tables/{synced_table}" --profile <p>
 """)
 
@@ -116,31 +120,35 @@ databricks postgres get-synced-table "synced_tables/{synced_table}" --profile <p
 # COMMAND ----------
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.database import (
-    SyncedDatabaseTable,
-    SyncedTableSpec,
+from databricks.sdk.service.postgres import (
     NewPipelineSpec,
-    SyncedTableSchedulingPolicy,
+    SyncedTable,
+    SyncedTableSyncedTableSpec,
+    SyncedTableSyncedTableSpecSyncedTableSchedulingPolicy,
 )
 
 w = WorkspaceClient()
 
-# Assumes the project + UC catalog (2a/2b) already exist. Create the synced table:
-synced = w.database.create_synced_database_table(
-    SyncedDatabaseTable(
-        name=synced_table,
-        spec=SyncedTableSpec(
+# Assumes the project (2a) already exists. The synced-table id is a UC name in
+# your existing catalog — there is NO Lakebase catalog. `.wait()` blocks until the
+# initial snapshot finishes, so the app can read served rows immediately after.
+synced = w.postgres.create_synced_table(
+    synced_table_id=synced_table,
+    synced_table=SyncedTable(
+        spec=SyncedTableSyncedTableSpec(
             source_table_full_name=gold_serving,
             primary_key_columns=["contract_id"],
-            scheduling_policy=SyncedTableSchedulingPolicy.SNAPSHOT,
+            scheduling_policy=SyncedTableSyncedTableSpecSyncedTableSchedulingPolicy.SNAPSHOT,
+            branch=branch,
+            postgres_database="databricks_postgres",
             create_database_objects_if_missing=True,
             new_pipeline_spec=NewPipelineSpec(
                 storage_catalog=config.catalog,
                 storage_schema=config.schema,
             ),
         ),
-    )
-)
+    ),
+).wait()
 print("synced table:", synced.name)
 
 # COMMAND ----------
@@ -199,11 +207,12 @@ databricks apps start {app_name} --profile <p>
 # 4b. Wire resources (Apps UI → Edit → Resources, or `databricks apps create-update`):
 #   genie-space  (Can run)                 → GENIE_SPACE_ID  ({dbutils.widgets.get("genie_space_id") or "your 06_genie space id"})
 #   postgres     (Can connect and create)  → PGHOST/... + LAKEBASE_ENDPOINT
-#   env SERVING_TABLE = public.gold_contract_performance
+#   env SERVING_TABLE = {serving_table}
 
-# 4c. Grant the app SP SELECT on the synced table (run as project owner):
-#   GRANT USAGE ON SCHEMA public TO "<app_sp_client_id>";
-#   GRANT SELECT ON ALL TABLES IN SCHEMA public TO "<app_sp_client_id>";
+# 4c. Grant the app SP SELECT on the synced table (run as project owner). The
+#     synced table lands in the Postgres schema "{config.schema}" (= your UC schema):
+#   GRANT USAGE ON SCHEMA "{config.schema}" TO "<app_sp_client_id>";
+#   GRANT SELECT ON ALL TABLES IN SCHEMA "{config.schema}" TO "<app_sp_client_id>";
 # app_sp_client_id: databricks apps get {app_name} --profile <p>  (service_principal_client_id)
 """)
 

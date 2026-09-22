@@ -11,12 +11,14 @@ command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
 #                      PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD + LAKEBASE_ENDPOINT
 #
 # SERVING_TABLE / SERVING_LIMIT are plain config: point them at YOUR synced
-# serving table (as <schema>.<table> in Postgres; synced tables land in `public`
-# by default). Finance defaults are baked into backend.py.
+# serving table as <schema>.<table> in Postgres. A synced table lands in a
+# Postgres schema matching its Unity Catalog schema (your participant schema) —
+# e.g. `finance.gold_contract_performance_served_<suffix>` — so set this per
+# participant. The value below is only a placeholder.
 env:
   - name: GENIE_SPACE_ID
     valueFrom: genie-space
   - name: SERVING_TABLE
-    value: "public.gold_contract_performance"
+    value: "finance.gold_contract_performance_served"
   - name: SERVING_LIMIT
     value: "100"
