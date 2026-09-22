@@ -288,6 +288,20 @@ def test_missing_document_enrichment_identity_fails():
     assert result.details["missing"] == ["txn-3"]
 
 
+def test_partial_document_coverage_passes_with_unenriched_fact_row():
+    spark = FakeSpark(
+        expected_enriched={"txn-1", "txn-2"},
+        observed_enriched={"txn-1", "txn-2"},
+    )
+    result = _check(spark)
+    assert result.passed is True
+    assert result.details["enriched_rows"] == 2
+    join_query = next(
+        query for query in spark.queries if "gold:detail_join_reconciliation" in query
+    )
+    assert "g.`contract_agreement_id` IS NOT NULL" in join_query
+
+
 def test_wrong_transaction_to_document_association_fails():
     result = _check(FakeSpark(detail_join_mismatches=1))
     assert result.passed is False
@@ -334,6 +348,35 @@ def test_mart_measure_mismatch_fails():
     assert result.passed is False
     assert result.details["stage"] == "mart_reconciliation"
     assert result.details["mismatched_groups"] == 1
+
+
+def test_custom_additive_measure_list_is_honored():
+    spark = FakeSpark()
+    result = _check(
+        spark,
+        reconcile_measures=["finding_count", "affected_assets"],
+    )
+    assert result.passed is True
+    assert result.details["reconciled_measures"] == [
+        "finding_count",
+        "affected_assets",
+    ]
+    reconciliation_query = next(
+        query for query in spark.queries if "gold:mart_reconciliation" in query
+    )
+    assert "SUM(CAST(`finding_count` AS DECIMAL(38, 6)))" in reconciliation_query
+    assert "SUM(CAST(`affected_assets` AS DECIMAL(38, 6)))" in reconciliation_query
+    assert "`order_id`" not in reconciliation_query
+    assert "`transaction_count`" not in reconciliation_query
+
+
+def test_empty_measure_list_disables_only_measure_reconciliation():
+    spark = FakeSpark()
+    result = _check(spark, reconcile_measures=[])
+    assert result.passed is True
+    assert result.details["measures_reconciled"] is False
+    assert result.details["reconciled_measures"] == []
+    assert not any("gold:mart_reconciliation" in query for query in spark.queries)
 
 
 def test_green_and_quotes_every_identifier():

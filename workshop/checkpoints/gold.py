@@ -41,6 +41,21 @@ DEFAULT_DETAIL_DOCUMENT_KEY = "contract_agreement_id"
 DEFAULT_DETAIL_DOCUMENT_MATCH = "contract_document_path"
 DEFAULT_MART_KEY = "contract_id"
 
+# Finance defaults.  A domain can replace the entire set by passing a list of
+# same-named additive source/mart columns as ``reconcile_measures``.  The two
+# count aggregations remain defaults only; they are not imposed on a custom
+# domain contract.
+DEFAULT_RECONCILIATION_SPECS: tuple[tuple[str | None, str, str], ...] = (
+    (None, "transaction_count", "count"),
+    ("order_id", "order_count", "count_distinct"),
+    ("units", "total_units", "sum"),
+    ("gross_sales", "gross_sales", "sum"),
+    ("net_sales", "net_sales", "sum"),
+    ("gross_margin", "gross_margin", "sum"),
+)
+
+_UNSET = object()
+
 
 def _fail(message: str, details: dict[str, Any]) -> CheckResult:
     return CheckResult(GOLD_CHECKPOINT_ID, False, message, details)
@@ -49,6 +64,36 @@ def _fail(message: str, details: dict[str, Any]) -> CheckResult:
 def _collect_keys(spark: Any, query: str) -> set[str]:
     """Collect the first column as a string identity set."""
     return {str(row[0]) for row in spark.sql(query).collect()}
+
+
+def _reconciliation_specs(value: Any) -> tuple[tuple[str | None, str, str], ...]:
+    """Resolve the measure contract from a checkpoint extra.
+
+    Unset/``True`` preserves the Finance defaults. ``False`` or an empty list
+    disables measure reconciliation while retaining all grain/identity checks.
+    A non-empty list/tuple contains additive column names present under the same
+    name in both source and mart; each is reconciled as an exact decimal sum.
+    """
+    if value is _UNSET or value is None or value is True:
+        return DEFAULT_RECONCILIATION_SPECS
+    if value is False:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(
+            "reconcile_measures must be True, False, or a list of column names"
+        )
+
+    specs: list[tuple[str | None, str, str]] = []
+    seen: set[str] = set()
+    for column in value:
+        if not isinstance(column, str) or not column.strip():
+            raise ValueError(
+                "reconcile_measures entries must be non-empty column names"
+            )
+        if column not in seen:
+            specs.append((column, column, "sum"))
+            seen.add(column)
+    return tuple(specs)
 
 
 @checkpoint(
@@ -92,6 +137,16 @@ def check_gold(ctx: CheckContext) -> CheckResult:
         ctx.extras.get("detail_document_match") or DEFAULT_DETAIL_DOCUMENT_MATCH
     )
     mart_key_name = ctx.extras.get("mart_key") or DEFAULT_MART_KEY
+
+    try:
+        reconciliation_specs = _reconciliation_specs(
+            ctx.extras.get("reconcile_measures", _UNSET)
+        )
+    except (TypeError, ValueError) as exc:
+        return _fail(
+            f"Invalid measure reconciliation configuration: {exc}.",
+            {"stage": "configuration", "error_type": type(exc).__name__},
+        )
 
     source_key = quote_identifier(source_key_name)
     detail_key = quote_identifier(detail_key_name)
@@ -298,8 +353,9 @@ def check_gold(ctx: CheckContext) -> CheckResult:
                 FULL OUTER JOIN {detail} AS g
                   ON CAST(s.{source_key} AS STRING) = CAST(g.{detail_key} AS STRING)
                 WHERE s.{source_key} IS NULL OR g.{detail_key} IS NULL
-                   OR NOT (CAST(s.{source_group} AS STRING) <=>
-                           CAST(g.{detail_document_key} AS STRING))"""
+                   OR (g.{detail_document_key} IS NOT NULL
+                       AND NOT (CAST(s.{source_group} AS STRING) <=>
+                                CAST(g.{detail_document_key} AS STRING)))"""
             ).collect()[0][0]
         )
     except Exception as exc:  # noqa: BLE001
@@ -408,11 +464,43 @@ def check_gold(ctx: CheckContext) -> CheckResult:
             },
         )
 
-    # Finance's additive mart measures are part of the default contract.  A
-    # future domain can set reconcile_measures=False while using the generic
-    # grain/identity checks, or provide a domain-specific follow-on check.
-    reconcile = ctx.extras.get("reconcile_measures", True)
-    if reconcile:
+    if reconciliation_specs:
+        expected_expressions: list[str] = []
+        mismatch_predicates: list[str] = []
+        reconciled_measures: list[str] = []
+        for index, (source_column, mart_column, aggregation) in enumerate(
+            reconciliation_specs
+        ):
+            alias = quote_identifier(f"expected_measure_{index}")
+            quoted_mart_column = quote_identifier(mart_column)
+            if aggregation == "count":
+                expected_expressions.append(f"COUNT(*) AS {alias}")
+                mismatch_predicates.append(
+                    f"NOT (e.{alias} <=> m.{quoted_mart_column})"
+                )
+                reconciled_measures.append(mart_column)
+            elif aggregation == "count_distinct":
+                quoted_source_column = quote_identifier(source_column or "")
+                expected_expressions.append(
+                    f"COUNT(DISTINCT {quoted_source_column}) AS {alias}"
+                )
+                mismatch_predicates.append(
+                    f"NOT (e.{alias} <=> m.{quoted_mart_column})"
+                )
+                reconciled_measures.append(source_column or mart_column)
+            else:
+                quoted_source_column = quote_identifier(source_column or "")
+                expected_expressions.append(
+                    f"SUM(CAST({quoted_source_column} AS DECIMAL(38, 6))) AS {alias}"
+                )
+                mismatch_predicates.append(
+                    f"NOT (e.{alias} <=> "
+                    f"CAST(m.{quoted_mart_column} AS DECIMAL(38, 6)))"
+                )
+                reconciled_measures.append(source_column or mart_column)
+
+        expected_sql = ",\n                        ".join(expected_expressions)
+        mismatches_sql = "\n                       OR ".join(mismatch_predicates)
         try:
             mismatches = int(
                 spark.sql(
@@ -420,12 +508,7 @@ def check_gold(ctx: CheckContext) -> CheckResult:
                     WITH expected AS (
                       SELECT
                         {source_group} AS business_key,
-                        COUNT(*) AS transaction_count,
-                        COUNT(DISTINCT `order_id`) AS order_count,
-                        SUM(CAST(`units` AS DECIMAL(38, 6))) AS total_units,
-                        SUM(CAST(`gross_sales` AS DECIMAL(38, 6))) AS gross_sales,
-                        SUM(CAST(`net_sales` AS DECIMAL(38, 6))) AS net_sales,
-                        SUM(CAST(`gross_margin` AS DECIMAL(38, 6))) AS gross_margin
+                        {expected_sql}
                       FROM {source}
                       GROUP BY {source_group}
                     )
@@ -434,16 +517,7 @@ def check_gold(ctx: CheckContext) -> CheckResult:
                     FULL OUTER JOIN {mart} AS m
                       ON CAST(e.business_key AS STRING) = CAST(m.{mart_key} AS STRING)
                     WHERE e.business_key IS NULL OR m.{mart_key} IS NULL
-                       OR NOT (e.transaction_count <=> m.`transaction_count`)
-                       OR NOT (e.order_count <=> m.`order_count`)
-                       OR NOT (e.total_units <=>
-                               CAST(m.`total_units` AS DECIMAL(38, 6)))
-                       OR NOT (e.gross_sales <=>
-                               CAST(m.`gross_sales` AS DECIMAL(38, 6)))
-                       OR NOT (e.net_sales <=>
-                               CAST(m.`net_sales` AS DECIMAL(38, 6)))
-                       OR NOT (e.gross_margin <=>
-                               CAST(m.`gross_margin` AS DECIMAL(38, 6)))"""
+                       OR {mismatches_sql}"""
                 ).collect()[0][0]
             )
         except Exception as exc:  # noqa: BLE001
@@ -461,6 +535,8 @@ def check_gold(ctx: CheckContext) -> CheckResult:
                 "additive measures do not reconcile to the transaction source.",
                 {"stage": "mart_reconciliation", "mismatched_groups": mismatches},
             )
+    else:
+        reconciled_measures = []
 
     return CheckResult(
         GOLD_CHECKPOINT_ID,
@@ -478,6 +554,7 @@ def check_gold(ctx: CheckContext) -> CheckResult:
             "detail_rows": detail_total,
             "enriched_rows": len(observed_enriched_keys),
             "mart_rows": mart_total,
-            "measures_reconciled": bool(reconcile),
+            "measures_reconciled": bool(reconciliation_specs),
+            "reconciled_measures": reconciled_measures,
         },
     )
