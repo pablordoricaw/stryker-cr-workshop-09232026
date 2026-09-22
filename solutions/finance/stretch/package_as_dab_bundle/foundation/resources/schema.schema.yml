@@ -1,7 +1,0 @@
-# The workshop schema, inside your EXISTING catalog. No catalog is created.
-resources:
-  schemas:
-    workshop_schema:
-      catalog_name: ${var.catalog}
-      name: ${var.schema}
-      comment: "Workshop domain schema (bronze/silver/gold tables and metric views land here)."

@@ -5,15 +5,17 @@ lock in the three deliverables so they cannot silently rot:
 
 1. **From-scratch mode** — an identical, markdown-only, default-off marker cell on
    every graded *build* stage (and deliberately not on ``00_setup``).
-2. **Package as a DAB** — a *set* of three independently-deployable example
-   bundles (not one monolith), bring-your-own-catalog, with deterministic names.
+2. **Package as a DAB** — a *set* of two independently-deployable example bundles
+   (not one monolith) that package the built work (pipeline + app) and target the
+   schema/volume ``00_setup`` provisioned, rather than re-declaring them.
 3. **Add your own** — a starter + gated solution that reuse the existing
    checkpoint override knobs rather than changing the framework.
 
 The bundles' *semantic* validity is covered by ``databricks bundle validate
 --strict`` (run out-of-band); these tests assert the workshop-specific invariants
-that validate does not — CREATE-CATALOG-free, no dev-mode name prefixing, and the
-documented cross-references.
+that validate does not — CREATE-CATALOG-free, no managed schema/volume resource
+(so a deploy never collides with ``00_setup``'s objects), bundle-local app source,
+no dev-mode name prefixing, and the documented cross-references.
 """
 
 from __future__ import annotations
@@ -103,27 +105,44 @@ def test_from_scratch_marker_links_to_the_doc():
 # --- Deliverable 1: package as a DAB (bundle SET, not a monolith) ---------------
 
 BUNDLE_ROOT = ("solutions", "finance", "stretch", "package_as_dab_bundle")
-BUNDLES = ("foundation", "pipeline", "app")
+BUNDLES = ("pipeline", "app")
 
 
-def test_bundle_set_has_three_independent_bundles():
-    # Three separate databricks.yml files == three independently-deployable
-    # bundles (the anti-monolith guarantee).
+def test_bundle_set_has_two_independent_bundles_and_no_foundation():
+    # Two separate databricks.yml files == two independently-deployable bundles
+    # (the anti-monolith guarantee).
     for name in BUNDLES:
         path = os.path.join(REPO_ROOT, *BUNDLE_ROOT, name, "databricks.yml")
         assert os.path.isfile(path), f"missing bundle: {name}/databricks.yml"
+    # The old 'foundation' bundle is gone: schema/volume are provisioned by
+    # 00_setup, not packaged, so nothing double-creates them.
+    foundation = os.path.join(REPO_ROOT, *BUNDLE_ROOT, "foundation")
+    assert not os.path.exists(foundation), "foundation bundle must not exist (00_setup provisions schema/volume)"
+
+
+def _bundle_yaml_bodies(name: str):
+    bundle_dir = os.path.join(REPO_ROOT, *BUNDLE_ROOT, name)
+    for dirpath, _dirs, files in os.walk(bundle_dir):
+        for fname in files:
+            if fname.endswith((".yml", ".yaml")):
+                yield f"{name}/{fname}", _yaml_body(_read(os.path.join(dirpath, fname)))
 
 
 def test_bundles_are_create_catalog_free():
     for name in BUNDLES:
-        bundle_dir = os.path.join(REPO_ROOT, *BUNDLE_ROOT, name)
-        for dirpath, _dirs, files in os.walk(bundle_dir):
-            for fname in files:
-                if not fname.endswith((".yml", ".yaml")):
-                    continue
-                body = _yaml_body(_read(os.path.join(dirpath, fname)))
-                assert "catalogs:" not in body, f"{name}/{fname} defines a catalog resource"
-                assert "CREATE CATALOG" not in body.upper(), f"{name}/{fname} creates a catalog"
+        for label, body in _bundle_yaml_bodies(name):
+            assert "catalogs:" not in body, f"{label} defines a catalog resource"
+            assert "CREATE CATALOG" not in body.upper(), f"{label} creates a catalog"
+
+
+def test_bundles_declare_no_managed_schema_or_volume_resource():
+    # 00_setup provisions the schema + volume; the bundles TARGET them by
+    # variable. Declaring them as managed resources would make a first deploy
+    # collide with the pre-existing UC objects. Guard both `resources:` keys.
+    for name in BUNDLES:
+        for label, body in _bundle_yaml_bodies(name):
+            assert "schemas:" not in body, f"{label} must not manage a schema resource"
+            assert "volumes:" not in body, f"{label} must not manage a volume resource"
 
 
 def test_bundles_use_deterministic_names_not_dev_mode():
@@ -134,11 +153,10 @@ def test_bundles_use_deterministic_names_not_dev_mode():
         assert "mode: development" not in body, f"{name} must not use dev-mode name prefixing"
 
 
-def test_foundation_and_pipeline_share_catalog_schema_variables():
-    for name in ("foundation", "pipeline"):
-        text = _read(*BUNDLE_ROOT, name, "databricks.yml")
-        assert "variables:" in text
-        assert "catalog:" in text and "schema:" in text
+def test_pipeline_targets_catalog_schema_by_variable():
+    text = _read(*BUNDLE_ROOT, "pipeline", "databricks.yml")
+    assert "variables:" in text
+    assert "catalog:" in text and "schema:" in text
 
 
 def test_pipeline_references_notebooks_by_workspace_path():
@@ -150,7 +168,19 @@ def test_pipeline_references_notebooks_by_workspace_path():
 
 def test_app_bundle_is_namespace_aware():
     text = _read(*BUNDLE_ROOT, "app", "databricks.yml")
-    assert "app_name:" in text and "app_source_path:" in text
+    assert "app_name:" in text
+
+
+def test_app_source_is_bundle_local_not_a_workspace_path():
+    # The app bundle must ship its OWN source (bundle deploy uploads it), not
+    # depend on a pre-existing /Workspace/ checkout.
+    db = _yaml_body(_read(*BUNDLE_ROOT, "app", "databricks.yml"))
+    resource = _yaml_body(_read(*BUNDLE_ROOT, "app", "resources", "data_app.app.yml"))
+    # sync.paths scopes the sync root so deploy ships the local app source.
+    assert "sync:" in db and "paths:" in db, "app bundle must declare sync.paths for bundle-local source"
+    # No source_code_path anywhere may point at an ambient Workspace location.
+    combined = db + "\n" + resource
+    assert "/Workspace/" not in combined, "app source must be local, not a /Workspace/ path"
 
 
 def test_bundle_set_readme_documents_the_why():

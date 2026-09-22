@@ -22,7 +22,7 @@ solutions/
 │   ├── 07_app.py           # #12 — provided FastAPI app + Lakebase synced table
 │   └── stretch/            # #16 — optional Tier-3 gated solutions
 │       ├── package_as_dab.py            # walkthrough of the bundle set below
-│       ├── package_as_dab_bundle/       # 3 independently-deployable DABs + the "why"
+│       ├── package_as_dab_bundle/       # 2 independently-deployable DABs + the "why"
 │       └── add_your_own.py              # a 3rd Metric View + extra Genie questions
 ├── security/
 └── itsm/
@@ -63,10 +63,12 @@ state only (synced table serving the expected gold data + app deployed and
 running).
 
 `stretch/` holds the gated solutions for the optional Tier-3 modules (#16).
-`package_as_dab_bundle/` is a **set of three independently-deployable DABs**
-(`foundation`, `pipeline`, `app`) — deliberately not one monolith — with a
-README that documents the division rationale, coupling/decoupling tradeoffs,
-cross-bundle references, and deploy runbook; all three pass
+`package_as_dab_bundle/` is a **set of two independently-deployable DABs**
+(`pipeline`, `app`) — deliberately not one monolith — that package the built work
+and **target** the schema/volume `00_setup` provisioned (neither declares a
+schema/volume resource, so a first deploy never collides with pre-existing UC
+objects). Its README documents the division rationale, coupling/decoupling
+tradeoffs, cross-bundle references, and deploy runbook; both pass
 `databricks bundle validate --strict` offline. `add_your_own.py` adds a third
 Metric View and two Genie benchmark questions, validated through the existing
 `05_metrics` `metric_views=` and `06_genie` `expected_sources=`/

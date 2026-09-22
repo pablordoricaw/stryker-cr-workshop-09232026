@@ -1,29 +1,34 @@
-# App bundle — the provided FastAPI data app (wired to Genie + a Lakebase synced table).
+# App bundle — the provided FastAPI data app, packaged as a self-contained DAB.
 #
-# ONE of three independently-deployable bundles (see ../README.md for the "why").
+# ONE of TWO independently-deployable bundles (see ../README.md for the "why").
 # This one owns the product lifecycle: the Databricks App. It changes on the app
 # cadence (UI, endpoints) and deploys many times a day, independently of the
-# foundation and pipeline. Its blast radius is small — a bad app deploy affects
-# only the app, never your schema or your gold data.
+# pipeline. Its blast radius is small — a bad app deploy affects only the app,
+# never your schema or your gold data.
 #
-# Cross-bundle reference by NAME, not coupling: the app reads the gold data the
-# PIPELINE built and the Genie agent (06) and Lakebase synced table (07) you
-# created out-of-band. None of those is a DAB resource this bundle owns:
+# Self-contained source: `bundle deploy` ships the app source itself. `sync.paths`
+# scopes this bundle's sync root to the repo's `app/` directory, so deploy uploads
+# exactly that app (no dependency on a pre-existing Workspace checkout, and no
+# second copy of the app to drift). The deep `../` is only because this example is
+# stored under `solutions/`; when you copy this bundle to your repo root, both the
+# sync path and `app_source_path` simplify to `app`.
+#
+# Targets, never creates: the app reads the gold data the PIPELINE built and the
+# Genie agent (06) + Lakebase synced table (07) you created out-of-band. It
+# declares NO Unity Catalog schema/volume — those are provisioned by 00_setup, not
+# packaged here. Never CREATE CATALOG.
 #   - Genie agent  -> not a DAB resource type; created via the SDK in 06_genie.
 #   - synced table -> created via the CLI/SDK in 07_app (the DAB synced-table
 #                     resource is deprecated); the app reaches it through its
 #                     `postgres` app resource, added in the Apps UI.
-# So the app is wired to those by resource key at deploy time, not by an in-bundle
-# handle. Deploy the foundation and pipeline (and create the Genie agent + synced
-# table) first — see the runbook in ../README.md.
+#   - gold data    -> produced by the pipeline bundle; referenced by name.
+# Deploy the pipeline (and create the Genie agent + synced table) first — see the
+# runbook in ../README.md.
 #
 # Namespace-aware: `app_name` defaults to a placeholder; pass your identity-derived
 # app name (the value 07_app prints, e.g. stryker-finance-<you>-<digest>) with
-# `--var app_name=...` so your app never collides with a teammate's. The `07_app`
-# checkpoint asserts THIS exact name.
-#
-# Deterministic names: no `mode: development` — the app name must match what the
-# checkpoint expects, so dev-mode name-prefixing is deliberately avoided.
+# `--var app_name=...`. The `07_app` checkpoint asserts THIS exact name, so no
+# `mode: development` (its name-prefixing would break that match).
 #
 # Validate offline:
 #   databricks bundle validate --strict            # from this directory
@@ -40,10 +45,16 @@ variables:
     default: stryker-finance-app
   app_source_path:
     description: >-
-      Workspace path of the app/ directory in your cloned workshop Git folder.
-      Absolute workspace path so the bundle deploys the app already synced into
-      your workspace rather than a bundled copy.
-    default: /Workspace/Users/${workspace.current_user.userName}/stryker-cr-workshop/app
+      Local path (relative to resources/) to the app source this bundle deploys.
+      Defaults to the repo's app/ so there is one source of truth; at your repo
+      root this is simply `app`.
+    default: ../../../../../../app
+
+# Ship the repo's app/ as this bundle's source (local files, uploaded on deploy),
+# rather than depending on an ambient Workspace path. At your repo root: `app`.
+sync:
+  paths:
+    - ../../../../../app
 
 targets:
   dev:

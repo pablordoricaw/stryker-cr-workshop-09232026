@@ -6,19 +6,23 @@
 # MAGIC **Optional Tier-3 module.** Your workshop is already complete without it.
 # MAGIC
 # MAGIC The Finance team ships pipelines and apps by hand. A **Databricks Asset
-# MAGIC Bundle (DAB)** versions the provided infrastructure and app as
-# MAGIC source-controlled YAML, so the whole thing is reviewable, re-runnable, and
-# MAGIC promotable between workspaces. This module has you package the work you
-# MAGIC already built — but **not as one monolithic bundle**.
+# MAGIC Bundle (DAB)** versions your **built work** as source-controlled YAML, so it
+# MAGIC is reviewable, re-runnable, and promotable between workspaces. This module
+# MAGIC has you package what you built — **not as one monolithic bundle**.
 # MAGIC
-# MAGIC **Split it into three independently-deployable bundles**, grouped by
-# MAGIC lifecycle / ownership / deploy cadence:
+# MAGIC **Package the built work as two independently-deployable bundles**, grouped
+# MAGIC by lifecycle / ownership / deploy cadence:
 # MAGIC
 # MAGIC | Bundle | Owns | Deploys |
 # MAGIC | ------ | ---- | ------- |
-# MAGIC | `foundation` | schema + UC Volume | once, up front (widest blast radius) |
 # MAGIC | `pipeline` | the medallion Lakeflow Job (bronze→gold→metadata→metrics) | on the DE cadence |
 # MAGIC | `app` | the Databricks App | many times a day (smallest blast radius) |
+# MAGIC
+# MAGIC **What you do NOT package: your schema + UC Volume.** `00_setup` already
+# MAGIC provisioned those (the notebook path). Both bundles **target** that existing
+# MAGIC `catalog.schema` by variable and declare **no** schema/volume resource — so a
+# MAGIC `bundle deploy` never collides with what `00_setup` created. Never
+# MAGIC `CREATE CATALOG`.
 # MAGIC
 # MAGIC The **why** (coupling/decoupling tradeoffs, cross-bundle references, deploy
 # MAGIC order) is the point of this module — read
@@ -27,18 +31,6 @@
 # MAGIC > This module uses the Databricks CLI (`databricks bundle …`), which needs a
 # MAGIC > terminal or local machine — the one Tier-3 module that steps outside the
 # MAGIC > pure Workspace-UI flow, because a DAB *is* a source-control/CLI artifact.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## ⚠️ Two rules carry over from the core path
-# MAGIC
-# MAGIC - **Bring your own catalog.** No bundle here runs `CREATE CATALOG`; the
-# MAGIC   `catalog` variable names your **existing** catalog and the bundles define
-# MAGIC   only the schema, volume, job, and app inside it.
-# MAGIC - **Per-participant names.** The `schema` and `app_name` variables default
-# MAGIC   to placeholders; you pass your identity-derived names (printed below) as
-# MAGIC   `--var`, so your bundle set never collides with a teammate's.
 
 # COMMAND ----------
 
@@ -62,8 +54,9 @@ import workshop
 # MAGIC %md
 # MAGIC ## 1. Your per-participant bundle variables
 # MAGIC
-# MAGIC The same identity-derived names your other notebooks use. Pass these as
-# MAGIC `--var` to every bundle so all three agree on where your objects live.
+# MAGIC The same identity-derived names your other notebooks use. Pass `catalog` and
+# MAGIC `schema` (the ones `00_setup` provisioned) to the pipeline, and `app_name`
+# MAGIC to the app.
 
 # COMMAND ----------
 
@@ -83,64 +76,26 @@ config = workshop.resolve_config(
 )
 ns = workshop.namespace(me, domain=config.domain)
 
-print("Pass these to every bundle as --var:")
-print(f"  --var catalog={config.catalog}   (existing — never created)")
-print(f"  --var schema={config.schema}")
+print("pipeline bundle --var:")
+print(f"  --var catalog={config.catalog}   (existing — provisioned by 00_setup, never created)")
+print(f"  --var schema={config.schema}     (provisioned by 00_setup)")
 print(f"  --var volume={config.volume}")
+print(f"  --var notebooks_root=/Workspace/Users/{me}/stryker-cr-workshop/notebooks")
+print("app bundle --var:")
 print(f"  --var app_name={ns.app_name()}")
-print(f"  notebooks_root: /Workspace/Users/{me}/stryker-cr-workshop/notebooks")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Author the `foundation` bundle (schema + UC Volume)
-# MAGIC
-# MAGIC In your cloned Git folder, create `foundation/databricks.yml` (with a
-# MAGIC `catalog`/`schema`/`volume` variable block and dev/prod targets) plus
-# MAGIC `foundation/resources/schema.schema.yml` and
-# MAGIC `foundation/resources/volume.volume.yml`. This is the substrate every other
-# MAGIC bundle references **by name**.
-
-# COMMAND ----------
-
-# TODO: Create the foundation bundle files (databricks.yml + resources/). It must
-# TODO: define ONLY a schema and volume inside ${var.catalog} — no catalogs:
-# TODO: resource. Do NOT set `mode: development` (it prefixes names with illegal
-# TODO: UC characters). Then, in a terminal:
-# TODO:   cd foundation && databricks bundle validate --strict
-
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — foundation resource skeleton</summary>
-# MAGIC
-# MAGIC ```yaml
-# MAGIC # resources/schema.schema.yml
-# MAGIC resources:
-# MAGIC   schemas:
-# MAGIC     workshop_schema:
-# MAGIC       catalog_name: ${var.catalog}   # EXISTING catalog — not created
-# MAGIC       name: ${var.schema}
-# MAGIC # resources/volume.volume.yml — schema_name references the schema RESOURCE
-# MAGIC # (${resources.schemas.workshop_schema.name}) so the volume waits for it.
-# MAGIC ```
-# MAGIC
-# MAGIC The complete, validated files are in
-# MAGIC `solutions/finance/stretch/package_as_dab_bundle/foundation/`.
-# MAGIC </details>
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 3. Author the `pipeline` bundle (medallion Lakeflow Job)
+# MAGIC ## 2. Author the `pipeline` bundle (medallion Lakeflow Job)
 # MAGIC
 # MAGIC A serverless Lakeflow Job whose tasks run your build notebooks
 # MAGIC (`01_bronze_*` → `02_silver_docs` → `03_gold` → `04_metadata` →
 # MAGIC `05_metric_views`) by **workspace path** — so the bundle carries no copy of
-# MAGIC them to drift. UC Metric Views are not a DAB resource type, so they ride
-# MAGIC this job (the `metric_views` task) rather than a bundle of their own.
+# MAGIC them to drift. It **targets** your existing `catalog.schema` (declare no
+# MAGIC schema/volume resource). UC Metric Views are not a DAB resource type, so
+# MAGIC they ride this job (the `metric_views` task) rather than a bundle of their
+# MAGIC own.
 
 # COMMAND ----------
 
@@ -148,6 +103,7 @@ print(f"  notebooks_root: /Workspace/Users/{me}/stryker-cr-workshop/notebooks")
 # TODO: variables) and pipeline/resources/medallion.job.yml — one serverless
 # TODO: notebook_task per build notebook, wired with depends_on to mirror the
 # TODO: medallion DAG, each passing catalog/domain/schema/volume as base_parameters.
+# TODO: Declare NO schemas:/volumes: resources — 00_setup already made those.
 
 
 # COMMAND ----------
@@ -175,55 +131,60 @@ print(f"  notebooks_root: /Workspace/Users/{me}/stryker-cr-workshop/notebooks")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Author the `app` bundle (Databricks App)
+# MAGIC ## 3. Author the `app` bundle (self-contained Databricks App)
 # MAGIC
-# MAGIC The App deploys independently of the data. Its Genie agent (`06_genie`) and
+# MAGIC The App deploys independently of the data, and must ship its **own source**
+# MAGIC (`bundle deploy` uploads it) — not point at a pre-existing Workspace path.
+# MAGIC Use `sync.paths` to scope the bundle's sync root to your repo's `app/`, then
+# MAGIC point `source_code_path` at it. The app's Genie agent (`06_genie`) and
 # MAGIC Lakebase synced table (`07_app`) are **not** DAB resources — the app reaches
 # MAGIC them through its `genie-space` and `postgres` app resources (added in the
 # MAGIC Apps UI), referenced by key rather than owned by the bundle.
 
 # COMMAND ----------
 
-# TODO: Create app/databricks.yml (app_name + app_source_path variables) and
-# TODO: app/resources/data_app.app.yml with name: ${var.app_name} and
-# TODO: source_code_path: ${var.app_source_path}. No `mode: development` — the
-# TODO: app name must match what the `07_app` checkpoint expects.
+# TODO: Create app/databricks.yml with an `app_name` variable, a `sync: {paths: [app]}`
+# TODO: block scoping the sync root to your repo's app/, and no schema/volume
+# TODO: resource. In app/resources/data_app.app.yml set name: ${var.app_name} and
+# TODO: source_code_path to that bundle-local app source. No `mode: development` —
+# TODO: the app name must match what the `07_app` checkpoint expects.
 
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <details>
-# MAGIC <summary>💡 Hint — app resource + deploy order</summary>
+# MAGIC <summary>💡 Hint — bundle-local app source + deploy order</summary>
 # MAGIC
 # MAGIC ```yaml
-# MAGIC # resources/data_app.app.yml
+# MAGIC # app/databricks.yml (at your repo root)
+# MAGIC sync:
+# MAGIC   paths: [app]            # ship the repo's app/ as this bundle's source
+# MAGIC # app/resources/data_app.app.yml
 # MAGIC resources:
 # MAGIC   apps:
 # MAGIC     data_app:
 # MAGIC       name: ${var.app_name}
-# MAGIC       source_code_path: ${var.app_source_path}   # /Workspace/Users/<you>/.../app
+# MAGIC       source_code_path: app   # LOCAL path uploaded on deploy, not /Workspace/...
 # MAGIC ```
 # MAGIC
-# MAGIC Deploy order is the only cross-bundle "dependency": **foundation → pipeline
-# MAGIC (→ run) → app**. There is no in-bundle handle between them — they agree by
-# MAGIC shared `--var catalog`/`schema`. The full runbook + the *why* are in
-# MAGIC `solutions/finance/stretch/package_as_dab_bundle/README.md`.
+# MAGIC Deploy order is the only cross-bundle "dependency": **pipeline (→ run) →
+# MAGIC app**. There is no in-bundle handle between them — they agree by shared
+# MAGIC `--var catalog`/`schema` and by the gold table name. The full runbook + the
+# MAGIC *why* are in `solutions/finance/stretch/package_as_dab_bundle/README.md`.
 # MAGIC </details>
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Validate (and optionally deploy)
+# MAGIC ## 4. Validate (and optionally deploy)
 # MAGIC
-# MAGIC From a terminal, validate each bundle on its own — all three should pass
-# MAGIC offline:
+# MAGIC From a terminal, validate each bundle on its own — both should pass offline:
 # MAGIC
 # MAGIC ```bash
-# MAGIC for b in foundation pipeline app; do (cd $b && databricks bundle validate --strict); done
+# MAGIC for b in pipeline app; do (cd $b && databricks bundle validate --strict); done
 # MAGIC ```
 # MAGIC
 # MAGIC To deploy, follow the ordered runbook in the gated solution's README
-# MAGIC (foundation → pipeline → run → app). There is **no `workshop.check` for this
-# MAGIC stretch** — a clean `bundle validate --strict` on all three bundles is your
-# MAGIC green.
+# MAGIC (pipeline → run → app). There is **no `workshop.check` for this stretch** — a
+# MAGIC clean `bundle validate --strict` on both bundles is your green.

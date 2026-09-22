@@ -1,20 +1,25 @@
 # Pipeline bundle — the medallion + governance + semantic build, as one Lakeflow Job.
 #
-# ONE of three independently-deployable bundles (see ../README.md for the "why").
+# ONE of TWO independently-deployable bundles (see ../README.md for the "why").
 # This one owns the data-engineering lifecycle: a serverless Lakeflow Job that
 # re-runs the workshop's build notebooks (bronze -> silver -> gold -> metadata ->
 # metric views). It changes on the DE cadence (new transforms, new columns) and
-# is redeployed/rerun WITHOUT touching the foundation or the app.
+# is redeployed/rerun WITHOUT touching the app.
 #
-# Cross-bundle reference by NAME, not coupling: the job's notebooks write into the
-# `${var.catalog}.${var.schema}` the FOUNDATION bundle created. There is no
-# in-bundle handle to the foundation — deploy the foundation first (see the
-# runbook in ../README.md). The medallion notebooks themselves live in your
-# cloned Git folder; the job points at them by workspace path (`notebooks_root`),
-# so this bundle carries no copy of them to drift.
+# Targets, never creates: the job's notebooks write into the
+# `${var.catalog}.${var.schema}` that **00_setup already provisioned** (the schema
+# + UC Volume are created by the notebook path, not by any bundle). This bundle
+# declares NO `schemas:`/`volumes:` resources, so deploying it never collides with
+# the objects 00_setup created. Never CREATE CATALOG. The medallion notebooks
+# themselves live in your cloned Git folder; the job points at them by workspace
+# path (`notebooks_root`), so this bundle carries no copy of them to drift.
 #
-# Namespace-aware & CREATE-CATALOG-free: same `catalog`/`schema` variables as the
-# foundation; no catalog resource. Metric views (05) are created by the notebook's
+# Cross-bundle reference by NAME, not coupling: the app bundle later reads the gold
+# this job produces. There is no in-bundle handle between them — deploy this
+# pipeline (and run it) before the app (see the runbook in ../README.md).
+#
+# Namespace-aware & CREATE-CATALOG-free: pass your identity-derived schema with
+# `--var schema=workshop_<you>`. Metric views (05) are created by the notebook's
 # SQL inside the job — UC Metric Views are not a DAB resource type, so they ride
 # the pipeline rather than getting a bundle of their own.
 #
@@ -32,10 +37,10 @@ variables:
     description: Existing Unity Catalog catalog (never created here).
     default: main
   schema:
-    description: Your per-participant schema (pass --var schema=workshop_<you>).
+    description: Your per-participant schema (provisioned by 00_setup; pass --var schema=workshop_<you>).
     default: workshop_finance
   volume:
-    description: UC Volume where source documents land.
+    description: UC Volume where source documents land (provisioned by 00_setup).
     default: landing
   domain:
     description: Workshop domain the notebooks run against.

@@ -107,8 +107,9 @@ Finished early or want more? Three **optional** modules for strong engineers,
 strictly additive to the graded path (skip them and your workshop is still
 complete):
 
-1. **Package your work as a DAB** — split what you built into three
-   independently-deployable Databricks Asset Bundles.
+1. **Package your work as a DAB** — split what you built into two
+   independently-deployable Databricks Asset Bundles (pipeline + app) that target
+   the schema `00_setup` provisioned.
 2. **Add your own metrics / Genie questions** — extend the semantic + Genie
    layers with your own governed Metric View and benchmark questions.
 3. **From-scratch mode** — a uniform convention for flipping any build stage from

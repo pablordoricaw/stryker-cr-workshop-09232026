@@ -9,17 +9,25 @@
 # MAGIC ```
 # MAGIC solutions/finance/stretch/package_as_dab_bundle/
 # MAGIC ├── README.md        # the WHY: division rationale, tradeoffs, deploy runbook
-# MAGIC ├── foundation/      # schema + UC Volume            (platform lifecycle)
 # MAGIC ├── pipeline/        # medallion Lakeflow Job         (data-engineering lifecycle)
-# MAGIC └── app/             # Databricks App                 (product lifecycle)
+# MAGIC └── app/             # Databricks App, bundle-local source (product lifecycle)
 # MAGIC ```
 # MAGIC
-# MAGIC The headline decision: **three independently-deployable bundles, not one
-# MAGIC monolith.** A monolith couples resources with unrelated lifecycles under a
-# MAGIC single `deploy`/`destroy`, so an app redeploy re-plans your schema and an
-# MAGIC app teardown can drop it. The split groups by what changes together, who
-# MAGIC owns it, and how often it deploys — see the bundle-set README for the full
-# MAGIC reasoning and the cross-bundle reference model.
+# MAGIC Two headline decisions:
+# MAGIC
+# MAGIC 1. **Two independently-deployable bundles, not one monolith.** A monolith
+# MAGIC    couples resources with unrelated lifecycles under a single
+# MAGIC    `deploy`/`destroy`, so an app teardown can drop the pipeline job. The
+# MAGIC    split groups by what changes together, who owns it, and how often it
+# MAGIC    deploys.
+# MAGIC 2. **Package the built work, not the provisioning.** Your schema + UC Volume
+# MAGIC    were created by `00_setup` (the notebook path), so neither bundle declares
+# MAGIC    a schema/volume resource — they **target** the existing `catalog.schema`
+# MAGIC    by variable. That is what makes the runbook deployable without colliding
+# MAGIC    with pre-existing UC objects. Never `CREATE CATALOG`.
+# MAGIC
+# MAGIC See the bundle-set README for the full reasoning and the cross-bundle
+# MAGIC reference model.
 
 # COMMAND ----------
 
@@ -63,57 +71,55 @@ ns = workshop.namespace(me, domain=config.domain)
 
 bundle_root = os.path.join(_root, "solutions", "finance", "stretch", "package_as_dab_bundle")
 notebooks_root = f"/Workspace/Users/{me}/stryker-cr-workshop/notebooks"
-app_source_path = f"/Workspace/Users/{me}/stryker-cr-workshop/app"
 
 print(f"Example bundle set : {bundle_root}")
-print("Pass these to every bundle as --var:")
-print(f"  catalog={config.catalog}   (existing — never created)")
-print(f"  schema={config.schema}")
+print("pipeline --var:")
+print(f"  catalog={config.catalog}   (existing — provisioned by 00_setup, never created)")
+print(f"  schema={config.schema}     (provisioned by 00_setup)")
 print(f"  volume={config.volume}")
-print(f"  app_name={ns.app_name()}")
 print(f"  notebooks_root={notebooks_root}")
-print(f"  app_source_path={app_source_path}")
+print("app --var:")
+print(f"  app_name={ns.app_name()}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Validate all three bundles offline
+# MAGIC ## 2. Validate both bundles offline
 # MAGIC
 # MAGIC Each bundle validates on its own. Run these in a terminal from the bundle
 # MAGIC set directory (they pass offline with `--strict`):
 # MAGIC
 # MAGIC ```bash
 # MAGIC cd solutions/finance/stretch/package_as_dab_bundle
-# MAGIC for b in foundation pipeline app; do
-# MAGIC   echo "== $b =="; (cd "$b" && databricks bundle validate --strict --profile <p>)
+# MAGIC for b in pipeline app; do
+# MAGIC   echo "== $b =="; (cd "$b" && databricks bundle validate --strict --profile "$PROFILE")
 # MAGIC done
 # MAGIC ```
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Deploy in order (foundation → pipeline → app)
+# MAGIC ## 3. Deploy in order (pipeline → run → app)
 # MAGIC
 # MAGIC Deploy order is the only cross-bundle dependency; there is no in-bundle
-# MAGIC handle between the bundles — they agree by shared `--var catalog`/`schema`.
+# MAGIC handle between the bundles — they agree by shared `--var catalog`/`schema`
+# MAGIC and by the gold table name. Neither bundle creates the schema/volume
+# MAGIC `00_setup` provisioned, so nothing collides.
 # MAGIC
 # MAGIC ```bash
-# MAGIC CATALOG=<your_existing_catalog>; SCHEMA=<workshop_you>; APPNAME=<your_app_name>; P=--profile <p>
+# MAGIC CATALOG=your_existing_catalog; SCHEMA=workshop_you; APPNAME=your_app_name; PROFILE=your-profile
 # MAGIC
-# MAGIC (cd foundation && databricks bundle deploy --var catalog=$CATALOG --var schema=$SCHEMA $P)
-# MAGIC
-# MAGIC (cd pipeline && databricks bundle deploy --var catalog=$CATALOG --var schema=$SCHEMA \
-# MAGIC     --var notebooks_root=/Workspace/Users/<you>/stryker-cr-workshop/notebooks $P \
-# MAGIC   && databricks bundle run medallion_build $P)
+# MAGIC (cd pipeline && databricks bundle deploy --var catalog="$CATALOG" --var schema="$SCHEMA" \
+# MAGIC     --var notebooks_root=/Workspace/Users/you/stryker-cr-workshop/notebooks --profile "$PROFILE" \
+# MAGIC   && databricks bundle run medallion_build --profile "$PROFILE")
 # MAGIC
 # MAGIC # (create the Genie agent [06] and Lakebase synced table [07] out-of-band —
 # MAGIC #  they are not DAB resources.)
 # MAGIC
-# MAGIC (cd app && databricks bundle deploy --var app_name=$APPNAME \
-# MAGIC     --var app_source_path=/Workspace/Users/<you>/stryker-cr-workshop/app $P \
-# MAGIC   && databricks apps start $APPNAME $P)
+# MAGIC (cd app && databricks bundle deploy --var app_name="$APPNAME" --profile "$PROFILE" \
+# MAGIC   && databricks apps start "$APPNAME" --profile "$PROFILE")
 # MAGIC ```
 # MAGIC
 # MAGIC No `workshop.check` for this stretch — a clean `bundle validate --strict` on
-# MAGIC all three bundles (and, if you deploy, a green pipeline run + a running app)
-# MAGIC is the bar. The full rationale and runbook live in the bundle-set README.
+# MAGIC both bundles (and, if you deploy, a green pipeline run + a running app) is
+# MAGIC the bar. The full rationale and runbook live in the bundle-set README.
