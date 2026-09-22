@@ -2,8 +2,9 @@
 
 Every test drives the real ``workshop.check`` seam with an injected fake Genie
 client, so no Databricks SDK, notebook, or network is needed. The fake serves
-only observable Genie state (agents, their attached sources, and answers), which
-is exactly what the checkpoint is allowed to assert on.
+only observable Genie state (agents, their owning workspace path, attached
+sources, and answers), which is exactly what the checkpoint is allowed to
+assert on.
 """
 
 from __future__ import annotations
@@ -21,6 +22,9 @@ from workshop.checkpoints.genie import (
 CATALOG = "team-catalog"
 SCHEMA = "finance data"  # a space in the schema name exercises quoting
 AGENT = "workshop_genie_finance_ada_lovelace"
+OWNER = "/Workspace/Users/ada@example.com"
+OTHER_OWNER = "/Workspace/Users/grace@example.com"
+Q0 = DEFAULT_BENCHMARK_QUESTIONS[0]
 
 
 def _fqn(name: str) -> str:
@@ -31,12 +35,28 @@ def _default_sources() -> list[str]:
     return [_fqn(name) for name in DEFAULT_EXPECTED_SOURCES]
 
 
+def _bfqn(name: str) -> str:
+    return f"`{CATALOG}`.`{SCHEMA}`.`{name}`"
+
+
 def _grounded_sql(name: str = "gold_sales") -> str:
-    return f"SELECT product_family, SUM(net_sales) FROM `{CATALOG}`.`{SCHEMA}`.`{name}` GROUP BY 1"
+    return f"SELECT product_family, SUM(net_sales) FROM {_bfqn(name)} GROUP BY 1"
+
+
+def _answer(sql: str | None, status: str = "completed", text: str | None = None) -> GenieAnswer:
+    return GenieAnswer(status=status, sql=sql, text=text)
+
+
+def _own_space(title=AGENT, sources=None, parent=None):
+    return {
+        "title": title,
+        "sources": _default_sources() if sources is None else sources,
+        "parent_path": f"{OWNER}/genie_spaces" if parent is None else parent,
+    }
 
 
 class FakeGenie:
-    """Serve Genie agents, their attached sources, and canned answers."""
+    """Serve Genie agents, their owning path, attached sources, and answers."""
 
     def __init__(
         self,
@@ -45,10 +65,8 @@ class FakeGenie:
         answers: dict[str, GenieAnswer] | None = None,
         raise_on: str | None = None,
     ) -> None:
-        # space_id -> {"title": str, "sources": list[str]}
-        self.spaces = spaces if spaces is not None else {
-            "sp-1": {"title": AGENT, "sources": _default_sources()}
-        }
+        # space_id -> {"title": str, "sources": list[str], "parent_path": str}
+        self.spaces = spaces if spaces is not None else {"sp-1": _own_space()}
         self.answers = answers or {}
         self.raise_on = raise_on
         self.asked: list[str] = []
@@ -56,25 +74,27 @@ class FakeGenie:
     def list_spaces(self) -> list[GenieSpaceRef]:
         if self.raise_on == "list_spaces":
             raise RuntimeError("PERMISSION_DENIED listing spaces")
-        return [GenieSpaceRef(sid, meta["title"]) for sid, meta in self.spaces.items()]
+        return [
+            GenieSpaceRef(sid, m["title"], m.get("parent_path"))
+            for sid, m in self.spaces.items()
+        ]
 
     def get_space(self, space_id: str) -> GenieSpace:
         if self.raise_on == "get_space":
             raise RuntimeError("RESOURCE_DOES_NOT_EXIST")
-        meta = self.spaces[space_id]
-        return GenieSpace(space_id, meta["title"], tuple(meta.get("sources", ())))
+        m = self.spaces[space_id]
+        return GenieSpace(space_id, m["title"], m.get("parent_path"), tuple(m.get("sources", ())))
 
     def ask(self, space_id: str, question: str) -> GenieAnswer:
         if self.raise_on == "ask":
             raise RuntimeError("Conversation API not enabled")
         self.asked.append(question)
-        return self.answers.get(
-            question, GenieAnswer(status="completed", sql=_grounded_sql(), text="ok")
-        )
+        return self.answers.get(question, _answer(_grounded_sql()))
 
 
 def _check(genie, **kwargs):
     kwargs.setdefault("agent_name", AGENT)
+    kwargs.setdefault("owner_path", OWNER)
     return workshop.check(
         GENIE_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, genie=genie, **kwargs
     )
@@ -144,23 +164,11 @@ def test_green_via_explicit_space_id_skips_listing():
     assert result.details["space_id"] == "sp-1"
 
 
-def test_green_structure_only_when_benchmarks_disabled():
-    genie = FakeGenie(raise_on="ask")  # asking would fail if attempted
-    result = _check(genie, ask_benchmarks=False)
-    assert result.passed is True
-    assert result.details["questions_asked"] == []
-    assert genie.asked == []
-
-
 def test_custom_domain_sources_and_questions():
     sources = [_fqn("gold_incidents"), _fqn("itsm_incident_metrics")]
     genie = FakeGenie(
-        spaces={"sp-9": {"title": AGENT, "sources": sources}},
-        answers={
-            "How many incidents by team?": GenieAnswer(
-                status="completed", sql=_grounded_sql("itsm_incident_metrics")
-            )
-        },
+        spaces={"sp-9": _own_space(sources=sources)},
+        answers={"How many incidents by team?": _answer(_grounded_sql("itsm_incident_metrics"))},
     )
     result = _check(
         genie,
@@ -171,24 +179,37 @@ def test_custom_domain_sources_and_questions():
     assert result.details["questions_asked"][0]["referenced"]
 
 
+# --- BLOCKING 1: benchmarks are required to pass ----------------------------
+
+
+def test_disabled_benchmarks_is_red():
+    # ask_benchmarks=False must NOT be a structure-only green pass.
+    genie = FakeGenie()
+    result = _check(genie, ask_benchmarks=False)
+    assert result.passed is False
+    assert result.details["stage"] == "benchmarks"
+    assert genie.asked == []
+
+
+def test_empty_benchmark_questions_is_red():
+    result = _check(FakeGenie(), benchmark_questions=[])
+    assert result.passed is False
+    assert result.details["stage"] == "benchmarks"
+
+
 # --- identity guards --------------------------------------------------------
 
 
 def test_missing_agent_is_red():
-    genie = FakeGenie(spaces={"sp-x": {"title": "someone_elses_agent", "sources": _default_sources()}})
+    genie = FakeGenie(spaces={"sp-x": _own_space(title="someone_elses_agent")})
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "identity"
     assert result.details["expected_title"] == AGENT
 
 
-def test_duplicate_agent_name_is_red():
-    genie = FakeGenie(
-        spaces={
-            "sp-1": {"title": AGENT, "sources": _default_sources()},
-            "sp-2": {"title": AGENT, "sources": _default_sources()},
-        }
-    )
+def test_duplicate_owned_agent_name_is_red():
+    genie = FakeGenie(spaces={"sp-1": _own_space(), "sp-2": _own_space()})
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "identity"
@@ -196,19 +217,74 @@ def test_duplicate_agent_name_is_red():
 
 
 def test_space_id_with_wrong_title_is_red():
-    # A supplied space id that is not the caller's namespaced agent fails.
-    genie = FakeGenie(spaces={"sp-1": {"title": "shared_default", "sources": _default_sources()}})
+    genie = FakeGenie(spaces={"sp-1": _own_space(title="shared_default")})
     result = _check(genie, genie_space_id="sp-1")
     assert result.passed is False
     assert result.details["stage"] == "identity"
     assert result.details["observed_title"] == "shared_default"
 
 
+# --- BLOCKING 3: enforce the caller's OWN namespaced agent ------------------
+
+
+def test_same_title_owned_by_other_is_not_adopted():
+    # A same-title agent living under another participant's path is not "yours".
+    genie = FakeGenie(
+        spaces={"sp-other": _own_space(parent=f"{OTHER_OWNER}/genie_spaces")}
+    )
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "ownership"
+
+
+def test_explicit_id_cross_owner_is_red():
+    genie = FakeGenie(
+        spaces={"sp-other": _own_space(parent=f"{OTHER_OWNER}/genie_spaces")}
+    )
+    result = _check(genie, genie_space_id="sp-other")
+    assert result.passed is False
+    assert result.details["stage"] == "ownership"
+    assert result.details["owner_path"] == OWNER
+
+
+def test_own_agent_is_selected_over_a_same_title_other():
+    # Two same-title agents; only the one under the caller's path is graded.
+    genie = FakeGenie(
+        spaces={
+            "sp-other": _own_space(parent=f"{OTHER_OWNER}/genie_spaces"),
+            "sp-mine": _own_space(parent=f"{OWNER}/genie_spaces"),
+        }
+    )
+    result = _check(genie)
+    assert result.passed is True
+    assert result.details["space_id"] == "sp-mine"
+
+
+def test_owner_path_matches_across_workspace_prefix():
+    # Genie returns parent_path without the /Workspace prefix; owner_path may
+    # carry it. Ownership must still match (regression from live validation).
+    genie = FakeGenie(
+        spaces={"sp-1": _own_space(parent="/Users/ada@example.com/genie_spaces")}
+    )
+    result = _check(genie, owner_path="/Workspace/Users/ada@example.com")
+    assert result.passed is True
+
+
+def test_shared_default_name_matching_another_agent_is_not_own():
+    # A shared/default name that only matches another owner's agent → RED.
+    genie = FakeGenie(
+        spaces={"sp-shared": _own_space(title="shared_default", parent=f"{OTHER_OWNER}/x")}
+    )
+    result = _check(genie, agent_name="shared_default")
+    assert result.passed is False
+    assert result.details["stage"] == "ownership"
+
+
 # --- source-configuration guards --------------------------------------------
 
 
 def test_no_attached_sources_is_red():
-    genie = FakeGenie(spaces={"sp-1": {"title": AGENT, "sources": []}})
+    genie = FakeGenie(spaces={"sp-1": _own_space(sources=[])})
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "sources"
@@ -218,7 +294,7 @@ def test_no_attached_sources_is_red():
 def test_partial_sources_is_red():
     # Missing the Metric Views: the acceptance is gold *and* metrics.
     genie = FakeGenie(
-        spaces={"sp-1": {"title": AGENT, "sources": [_fqn("gold_sales"), _fqn("gold_contract_performance")]}}
+        spaces={"sp-1": _own_space(sources=[_fqn("gold_sales"), _fqn("gold_contract_performance")])}
     )
     result = _check(genie)
     assert result.passed is False
@@ -228,66 +304,94 @@ def test_partial_sources_is_red():
     assert "finance_contract_metrics" in missing
 
 
-def test_extra_sources_still_pass_and_quoting_is_ignored():
-    # A superset is fine, and attached identifiers may be quoted/spaced.
-    attached = [f"`{CATALOG}`.`{SCHEMA}`.`{n}`" for n in DEFAULT_EXPECTED_SOURCES]
-    attached.append(_fqn("bronze_sales_transactions"))
-    genie = FakeGenie(spaces={"sp-1": {"title": AGENT, "sources": attached}})
+def test_source_superset_passes_despite_case_quotes_and_spaces():
+    # Attached identifiers may differ only by case, backticks, or spacing.
+    attached = [
+        f"`{CATALOG}`.`{SCHEMA}`.`GOLD_SALES`",
+        f"{CATALOG} . {SCHEMA} . Gold_Contract_Performance",
+        f'"{CATALOG}"."{SCHEMA}"."finance_sales_metrics"',
+        _fqn("finance_contract_metrics"),
+        _fqn("bronze_sales_transactions"),  # a harmless extra
+    ]
+    genie = FakeGenie(spaces={"sp-1": _own_space(sources=attached)})
     result = _check(genie)
     assert result.passed is True
 
 
-# --- answer-sanity guards ---------------------------------------------------
-
-
-def test_failed_answer_is_red():
-    genie = FakeGenie(
-        answers={
-            DEFAULT_BENCHMARK_QUESTIONS[0]: GenieAnswer(status="failed", error="SQL_EXECUTION_EXCEPTION")
-        }
-    )
-    result = _check(genie)
-    assert result.passed is False
-    assert result.details["stage"] == "answer"
-    assert result.details["status"] == "failed"
+# --- BLOCKING 2: grounded SQL must be a real relation reference -------------
 
 
 def test_answer_without_sql_is_red():
-    # A clarifying-question / text-only reply is not a grounded answer.
-    genie = FakeGenie(
-        answers={
-            DEFAULT_BENCHMARK_QUESTIONS[0]: GenieAnswer(
-                status="completed", sql=None, text="Which fiscal year did you mean?"
-            )
-        }
-    )
+    genie = FakeGenie(answers={Q0: _answer(None, text="Which fiscal year did you mean?")})
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "answer"
     assert "without" in result.message
 
 
-def test_answer_with_off_topic_sql_is_red():
-    # Completed with SQL, but the SQL never touches a curated source.
-    genie = FakeGenie(
-        answers={
-            DEFAULT_BENCHMARK_QUESTIONS[0]: GenieAnswer(
-                status="completed", sql="SELECT * FROM some_other_catalog.public.weather"
-            )
-        }
-    )
+def test_failed_answer_is_red():
+    genie = FakeGenie(answers={Q0: GenieAnswer(status="failed", error="SQL_EXECUTION_EXCEPTION")})
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "answer"
+    assert result.details["status"] == "failed"
+
+
+def test_answer_with_unrelated_from_is_red():
+    genie = FakeGenie(answers={Q0: _answer("SELECT * FROM some_other_catalog.public.weather")})
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "answer"
     assert "does not reference" in result.message
 
 
-def test_ask_api_gated_is_red_with_guidance():
+def test_source_name_only_in_string_literal_is_red():
+    genie = FakeGenie(answers={Q0: _answer("SELECT 'gold_sales' AS label FROM other_cat.pub.weather")})
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "answer"
+
+
+def test_source_name_only_in_comment_is_red():
+    genie = FakeGenie(answers={Q0: _answer("SELECT 1 /* gold_sales */ FROM other_cat.pub.weather -- gold_sales")})
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "answer"
+
+
+def test_source_name_only_as_column_alias_is_red():
+    genie = FakeGenie(answers={Q0: _answer("SELECT count(*) AS gold_sales FROM other_cat.pub.weather")})
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "answer"
+
+
+def test_source_name_only_as_cte_name_is_red():
+    genie = FakeGenie(answers={Q0: _answer("WITH gold_sales AS (SELECT 1 AS x) SELECT * FROM gold_sales")})
+    result = _check(genie)
+    assert result.passed is False
+    assert result.details["stage"] == "answer"
+
+
+def test_cte_body_selecting_from_curated_source_is_green():
+    sql = f"WITH t AS (SELECT SUM(net_sales) AS ns FROM {_bfqn('gold_sales')}) SELECT * FROM t"
+    genie = FakeGenie(answers={q: _answer(sql) for q in DEFAULT_BENCHMARK_QUESTIONS})
+    result = _check(genie)
+    assert result.passed is True
+
+
+def test_join_reference_to_curated_source_is_green():
+    sql = f"SELECT * FROM other_cat.pub.dim d JOIN {_bfqn('finance_sales_metrics')} m ON d.k = m.k"
+    genie = FakeGenie(answers={q: _answer(sql) for q in DEFAULT_BENCHMARK_QUESTIONS})
+    result = _check(genie)
+    assert result.passed is True
+
+
+def test_ask_api_gated_is_red():
     genie = FakeGenie(raise_on="ask")
     result = _check(genie)
     assert result.passed is False
     assert result.details["stage"] == "ask"
-    assert "ask_benchmarks=False" in result.message
 
 
 # --- configuration guards ---------------------------------------------------

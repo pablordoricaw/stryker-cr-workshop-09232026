@@ -64,8 +64,11 @@ data assets (`gold_sales`, `gold_contract_performance`, `finance_sales_metrics`,
 name** so teammates sharing the workspace do not collide, and adds pre-authored
 sample questions. It opens with a Partner-powered AI (Databricks Assistant)
 pre-check and ends on `06_genie`, which finds the caller's own agent by name,
-confirms the expected sources are attached, and asks benchmark questions —
-requiring each to return SQL grounded in the curated data. Pass
-`ask_benchmarks=False` if the Conversation API is gated on your workspace.
+confirms the expected sources are attached (binding to the caller's own
+workspace namespace so a teammate's same-titled agent is never adopted), and
+asks benchmark questions — requiring each to return SQL that genuinely queries
+the curated data (a source name in a string, comment, alias, or CTE name does
+not count). The agent must actually answer, so if the Conversation API is gated
+the checkpoint stays RED (enable Partner-powered AI) rather than passing.
 
 > The remaining notebook is added by a later ticket: the app wiring (#12).

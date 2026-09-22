@@ -197,11 +197,14 @@ agent_name = None
 # MAGIC The check reads only observable Genie state: it finds **your** agent by
 # MAGIC name, confirms it is attached to the expected gold tables and Metric Views,
 # MAGIC and asks the benchmark questions — requiring each to return SQL grounded in
-# MAGIC your curated data. It fails if the agent is missing, misconfigured, or
-# MAGIC answers with no/irrelevant SQL.
+# MAGIC your curated data. It fails if the agent is missing, misconfigured, owned
+# MAGIC by someone else (same title, different namespace), or answers with
+# MAGIC no/irrelevant SQL.
 # MAGIC
-# MAGIC If the Conversation API is gated on your workspace, pass
-# MAGIC `ask_benchmarks=False` to check structure only.
+# MAGIC `owner_path` binds the check to **your** workspace namespace so a teammate's
+# MAGIC same-titled agent is never adopted. The agent must actually answer, so if
+# MAGIC the Conversation API is gated the checkpoint stays **RED** — enable
+# MAGIC Partner-powered AI rather than skipping the answer check.
 
 # COMMAND ----------
 
@@ -213,6 +216,7 @@ result = workshop.check(
     schema=config.schema,
     genie=WorkspaceClient(),
     agent_name=agent_name,
+    owner_path=f"/Workspace/Users/{me}",  # your namespace (me from step 1)
     genie_space_id=space_id,  # optional; omit to resolve by name
 )
 print(result)

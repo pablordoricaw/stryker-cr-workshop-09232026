@@ -180,7 +180,8 @@ if not warehouse_id:
         "warehouse_id widget."
     )
 
-parent_path = f"/Workspace/Users/{me}/genie_spaces"
+home = f"/Workspace/Users/{me}"  # your own workspace namespace
+parent_path = f"{home}/genie_spaces"
 w.workspace.mkdirs(parent_path)
 
 
@@ -194,17 +195,38 @@ def _pages():
             return
 
 
-existing = next((s for s in _pages() if (s.title or "").strip() == agent_name), None)
-if existing is not None:
-    current = w.genie.get_space(existing.space_id, include_serialized_space=True)
+def _canon(path):
+    # Genie returns parent_path without the /Workspace prefix, so normalize both.
+    p = (path or "").rstrip("/")
+    return p[len("/Workspace"):] if p.startswith("/Workspace/") else p
+
+
+def _under_home(path):
+    p, h = _canon(path), _canon(home)
+    return bool(h) and (p == h or p.startswith(h + "/"))
+
+
+# Only ever update an agent that is demonstrably YOURS (same title AND living
+# under your own workspace path). A same-title agent owned by a teammate is left
+# untouched — we create our own instead — so we never overwrite someone else's.
+owned = None
+for s in _pages():
+    if (s.title or "").strip() != agent_name:
+        continue
+    full = w.genie.get_space(s.space_id, include_serialized_space=True)
+    if _under_home(full.parent_path):
+        owned = full
+        break
+
+if owned is not None:
     space = w.genie.update_space(
-        existing.space_id,
+        owned.space_id,
         serialized_space=serialized_space,
         title=agent_name,
         warehouse_id=warehouse_id,
-        etag=current.etag,
+        etag=owned.etag,
     )
-    print(f"Updated existing agent: {space.space_id}")
+    print(f"Updated your agent: {space.space_id}")
 else:
     space = w.genie.create_space(
         warehouse_id,
@@ -212,7 +234,7 @@ else:
         title=agent_name,
         parent_path=parent_path,
     )
-    print(f"Created agent: {space.space_id}")
+    print(f"Created your agent: {space.space_id}")
 
 space_id = space.space_id
 
@@ -246,6 +268,7 @@ result = workshop.check(
     schema=config.schema,
     genie=w,
     agent_name=agent_name,
+    owner_path=home,  # bind the check to YOUR namespace, not just the title
     genie_space_id=space_id,
 )
 print(result)
