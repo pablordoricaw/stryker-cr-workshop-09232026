@@ -517,6 +517,37 @@ def test_sdk_adapter_maps_postgres_synced_table():
     assert info.primary_key_columns == ()
 
 
+def _adapter_info_for_state(detailed_state: str):
+    """Build the live adapter's SyncedTableInfo for a given sync detailed_state."""
+    pg = _FakePostgres(
+        table=_FakeSyncedTable(
+            status=_FakeStatus(_Enum(detailed_state), _Enum("ACTIVE"))
+        )
+    )
+    tables = _FakeTables(
+        _FakeUCTable({"source_table": "cat.sch.gold_contract_performance"})
+    )
+    client = _SdkAppClient(_FakeWorkspace(pg, tables), pg={})
+    return client.get_synced_table("cat.sch.gold_contract_performance_served_ada")
+
+
+def test_sdk_adapter_provisioning_state_is_not_online():
+    # `.wait()` on create can return at SYNCED_TABLE_PROVISIONING — a not-yet-online
+    # table must NOT pass the online guard (the checkpoint stays RED until serving).
+    info = _adapter_info_for_state("SYNCED_TABLE_PROVISIONING")
+    assert info.detailed_state == "synced_table_provisioning"
+    assert _synced_online(info) is False
+
+
+def test_sdk_adapter_triggered_update_is_online():
+    # SYNCED_TABLE_ONLINE_TRIGGERED_UPDATE is a real live state (observed even for a
+    # SNAPSHOT request) — accepted as online by the startswith('synced_table_online')
+    # logic, so the checkpoint proceeds to the serving proof.
+    info = _adapter_info_for_state("SYNCED_TABLE_ONLINE_TRIGGERED_UPDATE")
+    assert info.detailed_state == "synced_table_online_triggered_update"
+    assert _synced_online(info) is True
+
+
 def test_sdk_adapter_source_table_missing_property_is_none():
     # A synced table whose UC entry has no source_table property → source None →
     # the checkpoint's source guard goes RED (never a false adopt).

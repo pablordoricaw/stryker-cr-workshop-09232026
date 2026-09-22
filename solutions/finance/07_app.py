@@ -127,11 +127,16 @@ from databricks.sdk.service.postgres import (
     SyncedTableSyncedTableSpecSyncedTableSchedulingPolicy,
 )
 
+import time
+
 w = WorkspaceClient()
 
 # Assumes the project (2a) already exists. The synced-table id is a UC name in
-# your existing catalog — there is NO Lakebase catalog. `.wait()` blocks until the
-# initial snapshot finishes, so the app can read served rows immediately after.
+# your existing catalog — there is NO Lakebase catalog. NOTE: `.wait()` returns
+# once the resource is provisioned, which can still be SYNCED_TABLE_PROVISIONING
+# — it does NOT block until the initial snapshot finishes. So poll below until
+# the sync is ONLINE before deploying the app / expecting served rows. The
+# `07_app` checkpoint correctly stays RED until the table is online and serving.
 synced = w.postgres.create_synced_table(
     synced_table_id=synced_table,
     synced_table=SyncedTable(
@@ -149,7 +154,23 @@ synced = w.postgres.create_synced_table(
         ),
     ),
 ).wait()
-print("synced table:", synced.name)
+print("synced table created:", synced.name)
+
+# Poll until the sync reaches an ONLINE detailed_state (e.g.
+# SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE). A still-provisioning table serves no
+# rows yet, so wait here before deploying / running the checkpoint.
+for _ in range(40):  # ~10 min ceiling at 15s
+    t = w.postgres.get_synced_table(name=f"synced_tables/{synced_table}")
+    detailed = getattr(getattr(t.status, "detailed_state", None), "value", "") or ""
+    print("  detailed_state:", detailed)
+    if detailed.startswith("SYNCED_TABLE_ONLINE") and "FAILED" not in detailed:
+        break
+    if "FAILED" in detailed:
+        raise RuntimeError(f"sync failed: {getattr(t.status, 'message', None)}")
+    time.sleep(15)
+else:
+    raise TimeoutError("synced table did not reach an ONLINE state in time")
+print("synced table ONLINE")
 
 # COMMAND ----------
 
