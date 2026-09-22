@@ -86,11 +86,11 @@ From the main worktree, merge without committing, strip the maintainer-only file
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
+git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
 git mv docs/participant/AGENTS.md AGENTS.md
 ```
 
-The `git rm` removes the maintainer `AGENTS.md`; the `git mv` then puts the participant hint ladder in its place. Verify the swap before committing — the root `AGENTS.md` must now exist and be the participant hint ladder (its sentinel present, the maintainer workflow's title absent), the participant source must no longer sit under `docs/`, and the other maintainer-only paths must be gone:
+The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md`; the `git mv` then puts the participant hint ladder in its place. Verify the swap before committing — the root `AGENTS.md` must now exist and be the participant hint ladder (its sentinel present, the maintainer workflow's title absent), the participant source must no longer sit under `docs/`, and the other maintainer-only paths must be gone:
 
 ```bash
 test -e AGENTS.md

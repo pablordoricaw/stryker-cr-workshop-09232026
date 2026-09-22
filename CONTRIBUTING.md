@@ -16,12 +16,12 @@ Keep each contribution focused, use [Conventional Commits](https://www.conventio
 
 A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material and **swap in the participant hint ladder** as its root `AGENTS.md`.
 
-Merge without committing, strip the maintainer-only files, then move the participant hint ladder into the root as `AGENTS.md` (the `git rm` removes the maintainer `AGENTS.md`; the `git mv` puts the participant ladder in its place, where Genie Code auto-discovers it):
+Merge without committing, strip the maintainer-only files, then move the participant hint ladder into the root as `AGENTS.md` (the `git rm` uses `-f` because the no-commit merge stages these files as additions — they are absent from `main`'s tree between releases — which a plain `git rm` refuses to remove; the `git mv` then puts the participant ladder in its place, where Genie Code auto-discovers it):
 
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm -r --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
+git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
 git mv docs/participant/AGENTS.md AGENTS.md
 ```
 
