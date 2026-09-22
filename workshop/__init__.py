@@ -22,6 +22,7 @@ from __future__ import annotations
 from .bootstrap import bootstrap, find_repo_root
 from .config import DOMAINS, WorkshopConfig, resolve_config
 from .context import CheckContext
+from .domains import DOMAIN_SPECS, DomainSpec, MetricViewSpec, domain_spec
 from .identifiers import fully_qualified, quote_identifier
 from .namespace import (
     WORKSHOP_SCHEMA_PREFIX,
@@ -90,6 +91,11 @@ __all__ = [
     "resolve_config",
     "WorkshopConfig",
     "DOMAINS",
+    # Per-domain transactional-track spec (ticket #25)
+    "domain_spec",
+    "DomainSpec",
+    "MetricViewSpec",
+    "DOMAIN_SPECS",
     "provision",
     "ProvisionReport",
     "quote_identifier",

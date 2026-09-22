@@ -4,10 +4,10 @@
 # MAGIC # 06 · Genie agent over gold + metrics
 # MAGIC
 # MAGIC Build a curated **Genie agent** — a natural-language interface — over the
-# MAGIC Finance data you governed in the earlier modules. You will attach the two
-# MAGIC gold tables and the two Metric Views, give the agent pre-authored sample
-# MAGIC questions and instructions, and confirm it answers Finance questions
-# MAGIC sanely. Run `05_metric_views` first.
+# MAGIC data you governed in the earlier modules for **your domain**. You will
+# MAGIC attach the two gold tables and the two Metric Views, give the agent
+# MAGIC pre-authored sample questions and instructions, and confirm it answers your
+# MAGIC domain's questions sanely. Run `05_metric_views` first.
 # MAGIC
 # MAGIC The agent is created in **your existing workshop schema's** catalog — it
 # MAGIC creates no catalog and no second schema. It only *reads* the gold tables
@@ -62,12 +62,13 @@ import workshop
 # MAGIC A Genie agent is **workspace-scoped**, and your whole team shares one
 # MAGIC workspace — so a fixed agent name would collide with your teammates'. Give
 # MAGIC your agent a **per-participant name** derived from your identity, so every
-# MAGIC participant gets their own agent.
+# MAGIC participant gets their own agent. This cell also derives your domain's gold
+# MAGIC tables and Metric Views (the four data assets to attach).
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
@@ -86,21 +87,29 @@ config = workshop.resolve_config(
 
 ns = workshop.namespace(me, domain=config.domain)
 
-gold_sales = workshop.fully_qualified(config.catalog, config.schema, "gold_sales")
-gold_contracts = workshop.fully_qualified(
-    config.catalog, config.schema, "gold_contract_performance"
-)
-sales_metrics = workshop.fully_qualified(
-    config.catalog, config.schema, "finance_sales_metrics"
-)
-contract_metrics = workshop.fully_qualified(
-    config.catalog, config.schema, "finance_contract_metrics"
-)
+# The single source of truth for this domain's gold tables, Metric Views, and
+# benchmark questions.
+spec = workshop.domain_spec(config.domain)
+
+gold_tables = [
+    workshop.fully_qualified(config.catalog, config.schema, spec.detail_table),
+    workshop.fully_qualified(config.catalog, config.schema, spec.mart_table),
+]
+metric_views = [
+    workshop.fully_qualified(config.catalog, config.schema, name)
+    for name in spec.metric_views
+]
+benchmark_questions = list(spec.genie_benchmark_questions)
 
 # TODO: Name your agent from your namespace, so it never collides with a
 # TODO: teammate's and the checkpoint resolves the exact same name:
 # TODO:   agent_name = ns.genie_agent_name()
 agent_name = None
+
+print(f"Domain      : {config.domain}")
+print(f"Gold tables : {gold_tables}")
+print(f"Metric Views: {metric_views}")
+print(f"Benchmarks  : {benchmark_questions}")
 
 # COMMAND ----------
 
@@ -144,17 +153,16 @@ agent_name = None
 # MAGIC - **Code:** create it with the Databricks SDK (`WorkspaceClient().genie`)
 # MAGIC   from a `serialized_space` JSON payload.
 # MAGIC
-# MAGIC Attach **all four**: `gold_sales`, `gold_contract_performance`,
-# MAGIC `finance_sales_metrics`, `finance_contract_metrics`. The gold tables answer
-# MAGIC transaction-detail questions; the Metric Views answer governed-KPI
-# MAGIC questions.
+# MAGIC Attach **all four** assets printed above (your two gold tables and two Metric
+# MAGIC Views). The gold tables answer transaction-detail questions; the Metric
+# MAGIC Views answer governed-KPI questions.
 
 # COMMAND ----------
 
 # TODO: Create (or update) a Genie agent titled exactly `agent_name`, attached to
-# TODO: the two gold tables and the two Metric Views, with a few Finance sample
-# TODO: questions. Then capture its space id, e.g. `space_id = ...`.
-
+# TODO: the `gold_tables` and `metric_views` derived above, with a few sample
+# TODO: questions for your domain (`benchmark_questions` is a good start). Then
+# TODO: capture its space id, e.g. `space_id = ...`.
 
 # COMMAND ----------
 
@@ -172,19 +180,13 @@ agent_name = None
 # MAGIC serialized = json.dumps({
 # MAGIC   "version": 2,
 # MAGIC   "data_sources": {
-# MAGIC     "tables": sorted([{"identifier": t} for t in (
-# MAGIC        f"{config.catalog}.{config.schema}.gold_sales",
-# MAGIC        f"{config.catalog}.{config.schema}.gold_contract_performance")],
+# MAGIC     "tables": sorted([{"identifier": t} for t in gold_tables],
 # MAGIC        key=lambda x: x["identifier"]),
-# MAGIC     "metric_views": sorted([{"identifier": m} for m in (
-# MAGIC        f"{config.catalog}.{config.schema}.finance_sales_metrics",
-# MAGIC        f"{config.catalog}.{config.schema}.finance_contract_metrics")],
+# MAGIC     "metric_views": sorted([{"identifier": m} for m in metric_views],
 # MAGIC        key=lambda x: x["identifier"]),
 # MAGIC   },
 # MAGIC   "config": {"sample_questions": sorted(
-# MAGIC      [{"id": uuid.uuid4().hex, "question": [q]} for q in [
-# MAGIC         "What were total net sales by product family?",
-# MAGIC         "Which sales region had the highest gross margin?"]],
+# MAGIC      [{"id": uuid.uuid4().hex, "question": [q]} for q in benchmark_questions],
 # MAGIC      key=lambda x: x["id"])},
 # MAGIC })
 # MAGIC
@@ -194,8 +196,8 @@ agent_name = None
 # MAGIC space_id = space.space_id
 # MAGIC ```
 # MAGIC
-# MAGIC The full solution (sample questions, instructions, and an idempotent
-# MAGIC create-or-update) is in `solutions/finance/06_genie.py`.
+# MAGIC The full solution (your domain's sample questions, instructions, and an
+# MAGIC idempotent create-or-update) is in `solutions/<domain>/06_genie.py`.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -208,11 +210,11 @@ agent_name = None
 
 # COMMAND ----------
 
-# TODO: Ask a Finance question and inspect the generated SQL + answer, e.g.:
-# TODO:   msg = w.genie.start_conversation_and_wait(space_id, "What were total net sales by product family?")
+# TODO: Ask one of your `benchmark_questions` and inspect the generated SQL +
+# TODO: answer, e.g.:
+# TODO:   msg = w.genie.start_conversation_and_wait(space_id, benchmark_questions[0])
 # TODO:   for a in (msg.attachments or []):
 # TODO:       print(getattr(a.query, "query", None) or getattr(a.text, "content", None))
-
 
 # COMMAND ----------
 
@@ -228,9 +230,10 @@ agent_name = None
 # MAGIC
 # MAGIC `namespace=ns` binds the check to **your** workspace namespace (deriving both
 # MAGIC your agent name and owner_path) so a teammate's same-titled agent is never
-# MAGIC adopted. The agent must actually answer, so if
-# MAGIC the Conversation API is gated the checkpoint stays **RED** — enable
-# MAGIC Partner-powered AI rather than skipping the answer check.
+# MAGIC adopted. Your domain's expected sources and benchmark questions are passed
+# MAGIC from the spec. The agent must actually answer, so if the Conversation API is
+# MAGIC gated the checkpoint stays **RED** — enable Partner-powered AI rather than
+# MAGIC skipping the answer check.
 
 # COMMAND ----------
 
@@ -243,6 +246,9 @@ result = workshop.check(
     genie=WorkspaceClient(),
     namespace=ns,  # derives your agent name AND owner_path (one source of truth)
     genie_space_id=space_id,  # optional; omit to resolve by name
+    # Domain expected sources + benchmark questions for the shared checkpoint.
+    expected_sources=list(spec.genie_expected_sources),
+    benchmark_questions=benchmark_questions,
 )
 print(result)
 assert result.passed, result.message
@@ -252,9 +258,8 @@ assert result.passed, result.message
 # MAGIC %md
 # MAGIC ## Stretch — tune your agent
 # MAGIC
-# MAGIC Add **text instructions** (e.g. default fiscal-year handling), **example
-# MAGIC SQL** for a tricky question shape, or per-column **synonyms** so Genie maps
-# MAGIC business language to your columns. Then re-ask a question and watch the
-# MAGIC generated SQL improve. For a custom domain, pass `expected_sources=[...]`
-# MAGIC and `benchmark_questions=[...]` to `workshop.check` to validate your own
-# MAGIC agent.
+# MAGIC Add **text instructions** (e.g. default fiscal-year or SLA handling),
+# MAGIC **example SQL** for a tricky question shape, or per-column **synonyms** so
+# MAGIC Genie maps business language to your columns. Then re-ask a question and
+# MAGIC watch the generated SQL improve. The `expected_sources` and
+# MAGIC `benchmark_questions` above already validate your own domain's agent.

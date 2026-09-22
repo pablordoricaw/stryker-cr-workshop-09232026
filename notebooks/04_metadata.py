@@ -1,7 +1,7 @@
 # Databricks notebook source
 # ruff: noqa: F401, F821, I001
 # MAGIC %md
-# MAGIC # 04 · Governed metadata with dbxmetagen — Finance
+# MAGIC # 04 · Governed metadata with dbxmetagen
 # MAGIC
 # MAGIC Turn the gold tables into *governed* tables by generating and applying
 # MAGIC metadata with [**dbxmetagen**](https://github.com/databricks-industry-solutions/dbxmetagen)
@@ -11,10 +11,11 @@
 # MAGIC - **`pi`** — PII/PHI/PCI classification tags on sensitive columns; and
 # MAGIC - **`domain`** — a business-domain tag on each table.
 # MAGIC
-# MAGIC The governance model is **stage → review → apply**: every run defaults to
-# MAGIC `apply_ddl=false`, so metadata is staged into review tables and *nothing*
-# MAGIC touches Unity Catalog until you approve it. You review, then re-run with
-# MAGIC `apply_ddl=true` to apply.
+# MAGIC It documents whichever two gold tables your domain built in `03_gold`
+# MAGIC (derived for you below). The governance model is **stage → review →
+# MAGIC apply**: every run defaults to `apply_ddl=false`, so metadata is staged into
+# MAGIC review tables and *nothing* touches Unity Catalog until you approve it. You
+# MAGIC review, then re-run with `apply_ddl=true` to apply.
 # MAGIC
 # MAGIC Run `03_gold` first. Fill in each **`# TODO`** cell, then run the checkpoint.
 # MAGIC This notebook uses the existing catalog from `00_setup`; it never creates a
@@ -61,7 +62,8 @@ import workshop
 # MAGIC %md
 # MAGIC ## 1. Read your workshop config
 # MAGIC
-# MAGIC Enter the same existing catalog and schema you used in `00_setup`.
+# MAGIC Enter the same existing catalog and schema you used in `00_setup`, and keep
+# MAGIC the same domain. Your domain's two gold tables are derived below.
 # MAGIC
 # MAGIC - **`model_endpoint`** is the Foundation Model endpoint dbxmetagen calls.
 # MAGIC   It defaults to `databricks-claude-sonnet-4-6`. **Confirm that endpoint
@@ -83,7 +85,7 @@ import workshop
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("model_endpoint", "databricks-claude-sonnet-4-6", "FM endpoint")
@@ -107,14 +109,16 @@ pi_classification_tag_name = (
     dbutils.widgets.get("pi_classification_tag_name") or "data_classification"
 )
 
-# The gold tables to document (built by 03_gold). dbxmetagen takes a
-# comma-separated list of fully-qualified table names.
-target_tables = ["gold_sales", "gold_contract_performance"]
+# The single source of truth for this domain's transactional-track names. The
+# gold tables to document (built by 03_gold) are your domain's detail + mart.
+spec = workshop.domain_spec(config.domain)
+target_tables = list(spec.metadata_tables)
 table_names = ",".join(
     f"{config.catalog}.{config.schema}.{table}" for table in target_tables
 )
 
-print(f"Documenting: {table_names}")
+print(f"Domain        : {config.domain}")
+print(f"Documenting   : {table_names}")
 print(f"Model endpoint: {model_endpoint}   (confirm it exists in Serving)")
 print(f"dbxmetagen output schema: {config.catalog}.{config.schema}")
 print(f"Tag keys: domain={domain_tag_name}, pi={pi_classification_tag_name}")
@@ -158,7 +162,6 @@ from dbxmetagen.main import main
 #   - apply_ddl                   = False            (stage only — do not apply yet)
 #   - domain_tag_name             = domain_tag_name          (keep keys in sync)
 #   - pi_classification_tag_name  = pi_classification_tag_name
-
 
 # COMMAND ----------
 
@@ -223,7 +226,6 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # Same main() calls as the staging step (still passing schema_name=config.schema
 # and the two *_tag_name options), but with apply_ddl=True and apply_tags=True.
 
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -255,7 +257,8 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # MAGIC This check reads only Unity Catalog state — `information_schema` comments
 # MAGIC and tags. It fails if any target table or column is uncommented, if no
 # MAGIC column carries the PI classification tag, or if any table is missing its
-# MAGIC business-domain tag. It never inspects this notebook.
+# MAGIC business-domain tag. It never inspects this notebook. Your domain's gold
+# MAGIC tables are passed to the shared checkpoint from the spec.
 
 # COMMAND ----------
 
@@ -264,6 +267,7 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    tables=target_tables,
     # Verify the same tag keys you generated with, so the two never drift.
     domain_tag_name=domain_tag_name,
     pi_tag_name=pi_classification_tag_name,

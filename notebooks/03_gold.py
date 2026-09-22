@@ -1,15 +1,19 @@
 # Databricks notebook source
 # ruff: noqa: F401, F821, I001
 # MAGIC %md
-# MAGIC # 03 · Gold medallion layer — Finance
+# MAGIC # 03 · Gold medallion layer
 # MAGIC
-# MAGIC Turn document intelligence and transaction facts into business-ready
-# MAGIC gold tables for Metric Views, Genie, and the app:
+# MAGIC Turn document intelligence and transaction facts into business-ready gold
+# MAGIC tables for Metric Views, Genie, and the app. Both table names and the
+# MAGIC business key differ per domain (derived for you below):
 # MAGIC
-# MAGIC - **`gold_sales`** — one row per `transaction_id`, enriched with its
-# MAGIC   extracted commercial agreement; and
-# MAGIC - **`gold_contract_performance`** — one row per `contract_id`, with
-# MAGIC   additive sales and margin measures.
+# MAGIC - a **detail** table — one row per transaction, enriched with its
+# MAGIC   document-derived record (Finance `gold_sales`, Security `gold_findings`,
+# MAGIC   ITSM `gold_incidents`); and
+# MAGIC - a **mart** table — one row per business key, with additive measures
+# MAGIC   (Finance `gold_contract_performance` per `contract_id`, Security
+# MAGIC   `gold_cve_exposure` per `cve_id`, ITSM `gold_service_performance` per
+# MAGIC   `incident_id`).
 # MAGIC
 # MAGIC Run `01_bronze_txn` and `02_silver_docs` first. Fill in each **`# TODO`**
 # MAGIC cell, then run `03_gold`. This notebook uses the existing catalog from
@@ -41,12 +45,15 @@ import workshop
 # MAGIC %md
 # MAGIC ## 1. Read your workshop config
 # MAGIC
-# MAGIC Enter the same existing catalog and schema you used in `00_setup`.
+# MAGIC Enter the same existing catalog and schema you used in `00_setup`, and keep
+# MAGIC the same domain. This cell is done for you: it derives your domain's upstream
+# MAGIC (bronze + silver) and gold (detail + mart) table names and the conformed
+# MAGIC join key from the domain spec.
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
@@ -62,19 +69,20 @@ config = workshop.resolve_config(
     identity=me,
 )
 
-bronze_sales = workshop.fully_qualified(
-    config.catalog, config.schema, "bronze_sales_transactions"
-)
-silver_contracts = workshop.fully_qualified(
-    config.catalog, config.schema, "silver_sales_contract_pricing_agreement"
-)
-gold_sales = workshop.fully_qualified(config.catalog, config.schema, "gold_sales")
-gold_contract_performance = workshop.fully_qualified(
-    config.catalog, config.schema, "gold_contract_performance"
-)
+# The single source of truth for this domain's transactional-track names/keys.
+spec = workshop.domain_spec(config.domain)
 
-print(f"Detail target: {gold_sales}")
-print(f"Mart target:   {gold_contract_performance}")
+bronze_source = workshop.fully_qualified(config.catalog, config.schema, spec.bronze_txn_table)
+silver_document = workshop.fully_qualified(config.catalog, config.schema, spec.document_table)
+gold_detail = workshop.fully_qualified(config.catalog, config.schema, spec.detail_table)
+gold_mart = workshop.fully_qualified(config.catalog, config.schema, spec.mart_table)
+
+print(f"Domain         : {config.domain}")
+print(f"Bronze source  : {bronze_source}")
+print(f"Silver document: {silver_document}")
+print(f"Detail target  : {gold_detail}   (one row per {spec.transaction_key})")
+print(f"Mart target    : {gold_mart}   (one row per {spec.group_key})")
+print(f"Join key       : bronze.{spec.group_key} = silver.{spec.document_key}")
 
 # COMMAND ----------
 
@@ -92,30 +100,29 @@ print(f"Mart target:   {gold_contract_performance}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Build transaction-grain `gold_sales`
+# MAGIC ## 2. Build the transaction-grain detail table
 # MAGIC
-# MAGIC The conformed business key is
-# MAGIC `bronze_sales_transactions.contract_id =
-# MAGIC silver_sales_contract_pricing_agreement.agreement_id`. Project the
-# MAGIC extracted agreement columns with clear `contract_...` names and left-join
-# MAGIC them to sales. Preserve every transaction column and write a managed Delta
-# MAGIC table in your participant schema.
+# MAGIC The conformed business key is `bronze.<group_key> = silver.<document_key>`
+# MAGIC (printed above for your domain). Project the extracted document columns with
+# MAGIC clear names and **left-join** them to the transactions. Preserve every
+# MAGIC transaction column and write a managed Delta table (`gold_detail`) in your
+# MAGIC participant schema.
 
 # COMMAND ----------
 
 from pyspark.sql import functions as F
 
-# TODO: Build and write `gold_sales`.
+# TODO: Build and write the gold detail table (`gold_detail`).
 #
 # Requirements:
-#   - one row per source `transaction_id` (use a left join),
+#   - one row per source transaction key (`spec.transaction_key`; use a left join),
 #   - retain all bronze transaction columns,
-#   - add `contract_agreement_id`, `contract_document_path`,
-#     `contract_document_filename`, `contract_customer_name`, effective and
-#     expiration dates, currency, commitment, rebate, governing-law, and
-#     covered-products fields from the silver contract table,
+#   - project the extracted document fields from `silver_document` under clear
+#     names, including `spec.detail_document_key` (the document key) and
+#     `spec.detail_document_match` (a non-null document column that proves
+#     enrichment landed) — see your domain's data/<domain>/README.md and gated
+#     solutions/<domain>/03_gold.py for the exact field list,
 #   - overwrite the managed Delta target with schema overwrite enabled.
-
 
 # COMMAND ----------
 
@@ -123,77 +130,75 @@ from pyspark.sql import functions as F
 # MAGIC <details>
 # MAGIC <summary>💡 Hint — grain-safe document enrichment</summary>
 # MAGIC
-# MAGIC Alias the source DataFrames, join on the conformed key, and explicitly
-# MAGIC project document columns so their provenance remains obvious:
+# MAGIC Alias the source DataFrames, project the document columns explicitly (so
+# MAGIC their provenance stays obvious), and left-join on the conformed key:
 # MAGIC
 # MAGIC ```python
-# MAGIC contracts = spark.table(silver_contracts).select(
-# MAGIC     F.col("agreement_id").alias("contract_agreement_id"),
-# MAGIC     F.col("path").alias("contract_document_path"),
-# MAGIC     F.col("filename").alias("contract_document_filename"),
-# MAGIC     F.col("customer_name").alias("contract_customer_name"),
-# MAGIC     F.to_date("effective_date").alias("contract_effective_date"),
-# MAGIC     F.to_date("expiration_date").alias("contract_expiration_date"),
-# MAGIC     # TODO: project the remaining extracted agreement fields.
+# MAGIC documents = spark.table(silver_document).select(
+# MAGIC     F.col(spec.document_key).alias(spec.detail_document_key),
+# MAGIC     F.col("path").alias(spec.detail_document_match),
+# MAGIC     # TODO: project the remaining extracted document fields for your domain.
 # MAGIC )
 # MAGIC
-# MAGIC gold_sales_df = (
-# MAGIC     spark.table(bronze_sales).alias("sales")
-# MAGIC     .join(contracts.alias("contract"),
-# MAGIC           F.col("sales.contract_id") == F.col("contract.contract_agreement_id"),
+# MAGIC gold_detail_df = (
+# MAGIC     spark.table(bronze_source).alias("txn")
+# MAGIC     .join(documents.alias("doc"),
+# MAGIC           F.col(f"txn.{spec.group_key}") == F.col(f"doc.{spec.detail_document_key}"),
 # MAGIC           "left")
-# MAGIC     .select("sales.*", "contract.*")
+# MAGIC     .select("txn.*", "doc.*")
 # MAGIC )
-# MAGIC gold_sales_df.write.format("delta").mode("overwrite") \
-# MAGIC     .option("overwriteSchema", "true").saveAsTable(gold_sales)
+# MAGIC gold_detail_df.write.format("delta").mode("overwrite") \
+# MAGIC     .option("overwriteSchema", "true").saveAsTable(gold_detail)
 # MAGIC ```
 # MAGIC
-# MAGIC The supplier invoices and purchase orders deliberately use a different
-# MAGIC business process. Do not manufacture a string match to attach them to
-# MAGIC customer sales.
+# MAGIC Documents from other business processes deliberately use different
+# MAGIC identifiers. Do not manufacture a string match to attach them — the
+# MAGIC checkpoint proves the join enriches exactly the expected transactions. The
+# MAGIC exact projected fields are in `data/<domain>/README.md` and the gated
+# MAGIC `solutions/<domain>/03_gold.py`.
 # MAGIC </details>
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Build contract-grain `gold_contract_performance`
+# MAGIC ## 3. Build the business-key-grain mart
 # MAGIC
-# MAGIC Starting from persisted `gold_sales`, group by `contract_id`. Retain one
-# MAGIC copy of the agreement attributes and calculate transaction/order counts,
-# MAGIC units, gross sales, discounts, net sales, cost, margin, and average
-# MAGIC discount. The result must have exactly one row per source contract.
+# MAGIC Starting from the persisted detail table, group by `spec.group_key`. Retain
+# MAGIC one copy of the document attributes and calculate your domain's additive
+# MAGIC measures (counts, sums, averages). The result must have exactly one row per
+# MAGIC source business key.
 
 # COMMAND ----------
 
-# TODO: Build and write `gold_contract_performance` at one row per contract_id.
-# Use countDistinct for order_count and additive sums for financial measures.
-
+# TODO: Build and write the mart (`gold_mart`) at one row per `spec.group_key`.
+# Use countDistinct for distinct-entity counts and additive sums for the
+# financial/exposure/effort measures. See solutions/<domain>/03_gold.py for the
+# exact measure set your domain reconciles.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <details>
-# MAGIC <summary>💡 Hint — contract performance aggregation</summary>
+# MAGIC <summary>💡 Hint — mart aggregation shape</summary>
 # MAGIC
 # MAGIC ```python
 # MAGIC mart = (
-# MAGIC     spark.table(gold_sales)
-# MAGIC     .groupBy("contract_id")
+# MAGIC     spark.table(gold_detail)
+# MAGIC     .groupBy(spec.group_key)
 # MAGIC     .agg(
-# MAGIC         F.first("contract_document_path", ignorenulls=True)
-# MAGIC             .alias("contract_document_path"),
-# MAGIC         F.count("transaction_id").alias("transaction_count"),
-# MAGIC         F.countDistinct("order_id").alias("order_count"),
-# MAGIC         F.sum("units").alias("total_units"),
-# MAGIC         F.sum("gross_sales").alias("gross_sales"),
-# MAGIC         F.sum("net_sales").alias("net_sales"),
-# MAGIC         F.sum("gross_margin").alias("gross_margin"),
-# MAGIC         # TODO: add the remaining agreement attributes and measures.
+# MAGIC         F.first(spec.detail_document_match, ignorenulls=True)
+# MAGIC             .alias(spec.detail_document_match),
+# MAGIC         F.count(spec.transaction_key).alias("transaction_count"),
+# MAGIC         # TODO: add your domain's additive measures (sums / distinct counts).
 # MAGIC     )
 # MAGIC )
 # MAGIC mart.write.format("delta").mode("overwrite") \
-# MAGIC     .option("overwriteSchema", "true").saveAsTable(gold_contract_performance)
+# MAGIC     .option("overwriteSchema", "true").saveAsTable(gold_mart)
 # MAGIC ```
+# MAGIC
+# MAGIC The gated `solutions/<domain>/03_gold.py` lists the exact measures — and the
+# MAGIC `03_gold` checkpoint reconciles the additive ones back to the transaction
+# MAGIC source for your domain.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -204,7 +209,8 @@ from pyspark.sql import functions as F
 # MAGIC This check derives expected identities and grains from the upstream
 # MAGIC tables. It catches missing tables, null/duplicate keys, a join that drops
 # MAGIC or multiplies rows, incomplete document enrichment, and aggregates that
-# MAGIC do not reconcile.
+# MAGIC do not reconcile. Your domain's table and column names (and which additive
+# MAGIC measures to reconcile) are passed to the shared checkpoint from the spec.
 
 # COMMAND ----------
 
@@ -213,6 +219,8 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    # Domain table/column contract for the domain-generic gold checkpoint.
+    **spec.gold_extras(),
 )
 print(result)
 assert result.passed, result.message

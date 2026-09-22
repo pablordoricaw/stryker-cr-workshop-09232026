@@ -15,11 +15,15 @@ import workshop
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # 01 · Transactional ingestion to bronze — Finance
+# MAGIC # 01 · Transactional ingestion to bronze
 # MAGIC
-# MAGIC Land the 3,000 synthetic sales transactions in one Delta table:
-# MAGIC `bronze_sales_transactions`. Choose one source; both paths produce the
-# MAGIC same current-state bronze table and finish at the same checkpoint.
+# MAGIC Land the 3,000 synthetic transactions for **your domain** in one Delta
+# MAGIC table. The table name and grain key differ per domain — Finance's
+# MAGIC `bronze_sales_transactions` / `transaction_id`, Security's
+# MAGIC `bronze_scan_findings` / `finding_id`, ITSM's `bronze_service_tickets` /
+# MAGIC `ticket_id` — and are derived for you below from the domain you pick.
+# MAGIC Choose one source; both paths produce the same current-state bronze table
+# MAGIC and finish at the same checkpoint.
 # MAGIC
 # MAGIC ## ⚠️ Lakebase CDF is an admin-enabled Beta/Preview
 # MAGIC
@@ -28,10 +32,10 @@ import workshop
 # MAGIC 1. enables the **Lakebase Lakehouse Sync / CDF Beta/Preview** in the
 # MAGIC    workspace **Previews** settings;
 # MAGIC 2. provides a Lakebase Autoscaling Postgres 17 project seeded from
-# MAGIC    `data/finance/transactional/lakebase/`; and
-# MAGIC 3. configures CDF for Postgres schema `finance_seed` into the Unity
-# MAGIC    Catalog catalog/schema entered below, then waits for
-# MAGIC    `lb_sales_transactions_history` to be online.
+# MAGIC    `data/<domain>/transactional/lakebase/`; and
+# MAGIC 3. configures CDF for the Postgres `<domain>_seed` schema into the Unity
+# MAGIC    Catalog catalog/schema entered below, then waits for your domain's CDF
+# MAGIC    history table to be online.
 # MAGIC
 # MAGIC **No admin or preview access? Choose `delta_fallback`.** It reads the
 # MAGIC committed, pre-seeded Delta snapshot and is the supported workshop path
@@ -46,15 +50,17 @@ import workshop
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Reuse your setup configuration
+# MAGIC ## 1. Reuse your setup configuration and pick your domain
 # MAGIC
 # MAGIC Enter the same existing catalog, schema, and volume you used in
-# MAGIC `00_setup`. The schema defaults to `finance` and the volume to `landing`.
+# MAGIC `00_setup`, and keep the **same domain** you chose there. This cell is done
+# MAGIC for you: it resolves your config and derives your domain's bronze table
+# MAGIC name, grain key, seeded row count, and committed Delta seed path.
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.dropdown(
@@ -65,8 +71,8 @@ dbutils.widgets.dropdown(
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
-    "lb_sales_transactions_history",
-    "Lakebase CDF history table",
+    "",
+    "Lakebase CDF history table (blank = your domain's default)",
 )
 
 # Your identity gives you a unique schema in the shared team catalog
@@ -80,10 +86,26 @@ config = workshop.resolve_config(
     volume=dbutils.widgets.get("volume") or None,
     identity=me,
 )
+
+# The single source of truth for this domain's transactional-track names/keys.
+spec = workshop.domain_spec(config.domain)
+
 source_mode = dbutils.widgets.get("source_mode")
-bronze_table = f"{config.quoted_schema()}.`bronze_sales_transactions`"
-print(f"Source: {source_mode}")
-print(f"Target: {bronze_table}")
+bronze_table = f"{config.quoted_schema()}.`{spec.bronze_txn_table}`"
+# The committed Delta snapshot for your domain, and the Lakebase CDF history
+# table (widget override wins; else the domain default).
+delta_seed_path = os.path.join(
+    _root, "data", config.domain, "transactional", "delta", spec.txn_seed_dir
+)
+lakebase_cdf_table = dbutils.widgets.get("lakebase_cdf_table") or spec.lakebase_cdf_table
+
+print(f"Domain          : {config.domain}   ({spec.txn_entity_label})")
+print(f"Source          : {source_mode}")
+print(f"Target          : {bronze_table}")
+print(f"Grain key       : {spec.transaction_key}")
+print(f"Expected rows   : {spec.expected_txn_rows:,}")
+print(f"Delta seed      : {delta_seed_path}")
+print(f"Lakebase CDF tbl: {lakebase_cdf_table}")
 
 # COMMAND ----------
 
@@ -103,13 +125,14 @@ print(f"Target: {bronze_table}")
 # MAGIC %md
 # MAGIC ## 2. Read one transactional source
 # MAGIC
-# MAGIC Complete the branch you selected. Leave the other branch alone.
+# MAGIC Complete the branch you selected. Leave the other branch alone. Both derive
+# MAGIC from the names printed above, so the same cell works for every domain.
 # MAGIC
 # MAGIC <details>
 # MAGIC <summary>Hint: Lakebase CDF (nudge)</summary>
 # MAGIC
-# MAGIC Read `lb_sales_transactions_history`, rank events within each
-# MAGIC `transaction_id` by descending `_sort_by`, keep rank 1 unless its
+# MAGIC Read `lakebase_cdf_table`, rank events within each `spec.transaction_key`
+# MAGIC (your domain's grain key) by descending `_sort_by`, keep rank 1 unless its
 # MAGIC `_pg_change_type` is `delete`, then drop the CDF metadata columns.
 # MAGIC </details>
 # MAGIC
@@ -117,9 +140,10 @@ print(f"Target: {bronze_table}")
 # MAGIC <summary>Hint: Delta fallback (nudge)</summary>
 # MAGIC
 # MAGIC Spark executors need a workspace-accessible path. Copy the committed
-# MAGIC `data/finance/transactional/delta/sales_transactions` directory into a
-# MAGIC subdirectory of `config.volume_path`, then read that destination with
-# MAGIC `spark.read.format("delta")`.
+# MAGIC `delta_seed_path` (printed above — `data/<domain>/transactional/delta/...`)
+# MAGIC into a subdirectory of `config.volume_path`, then read that destination with
+# MAGIC `spark.read.format("delta")`. Your domain's gated
+# MAGIC `solutions/<domain>/01_bronze_txn.py` has the full staging loop.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -127,10 +151,11 @@ print(f"Target: {bronze_table}")
 # TODO: Build a DataFrame named `transactions` from the selected source.
 #
 # if source_mode == "lakebase_cdf":
-#     # TODO: reconstruct current state from the Lakebase CDF history table.
+#     # TODO: reconstruct current state from `lakebase_cdf_table`, keeping only the
+#     #       latest non-deleted row per `spec.transaction_key`.
 #     ...
 # else:
-#     # TODO: copy the committed Delta seed to the UC Volume and read it.
+#     # TODO: copy `delta_seed_path` to a subdir of config.volume_path and read it.
 #     ...
 
 # COMMAND ----------
@@ -144,7 +169,8 @@ print(f"Target: {bronze_table}")
 # MAGIC <summary>Hint: write shape (nudge)</summary>
 # MAGIC
 # MAGIC Use `transactions.write.format("delta").mode("overwrite")`, allow schema
-# MAGIC overwrite, and save to the fully qualified `bronze_table`.
+# MAGIC overwrite, and save to the fully qualified `bronze_table` (derived above for
+# MAGIC your domain).
 # MAGIC </details>
 
 # COMMAND ----------
@@ -158,7 +184,9 @@ print(f"Target: {bronze_table}")
 # MAGIC ## 4. Checkpoint: `01_bronze_txn`
 # MAGIC
 # MAGIC The check observes only Unity Catalog state. It passes whether the rows
-# MAGIC came from Lakebase CDF or from the Delta fallback.
+# MAGIC came from Lakebase CDF or from the Delta fallback. Your domain's table name,
+# MAGIC grain key, and seeded row count are passed to the shared, domain-generic
+# MAGIC checkpoint from the domain spec — nothing Finance-specific is assumed.
 
 # COMMAND ----------
 
@@ -167,6 +195,10 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    # Domain expectations for the shared, domain-generic bronze_txn checkpoint.
+    bronze_txn_table=spec.bronze_txn_table,
+    expected_txn_rows=spec.expected_txn_rows,
+    transaction_key=spec.transaction_key,
 )
 print(result)
 assert result.passed, result.message

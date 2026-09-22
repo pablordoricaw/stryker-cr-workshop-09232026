@@ -3,12 +3,13 @@
 # MAGIC %md
 # MAGIC # 05 · Governed Metric Views
 # MAGIC
-# MAGIC Define Finance's reusable business metrics over the gold layer. You will
-# MAGIC create two Unity Catalog Metric Views in your existing workshop schema:
-# MAGIC
-# MAGIC - `finance_sales_metrics` — revenue and margin by product, region,
-# MAGIC   customer type, and sale date; and
-# MAGIC - `finance_contract_metrics` — contract-performance KPIs.
+# MAGIC Define your domain's reusable business metrics over the gold layer. You will
+# MAGIC create two Unity Catalog Metric Views in your existing workshop schema — one
+# MAGIC over the transaction-grain detail table and one over the business-key mart.
+# MAGIC Their names differ per domain (Finance `finance_sales_metrics` /
+# MAGIC `finance_contract_metrics`, Security `security_findings_metrics` /
+# MAGIC `security_cve_metrics`, ITSM `itsm_incident_metrics` /
+# MAGIC `itsm_service_metrics`) and are derived for you below.
 # MAGIC
 # MAGIC Metric Views are YAML semantic models, not copied tables. They keep one
 # MAGIC governed definition of each KPI for SQL, AI/BI, and Genie. Run `03_gold`
@@ -44,11 +45,15 @@ import workshop
 
 # MAGIC %md
 # MAGIC ## 1. Use your existing workshop schema
+# MAGIC
+# MAGIC This cell is done for you: it derives your domain's two gold source tables
+# MAGIC and the two Metric View names, and prints the exact dimensions and measures
+# MAGIC each view must expose (the `05_metrics` checkpoint asserts them).
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
@@ -63,16 +68,26 @@ config = workshop.resolve_config(
     volume=dbutils.widgets.get("volume") or None,
     identity=me,
 )
-gold_sales = workshop.fully_qualified(config.catalog, config.schema, "gold_sales")
-gold_contracts = workshop.fully_qualified(
-    config.catalog, config.schema, "gold_contract_performance"
-)
-sales_metrics = workshop.fully_qualified(
-    config.catalog, config.schema, "finance_sales_metrics"
-)
-contract_metrics = workshop.fully_qualified(
-    config.catalog, config.schema, "finance_contract_metrics"
-)
+
+# The single source of truth for this domain's metric-view names and contracts.
+spec = workshop.domain_spec(config.domain)
+
+# Resolve each view's fully-qualified name and its gold source table.
+metric_view_fqns = {
+    name: workshop.fully_qualified(config.catalog, config.schema, name)
+    for name in spec.metric_views
+}
+source_fqns = {
+    name: workshop.fully_qualified(config.catalog, config.schema, view.source_table)
+    for name, view in spec.metric_views.items()
+}
+
+print(f"Domain: {config.domain}")
+for name, view in spec.metric_views.items():
+    print(f"\nMetric View: {metric_view_fqns[name]}")
+    print(f"  source    : {source_fqns[name]}")
+    print(f"  dimensions: {', '.join(view.dimensions)}")
+    print(f"  measures  : {', '.join(view.measures)}")
 
 # COMMAND ----------
 
@@ -90,70 +105,71 @@ contract_metrics = workshop.fully_qualified(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create the Sales Metric View
+# MAGIC ## 2. Create the detail-grain Metric View
 # MAGIC
 # MAGIC `MEASURE()` makes these YAML measures queryable at any selected dimension
-# MAGIC grain. Use a composed `Gross Margin Percent` rather than repeating the
-# MAGIC ratio in every dashboard or Genie answer.
+# MAGIC grain. Build the **first** view above (over the gold detail table) with the
+# MAGIC printed dimensions and measures. Compose a ratio measure (e.g. a margin or
+# MAGIC average) with `MEASURE()` rather than repeating it in every dashboard.
 
 # COMMAND ----------
 
-# TODO: Create `finance_sales_metrics` with `CREATE OR REPLACE VIEW ... WITH
-# TODO: METRICS LANGUAGE YAML AS $$ ... $$`. Source it from `gold_sales` and
-# TODO: include these dimensions: Sale Date, Product Family, Sales Region,
-# TODO: Customer Type. Include Transaction Count, Order Count, Units Sold,
-# TODO: Gross Sales, Net Sales, Gross Margin, and Gross Margin Percent measures.
-
+# TODO: Create the first Metric View with `CREATE OR REPLACE VIEW ... WITH
+# TODO: METRICS LANGUAGE YAML AS $$ ... $$`, sourced from its gold detail table
+# TODO: and exposing exactly the dimensions and measures printed above. The exact
+# TODO: YAML for your domain is in solutions/<domain>/05_metric_views.py.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <details>
-# MAGIC <summary>💡 Hint — sales YAML skeleton</summary>
+# MAGIC <summary>💡 Hint — metric-view YAML skeleton</summary>
 # MAGIC
 # MAGIC ```sql
-# MAGIC CREATE OR REPLACE VIEW <sales_metrics>
+# MAGIC CREATE OR REPLACE VIEW <metric_view_fqn>
 # MAGIC WITH METRICS
 # MAGIC LANGUAGE YAML
 # MAGIC AS $$
 # MAGIC version: 1.1
-# MAGIC source: "<gold_sales>"
+# MAGIC source: "<gold_source_fqn>"
 # MAGIC dimensions:
-# MAGIC   - name: Product Family
-# MAGIC     expr: product_family
+# MAGIC   - name: <Dimension Name>
+# MAGIC     expr: <source_column>
 # MAGIC measures:
-# MAGIC   - name: Net Sales
-# MAGIC     expr: SUM(net_sales)
-# MAGIC   - name: Gross Margin Percent
-# MAGIC     expr: "MEASURE(`Gross Margin`) / NULLIF(MEASURE(`Net Sales`), 0)"
+# MAGIC   - name: <Measure Name>
+# MAGIC     expr: SUM(<source_column>)
+# MAGIC   # a composed ratio references atomic measures with MEASURE():
+# MAGIC   # - name: <Ratio> ; expr: "MEASURE(`A`) / NULLIF(MEASURE(`B`), 0)"
 # MAGIC $$
 # MAGIC ```
 # MAGIC
-# MAGIC Define the atomic `Gross Margin` and `Net Sales` measures before the
-# MAGIC composed percentage. The full field set is in the gated solution.
+# MAGIC Use the fully-qualified names and the exact `name:` labels printed in cell 1
+# MAGIC (the checkpoint matches on them). Define atomic measures before any composed
+# MAGIC ratio. The full field set and expressions for your domain are in the gated
+# MAGIC `solutions/<domain>/05_metric_views.py`.
 # MAGIC </details>
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Create the Contract Metric View
+# MAGIC ## 3. Create the mart-grain Metric View
 
 # COMMAND ----------
 
-# TODO: Create `finance_contract_metrics` over `gold_contract_performance`.
-# TODO: Add Contract ID, Customer, and Currency dimensions; add the contract
-# TODO: performance measures named in the checkpoint below.
-
+# TODO: Create the second Metric View over your domain's gold mart table, with
+# TODO: the dimensions and measures printed above. Mart measures are usually
+# TODO: SUM(...) over pre-aggregated columns; see solutions/<domain>/05_metric_views.py.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <details>
-# MAGIC <summary>💡 Hint — contract KPI pattern</summary>
+# MAGIC <summary>💡 Hint — mart KPI pattern</summary>
 # MAGIC
-# MAGIC Use `SUM(...)` for additive totals, `SUM(transaction_count)` and
-# MAGIC `SUM(order_count)` for pre-aggregated counts, and compose margin percent
-# MAGIC from `Gross Margin` and `Net Sales` with `MEASURE()`.
+# MAGIC Source the second view from your gold **mart** table. Use `SUM(...)` for
+# MAGIC additive totals (including pre-aggregated counts like a per-key
+# MAGIC transaction/finding/incident count) and compose any ratio from atomic
+# MAGIC measures with `MEASURE()`. Exact expressions are in the gated solution.
 # MAGIC </details>
 
 # COMMAND ----------
@@ -166,11 +182,10 @@ contract_metrics = workshop.fully_qualified(
 
 # COMMAND ----------
 
-# TODO: Run a query like:
-# TODO: SELECT `Product Family`, MEASURE(`Net Sales`) AS net_sales,
-# TODO:        MEASURE(`Gross Margin`) AS gross_margin
-# TODO: FROM <sales_metrics> GROUP BY ALL ORDER BY net_sales DESC
-
+# TODO: Run a query against one of your views, e.g.:
+# TODO: SELECT `<Dimension>`, MEASURE(`<Measure>`) AS m
+# TODO: FROM <metric_view_fqn> GROUP BY ALL ORDER BY m DESC
+# TODO: (use a real dimension/measure from the list printed in cell 1)
 
 # COMMAND ----------
 
@@ -179,7 +194,9 @@ contract_metrics = workshop.fully_qualified(
 
 # MAGIC The check reads the UC Metric View definitions and queries each view. It
 # MAGIC fails if either view is absent, its required dimensions/measures or source
-# MAGIC are wrong, or its aggregate result is empty/null.
+# MAGIC are wrong, or its aggregate result is empty/null. Your domain's view
+# MAGIC contracts (name, source, dimensions, measures) are passed to the shared
+# MAGIC checkpoint from the spec.
 
 # COMMAND ----------
 
@@ -188,6 +205,7 @@ result = workshop.check(
     spark=spark,
     catalog=config.catalog,
     schema=config.schema,
+    metric_views=spec.metric_view_contracts(),
 )
 print(result)
 assert result.passed, result.message
@@ -197,9 +215,8 @@ assert result.passed, result.message
 # MAGIC %md
 # MAGIC ## Stretch — add your own governed metric
 # MAGIC
-# MAGIC Add a third Metric View in this same schema for a question Finance asks
-# MAGIC often, such as net sales by `sales_channel` or average discount by
-# MAGIC `procedure_category`. Choose dimensions with useful cardinality, define
-# MAGIC atomic measures first, then compose a ratio with `MEASURE()` if needed.
-# MAGIC Query it with `MEASURE()` and `GROUP BY ALL`. For a custom domain, pass a
-# MAGIC `metric_views={...}` contract to `workshop.check` to validate it too.
+# MAGIC Add a third Metric View in this same schema for a question your domain asks
+# MAGIC often. Choose dimensions with useful cardinality, define atomic measures
+# MAGIC first, then compose a ratio with `MEASURE()` if needed. Query it with
+# MAGIC `MEASURE()` and `GROUP BY ALL`. To validate it too, pass an extended
+# MAGIC `metric_views={...}` contract to `workshop.check`.
