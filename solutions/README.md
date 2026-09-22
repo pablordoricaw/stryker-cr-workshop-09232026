@@ -25,6 +25,14 @@ solutions/
 │       ├── package_as_dab_bundle/       # 2 independently-deployable DABs + the "why"
 │       └── add_your_own.py              # a 3rd Metric View + extra Genie questions
 ├── security/
+│   ├── 01_bronze_docs.py   # land PDFs + register the bronze docs table
+│   ├── 01_bronze_txn.py    # Lakebase CDF + Delta fallback to bronze scan findings
+│   ├── 02_silver_docs.py   # ai_parse_document/classify/extract to silver
+│   ├── 03_gold.py          # advisory-enriched findings + CVE-exposure mart
+│   ├── 04_metadata.py      # dbxmetagen comment/pi/domain on the gold tables
+│   ├── 05_metric_views.py  # governed UC Metric Views over the gold tables
+│   ├── 06_genie.py         # per-participant Genie agent over gold + metrics
+│   └── 07_app.py           # provided FastAPI app + Lakebase synced table
 └── itsm/
 ```
 
@@ -74,3 +82,20 @@ Metric View and two Genie benchmark questions, validated through the existing
 `05_metrics` `metric_views=` and `06_genie` `expected_sources=`/
 `benchmark_questions=` knobs (no framework change). These are additive and
 ungraded; they ship on both `dev` and the participant release.
+
+The **Security** solutions run the identical pipeline on the infrastructure-
+security dataset (`data/security/`). The document classes are `vulnerability_scan`,
+`cve_advisory`, `pentest_report`, `cloud_posture_finding`, and `other`; the
+transactional grain is one row per vulnerability-scan finding
+(`bronze_scan_findings`, 3,000 rows). `03_gold` joins findings to the extracted
+CVE advisory on `cve_id`, building `gold_findings` (finding grain) and
+`gold_cve_exposure` (per-CVE mart); `05_metric_views` defines
+`security_findings_metrics` and `security_cve_metrics`; `06_genie` ships Security
+sample/benchmark questions (open findings by severity, weighted risk by CVE); and
+`07_app` syncs `gold_cve_exposure` on `cve_id`. Every domain-specific
+expectation (table/column names, reconcile measures, metric-view contracts,
+Genie sources, serving base) is passed to the shared, domain-generic checkpoints
+through `workshop.check(...)` extras — no shared checkpoint or notebook is
+modified. The domain-generic `01_bronze_txn` checkpoint takes the Security bronze
+table name and expected row count as inputs, so it validates Security data
+without any Finance-specific name baked in.
