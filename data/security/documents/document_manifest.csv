@@ -1,0 +1,26 @@
+file_path,document_id,expected_class,document_subtype,page_count,language
+vulnerability_scan/vulnerability_scan_01.pdf,SCAN-2026-4200,vulnerability_scan,Vulnerability Scan Report,2,en
+vulnerability_scan/vulnerability_scan_02.pdf,SCAN-2026-4213,vulnerability_scan,Authenticated Scan Summary,2,en
+vulnerability_scan/vulnerability_scan_03.pdf,SCAN-2026-4226,vulnerability_scan,Weekly Exposure Report,2,en
+vulnerability_scan/vulnerability_scan_04.pdf,SCAN-2026-4239,vulnerability_scan,External Attack-Surface Scan,2,en
+vulnerability_scan/vulnerability_scan_05.pdf,SCAN-2026-4252,vulnerability_scan,Infrastructure Vulnerability Assessment,2,en
+cve_advisory/cve_advisory_01.pdf,CVE-2026-31847,cve_advisory,Critical advisory,2,en
+cve_advisory/cve_advisory_02.pdf,CVE-2026-20415,cve_advisory,High advisory,2,en
+cve_advisory/cve_advisory_03.pdf,CVE-2025-48291,cve_advisory,High advisory,2,en
+cve_advisory/cve_advisory_04.pdf,CVE-2026-10022,cve_advisory,Critical advisory,2,en
+cve_advisory/cve_advisory_05.pdf,CVE-2025-53914,cve_advisory,Medium advisory,2,en
+pentest_report/pentest_report_01.pdf,PT-2026-70,pentest_report,Penetration Test Report,2,en
+pentest_report/pentest_report_02.pdf,PT-2026-73,pentest_report,Red-Team Engagement Report,2,en
+pentest_report/pentest_report_03.pdf,PT-2026-76,pentest_report,Application Security Assessment,2,en
+pentest_report/pentest_report_04.pdf,PT-2026-79,pentest_report,Cloud Penetration Test,2,en
+pentest_report/pentest_report_05.pdf,PT-2026-82,pentest_report,Payments Environment Pentest,2,en
+cloud_posture_finding/cloud_posture_finding_01.pdf,CSPM-2026-5300,cloud_posture_finding,Cloud Posture Finding,2,en
+cloud_posture_finding/cloud_posture_finding_02.pdf,CSPM-2026-5317,cloud_posture_finding,Compliance Control Finding,2,en
+cloud_posture_finding/cloud_posture_finding_03.pdf,CSPM-2026-5334,cloud_posture_finding,CSPM Misconfiguration Report,2,en
+cloud_posture_finding/cloud_posture_finding_04.pdf,CSPM-2026-5351,cloud_posture_finding,Cloud Security Posture Finding,2,en
+cloud_posture_finding/cloud_posture_finding_05.pdf,CSPM-2026-5368,cloud_posture_finding,Configuration Compliance Finding,2,en
+other/other_01.pdf,POL-SEC-0142,other,Security Policy Document,2,en
+other/other_02.pdf,IRP-2026-08,other,Incident Response Runbook,2,en
+other/other_03.pdf,RISK-ACC-2026-31,other,Risk Acceptance Memo,2,en
+other/other_04.pdf,CHG-2026-6620,other,Change Advisory Notice,2,en
+other/other_05.pdf,BULL-2026-19,other,Security Awareness Bulletin,2,en
