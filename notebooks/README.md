@@ -37,6 +37,18 @@ contract-grain `gold_contract_performance`. It ends on `03_gold`, which derives
 the expected grains, identities, enrichment coverage, and aggregate measures
 from the upstream tables rather than hardcoding seed counts.
 
-> The remaining notebooks are added by later tickets: the rest of the medallion
-> + AI-functions build spine (metadata #9), metric views (#10), the
+`04_metadata.py` (added by #9) governs the gold tables with
+[dbxmetagen](https://github.com/databricks-industry-solutions/dbxmetagen)
+(notebook-only install, pinned to `v0.10.68`). It runs the `comment`, `pi`, and
+`domain` modes with `apply_ddl=false` to stage metadata for review, then re-runs
+with `apply_ddl=true` to apply table/column comments, a PI classification tag on
+sensitive columns, and a business-domain tag on each table. dbxmetagen's model
+endpoint defaults to `databricks-claude-sonnet-4-6`; the notebook has you confirm
+that endpoint exists in **Serving → Foundation Models** or pick another (the only
+endpoint you select — the `02_silver_docs` AI Functions use the built-in system
+model). It ends on the `04_metadata` checkpoint, which reads only
+`information_schema` comments and tags and derives the expected columns from the
+live tables rather than hardcoding column names.
+
+> The remaining notebooks are added by later tickets: metric views (#10), the
 > Genie agent (#11), and the app wiring (#12).

@@ -15,7 +15,8 @@ solutions/
 │   ├── 01_bronze_docs.py   # #5 — land PDFs + register the bronze docs table
 │   ├── 01_bronze_txn.py    # #7 — Lakebase CDF + Delta fallback to bronze txn
 │   ├── 02_silver_docs.py   # #6 — ai_parse_document/classify/extract to silver
-│   └── 03_gold.py          # #8 — document-enriched sales + contract mart
+│   ├── 03_gold.py          # #8 — document-enriched sales + contract mart
+│   └── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
 ├── security/
 └── itsm/
 ```
@@ -26,7 +27,9 @@ and the no-admin Delta fallback; `02_silver_docs` builds the document-intelligen
 silver layer with AI Functions (`ai_parse_document` → `ai_classify` →
 `ai_extract`), landing `silver_docs` plus one `silver_<class>` table per class.
 `03_gold` joins sales to extracted commercial agreements without changing
-transaction grain and builds a reconciled contract-performance mart. Later
-solution notebooks are authored alongside each build-spine ticket and validated
-by maintainer CI (#17). This directory ships on both `dev` and the participant
-release.
+transaction grain and builds a reconciled contract-performance mart. `04_metadata`
+runs dbxmetagen (pinned `v0.10.68`) in `comment`, `pi`, and `domain` modes,
+staging metadata with `apply_ddl=false` and then applying comments, PI
+classification tags, and domain tags to the gold tables. Later solution notebooks
+are authored alongside each build-spine ticket and validated by maintainer CI
+(#17). This directory ships on both `dev` and the participant release.
