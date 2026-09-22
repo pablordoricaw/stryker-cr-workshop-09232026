@@ -16,9 +16,15 @@
 # MAGIC touches Unity Catalog until you approve it. You review, then re-run with
 # MAGIC `apply_ddl=true` to apply.
 # MAGIC
-# MAGIC Run `03_gold` first. Fill in each **`# TODO`** cell, open the collapsible
-# MAGIC hints if needed, then run the checkpoint. This notebook uses the existing
-# MAGIC catalog from `00_setup`; it never creates a catalog.
+# MAGIC Run `03_gold` first. Fill in each **`# TODO`** cell, then run the checkpoint.
+# MAGIC This notebook uses the existing catalog from `00_setup`; it never creates a
+# MAGIC catalog.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

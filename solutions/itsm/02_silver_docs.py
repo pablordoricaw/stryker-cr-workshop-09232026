@@ -198,9 +198,9 @@ display(
 # MAGIC Each class carries different fields, so we route each class to its own
 # MAGIC `ai_extract` schema (the extraction-field specification in
 # MAGIC `data/itsm/README.md`) and write one `silver_<class>` table per class.
-# MAGIC Scalar fields are cast to their contract types; nested `line_items` /
-# MAGIC `covered_products` stay as VARIANT. An `instructions` option keeps dates
-# MAGIC ISO `YYYY-MM-DD`, money numeric USD, and rates decimal. We create a table
+# MAGIC Every ITSM extraction field is scalar, so each is cast to its contract type
+# MAGIC (the ITSM schemas define no nested arrays). An `instructions` option keeps
+# MAGIC dates ISO `YYYY-MM-DD`, money numeric USD, and rates decimal. We create a table
 # MAGIC for **every** class — even one with zero classified documents — so the
 # MAGIC silver schema is complete and stable.
 # MAGIC
@@ -284,7 +284,7 @@ for cls, schema in EXTRACTION_SCHEMAS.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Peek: extracted vendor-invoice fields
+# MAGIC ### Peek: extracted incident-report fields
 
 # COMMAND ----------
 

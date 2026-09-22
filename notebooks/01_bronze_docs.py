@@ -9,8 +9,14 @@
 # MAGIC parsing yet — a later module reads these bytes with AI functions.
 # MAGIC
 # MAGIC Run `notebooks/00_setup` first: this notebook writes into the schema and
-# MAGIC UC Volume it created. Fill in each **`# TODO`** cell; open a **💡 Hint** if
-# MAGIC you get stuck; then run the checkpoint at the bottom until it's green.
+# MAGIC UC Volume it created. Fill in each **`# TODO`** cell, then run the checkpoint
+# MAGIC at the bottom until it's green.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

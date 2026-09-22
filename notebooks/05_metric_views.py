@@ -16,6 +16,12 @@
 # MAGIC
 # MAGIC **Compute requirement:** `WITH METRICS ... version: 1.1` needs DBR 17.2+
 # MAGIC and `DESCRIBE ... AS JSON` needs DBR 16.2+, so use DBR 17.2+ overall.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

@@ -12,6 +12,12 @@
 # MAGIC The agent is created in **your existing workshop schema's** catalog — it
 # MAGIC creates no catalog and no second schema. It only *reads* the gold tables
 # MAGIC and Metric Views you already built.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

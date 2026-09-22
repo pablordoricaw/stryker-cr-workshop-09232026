@@ -18,6 +18,12 @@
 # MAGIC 3. **deploy and start** the app (Apps UI or CLI) with its Genie + Lakebase resources;
 # MAGIC 4. fill the **two gaps** in `app/backend.py`; and
 # MAGIC 5. pass the **`07_app`** checkpoint.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

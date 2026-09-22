@@ -12,8 +12,14 @@
 # MAGIC   additive sales and margin measures.
 # MAGIC
 # MAGIC Run `01_bronze_txn` and `02_silver_docs` first. Fill in each **`# TODO`**
-# MAGIC cell, open the collapsible hints if needed, then run `03_gold`. This
-# MAGIC notebook uses the existing catalog from `00_setup`; never create a catalog.
+# MAGIC cell, then run `03_gold`. This notebook uses the existing catalog from
+# MAGIC `00_setup`; never create a catalog.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

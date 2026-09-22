@@ -36,6 +36,12 @@ import workshop
 # MAGIC **No admin or preview access? Choose `delta_fallback`.** It reads the
 # MAGIC committed, pre-seeded Delta snapshot and is the supported workshop path
 # MAGIC for every participant. This notebook never creates a catalog.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 

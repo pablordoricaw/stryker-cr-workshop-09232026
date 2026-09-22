@@ -13,8 +13,8 @@
 # MAGIC    **`silver_<class>`** table per class.
 # MAGIC
 # MAGIC Run `01_bronze_docs` first — this notebook reads the `bronze_docs` table it
-# MAGIC registers. Fill in each **`# TODO`** cell; open a **💡 Hint** if you get
-# MAGIC stuck; then run the checkpoint at the bottom until it's green.
+# MAGIC registers. Fill in each **`# TODO`** cell, then run the checkpoint at the
+# MAGIC bottom until it's green.
 # MAGIC
 # MAGIC ## ⚠️ Compute / preview requirements
 # MAGIC
@@ -24,6 +24,12 @@
 # MAGIC notebook to serverless or a DBR 17.3+ cluster. Each call is a billed LLM
 # MAGIC inference, so materialize each stage to a Delta table once rather than
 # MAGIC re-invoking the functions on every downstream read.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
 
 # COMMAND ----------
 
