@@ -67,11 +67,17 @@ Extras forwarded through ``ctx.extras``:
 
 * ``app_name`` — the expected per-participant Databricks App name (**required**).
 * ``synced_table`` — the fully-qualified Unity Catalog name of the caller's own
-  Lakebase synced table (**required**), created in the participant's *existing*
-  catalog/schema (e.g. ``my_catalog.finance.gold_contract_performance_served_ada``).
-  No Lakebase-registered catalog is involved: the synced-table id doubles as a UC
+  Lakebase synced table (**required** unless a ``namespace`` is given to derive
+  it), created in the participant's *existing* catalog/schema (e.g.
+  ``my_catalog.finance.gold_contract_performance_served_ada``). No
+  Lakebase-registered catalog is involved: the synced-table id doubles as a UC
   entity in the participant's catalog and a Postgres table ``{table}`` in schema
   ``{schema}``, so no ``CREATE CATALOG`` / ``create-catalog`` is ever required.
+* ``serving_base`` — when the synced-table name is derived from ``namespace``,
+  the serving-table base (default: the namespace helper's Finance base). A
+  domain (Security #13 / ITSM #14) passes its own base here so it gets the right
+  serving table from the namespace without an ad-hoc name. Ignored when an
+  explicit ``synced_table`` is supplied (that always wins).
 * ``apps`` — a normalized app client, a raw ``WorkspaceClient``, or ``None`` to
   build one from ambient workspace credentials.
 * ``source_table`` — the gold table the synced table must sync from (default
@@ -574,7 +580,17 @@ def check_app(ctx: CheckContext) -> CheckResult:
         )
     synced_table = _required_name(ctx, "synced_table")
     if not synced_table and ns is not None:
-        synced_table = ns.synced_table_fqn(ctx.catalog, ctx.schema)
+        # Derive the synced-table name from the namespace. The serving-table base
+        # is overridable via a ``serving_base`` extra so Security (#13) / ITSM
+        # (#14) get their own gold serving table through the namespace without an
+        # ad-hoc name; omitted, it uses the namespace helper's Finance default.
+        # An explicit ``synced_table`` (resolved above) still wins.
+        serving_base = ctx.extras.get("serving_base")
+        synced_table = (
+            ns.synced_table_fqn(ctx.catalog, ctx.schema, base=serving_base)
+            if serving_base
+            else ns.synced_table_fqn(ctx.catalog, ctx.schema)
+        )
     if not synced_table:
         return _fail(
             "No synced_table given. A Lakebase synced table is workspace-scoped, "

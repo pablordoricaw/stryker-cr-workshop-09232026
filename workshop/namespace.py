@@ -54,6 +54,13 @@ WORKSHOP_SCHEMA_PREFIX = "workshop_"
 #: staying short enough for the length-limited App / Lakebase names.
 _DIGEST_LEN = 8
 
+#: The default serving-table base for the synced-table name — the Finance gold
+#: serving mart. It is only a *default*: a domain reusing the helper passes its
+#: own base (``synced_table_name(base=...)`` / ``synced_table_fqn(base=...)``),
+#: and the ``07_app`` checkpoint forwards a ``serving_base`` extra to it, so the
+#: name is never Finance-hardcoded for Security (#13) / ITSM (#14).
+DEFAULT_SERVING_BASE = "gold_contract_performance_served"
+
 #: Any maximal run of characters outside this set becomes a single separator.
 _NON_IDENTIFIER = re.compile(r"[^a-z0-9]+")
 
@@ -89,8 +96,15 @@ class Namespace:
             ``current_user()`` — ``ada@stryker.com``). Used verbatim as the app
             owner and workspace ``owner_path``.
         domain: The workshop domain (``finance`` / ``security`` / ``itsm``); a
-            component of the object names so a participant can run more than one
-            domain in the same catalog without collision.
+            component of the *workspace-scoped* object names (Genie agent,
+            Databricks App, Lakebase project) so those stay distinct across
+            domains. The namespace isolates **participants** — each participant
+            runs a single domain per the workshop design. The :attr:`schema` is
+            deliberately NOT domain-scoped, so a same-identity run of two domains
+            would still collide on shared table names (``bronze_docs`` /
+            ``silver_docs`` / gold); that is out of scope for #22. The maintainer
+            CI (#17) that runs all three domains needs its own per-domain
+            isolation, tracked there.
         digest: The collision-resistant hex tail (see module docstring).
         slug_sql: The readable slug in ``_`` form (may be empty).
         slug_dns: The readable slug in ``-`` form (may be empty).
@@ -167,11 +181,12 @@ class Namespace:
         """Per-participant Genie agent title: ``<prefix>_<domain>_<suffix>``."""
         return f"{prefix}_{self.domain}_{self.suffix}"
 
-    def synced_table_name(self, *, base: str = "gold_contract_performance_served") -> str:
+    def synced_table_name(self, *, base: str = DEFAULT_SERVING_BASE) -> str:
         """Per-participant synced-table object name: ``<base>_<suffix>``.
 
-        ``base`` is the Finance default; a domain reusing this passes its own
-        serving-table base so the name stays domain-appropriate.
+        ``base`` defaults to :data:`DEFAULT_SERVING_BASE` (Finance); a domain
+        reusing this passes its own serving-table base so the name stays
+        domain-appropriate.
         """
         return f"{base}_{self.suffix}"
 
@@ -180,7 +195,7 @@ class Namespace:
         catalog: str,
         schema: str,
         *,
-        base: str = "gold_contract_performance_served",
+        base: str = DEFAULT_SERVING_BASE,
     ) -> str:
         """The synced table's fully-qualified UC name in the caller's catalog/schema.
 

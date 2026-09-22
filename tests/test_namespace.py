@@ -18,6 +18,7 @@ import pytest
 
 import workshop
 from workshop.namespace import (
+    DEFAULT_SERVING_BASE,
     WORKSHOP_SCHEMA_PREFIX,
     Namespace,
     namespace,
@@ -152,7 +153,10 @@ def test_genie_agent_name_includes_domain_and_suffix():
 def test_synced_table_fqn_lives_in_callers_catalog_and_schema():
     ns = namespace("ada@a.com", domain="finance")
     fqn = ns.synced_table_fqn("team_cat", ns.schema)
-    assert fqn == f"team_cat.{ns.schema}.gold_contract_performance_served_{ns.suffix}"
+    assert fqn == f"team_cat.{ns.schema}.{DEFAULT_SERVING_BASE}_{ns.suffix}"
+    # The default is the named Finance base, not a hardcoded literal.
+    assert DEFAULT_SERVING_BASE == "gold_contract_performance_served"
+    assert ns.synced_table_name() == f"{DEFAULT_SERVING_BASE}_{ns.suffix}"
     # Domain reuse: an overridable base keeps it domain-appropriate.
     other = ns.synced_table_fqn("team_cat", ns.schema, base="gold_incidents_served")
     assert other.endswith(f"gold_incidents_served_{ns.suffix}")

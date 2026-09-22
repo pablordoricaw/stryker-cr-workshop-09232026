@@ -622,3 +622,30 @@ def test_explicit_names_override_namespace():
     result = _check(FakeApps(), namespace=ns)  # _check sets app/synced/owner explicitly
     assert result.passed is True
     assert result.details["app_name"] == APP
+
+
+def test_namespace_serving_base_flows_through_for_non_finance_domain():
+    # FOLD-IN #22: a non-Finance domain gets its OWN serving table through the
+    # namespace by passing serving_base (+ its own source_table) — no ad-hoc
+    # synced_table override, and the checkpoint resolves that derived name.
+    ns = workshop.namespace(OWNER, domain="itsm")
+    expected = ns.synced_table_fqn(CATALOG, SCHEMA, base="gold_incidents_served")
+    fake = FakeApps(synced=_synced(source=f"{CATALOG}.{SCHEMA}.gold_incidents"))
+    result = workshop.check(
+        APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=fake,
+        namespace=ns, serving_base="gold_incidents_served", source_table="gold_incidents",
+    )
+    assert result.passed is True
+    assert result.details["synced_table"] == expected
+    assert result.details["synced_table"].endswith(f"gold_incidents_served_{ns.suffix}")
+
+
+def test_explicit_synced_table_wins_over_namespace_serving_base():
+    # An explicit synced_table still wins, even when serving_base is also given.
+    ns = workshop.namespace(OWNER, domain="finance")
+    result = workshop.check(
+        APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA, apps=FakeApps(),
+        namespace=ns, synced_table=SYNCED, serving_base="gold_incidents_served",
+    )
+    assert result.passed is True
+    assert result.details["synced_table"] == SYNCED
