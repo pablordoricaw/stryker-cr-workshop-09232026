@@ -168,6 +168,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     volume=config.volume,
+    domain=config.domain,
 )
 print(result)
 assert result.passed, result.message
