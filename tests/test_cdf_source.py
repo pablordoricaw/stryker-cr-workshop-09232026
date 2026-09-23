@@ -2,6 +2,10 @@
 
 Unit tests for mode selection and CDC row shaping logic, which are pure Python
 and unit-testable without Spark or live workspace access.
+
+Key semantic: provisioning_succeeded means "provisioned AND verified readable".
+When provisioning reaches ONLINE but the UC history table is not readable within
+the grace timeout, provisioning fails (raises) and mode resolves to "synthesized".
 """
 
 from __future__ import annotations
@@ -29,6 +33,24 @@ def test_resolve_mode_provisioned():
 
 def test_resolve_mode_synthesized():
     """If both detect and provision fail, mode is synthesized."""
+    mode = _resolve_mode(history_table_exists=False, provisioning_succeeded=False)
+    assert mode == "synthesized"
+
+
+def test_resolve_mode_provisioned_and_readable():
+    """Provisioning succeeds only when BOTH ONLINE AND table is readable.
+
+    This test documents the fixed contract: provisioning_succeeded=True means
+    the CDF config reached ONLINE AND post-provision verification confirmed
+    the UC history table is readable. If the table becomes unreadable after ONLINE,
+    provisioning is treated as failed and mode resolves to 'synthesized'.
+    """
+    # Provisioning succeeded: ONLINE + table readable -> provisioned mode
+    mode = _resolve_mode(history_table_exists=False, provisioning_succeeded=True)
+    assert mode == "provisioned"
+
+    # Provisioning failed: ONLINE but table unreadable -> synthesized mode
+    # (This is handled by the provision function raising, so provisioning_succeeded=False)
     mode = _resolve_mode(history_table_exists=False, provisioning_succeeded=False)
     assert mode == "synthesized"
 
