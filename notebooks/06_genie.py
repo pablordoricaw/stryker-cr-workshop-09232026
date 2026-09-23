@@ -20,6 +20,28 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Install dependencies
+# MAGIC
+# MAGIC This cell upgrades `databricks-sdk` so the Genie authoring API
+# MAGIC (`w.genie.create_space` / `update_space` / `list_spaces`) is available — the
+# MAGIC serverless-default SDK predates it. Installing does not restart the kernel on
+# MAGIC its own, so the next cell calls `dbutils.library.restartPython()` to make the
+# MAGIC upgraded package importable; the bootstrap cell then runs fresh.
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet --upgrade "databricks-sdk>=0.135"
+
+# COMMAND ----------
+
+# On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
+# installed package is not importable until the kernel restarts. Restart explicitly
+# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os
 import sys
