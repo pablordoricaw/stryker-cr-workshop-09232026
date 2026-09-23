@@ -160,12 +160,6 @@ assert result.passed, result.message
 
 # COMMAND ----------
 
-import io
-
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.workspace import ExportFormat, ImportFormat
-
 # The workshop clone's root (anchored on workshop/__init__.py) and the shipped
 # hint-ladder source. `config.domain` is the domain you chose above.
 repo_root = workshop.find_repo_root() or _root
@@ -180,21 +174,17 @@ block = workshop.build_injection_block(hint_source, repo_root, config.domain)
 # Your personal instructions file. Genie Code auto-loads it each session.
 personal_path = f"/Workspace/Users/{me}/.assistant_instructions.md"
 
-w = WorkspaceClient()
 try:
-    with w.workspace.download(personal_path, format=ExportFormat.RAW) as _stream:
-        existing = _stream.read().decode("utf-8")
-except NotFound:
+    with open(personal_path, "r", encoding="utf-8") as _f:
+        existing = _f.read()
+except FileNotFoundError:
     # No personal file yet (most common) — start from empty and only add ours.
     existing = ""
 
 merged = workshop.merge_block(existing, block)
-w.workspace.upload(
-    personal_path,
-    io.BytesIO(merged.encode("utf-8")),
-    format=ImportFormat.RAW,
-    overwrite=True,
-)
+os.makedirs(os.path.dirname(personal_path), exist_ok=True)
+with open(personal_path, "w", encoding="utf-8") as _f:
+    _f.write(merged)
 
 print(f"Injected the workshop hint block into {personal_path}")
 print(f"  repo root: {repo_root}")
