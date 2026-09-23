@@ -12,7 +12,12 @@ That personal file may already hold the participant's own instructions, so the
 splice must be surgical: the workshop's content is wrapped in a pair of
 ``<!-- STRYKER-WORKSHOP-START -->`` / ``<!-- STRYKER-WORKSHOP-END -->``
 sentinels, and every operation preserves everything outside those sentinels
-verbatim.
+**byte-for-byte** (leading/trailing blank lines, whitespace-only files, and
+files with no final newline all round-trip unchanged). A workshop block is
+recognized only when the start sentinel is immediately followed by the workshop
+heading (:data:`HINTS_HEADER`), so a stray or coincidental sentinel string in
+the participant's own text is never treated as the workshop's block — it is left
+alone rather than clobbered.
 
 Everything here is pure Python — no Spark, no Databricks SDK, no network — so it
 is unit-testable off-platform. The ``00_setup`` notebook supplies the SDK glue
@@ -23,11 +28,12 @@ Three functions carry the contract:
 
 * :func:`build_injection_block` — turn the hint-ladder source into a
   sentinel-wrapped block, with the participant's repo root and domain filled in.
-* :func:`merge_block` — splice a block into a personal file, replacing an
-  existing workshop block in place or appending when none is present, and
-  leaving all personal content untouched. Idempotent across re-runs.
-* :func:`strip_block` — remove only the workshop block, restoring the personal
-  content.
+* :func:`merge_block` — splice a block into a personal file, guaranteeing exactly
+  one workshop block afterward (replace in place, or append when none is present,
+  or collapse several into one), and leaving all personal content byte-for-byte
+  untouched. Idempotent across re-runs.
+* :func:`strip_block` — remove every workshop block, restoring the personal
+  content byte-for-byte.
 """
 
 from __future__ import annotations
@@ -101,30 +107,81 @@ def build_injection_block(
     return f"{SENTINEL_START}\n{inner}\n{SENTINEL_END}\n"
 
 
-def _find_block(text: str) -> tuple[int, int] | None:
-    """Return ``(start, end)`` char offsets of the sentinel block, or ``None``.
+def _find_blocks(text: str) -> list[tuple[int, int]]:
+    """Locate every well-formed workshop block, as ``(start, end)`` char spans.
 
-    ``end`` is exclusive and points just past :data:`SENTINEL_END`. Returns
-    ``None`` if the start sentinel is absent, or the end sentinel does not follow
-    it (a malformed half-block is left untouched by callers).
+    A **workshop block** is what :func:`build_injection_block` emits: a
+    :data:`SENTINEL_START` marker whose content opens with the :data:`HINTS_HEADER`
+    line, closed by the next :data:`SENTINEL_END` marker. The returned span runs
+    from the ``<`` of ``SENTINEL_START`` through ``SENTINEL_END`` **plus the one
+    trailing newline the block carries** (so removing the span is byte-exact
+    against an append), and never over any surrounding personal whitespace.
+
+    This is deliberately conservative so it never clobbers the participant's own
+    content:
+
+    * The :data:`HINTS_HEADER` anchor means a bare or coincidental sentinel
+      *string* in personal text — a lone marker, an inline mention, or a
+      START/END pair that is not the workshop's — is **not** matched.
+    * A ``SENTINEL_START`` that is not header-anchored, or that has no following
+      ``SENTINEL_END``, is skipped (the scan resumes just past that marker), so a
+      dangling personal ``START`` can never consume the real block or the text
+      between them.
+    * A header-anchored ``START`` is paired with the **first** ``SENTINEL_END``
+      that has no other ``SENTINEL_START`` before it — a well-formed block's body
+      never contains a start marker. This "innermost" pairing means an unclosed
+      header-anchored start cannot borrow a *later* block's end and swallow the
+      content between them.
+
+    Spans are returned in document order and never overlap.
     """
-    start = text.find(SENTINEL_START)
-    if start == -1:
-        return None
-    end = text.find(SENTINEL_END, start + len(SENTINEL_START))
-    if end == -1:
-        return None
-    return start, end + len(SENTINEL_END)
+    blocks: list[tuple[int, int]] = []
+    i = 0
+    while True:
+        start = text.find(SENTINEL_START, i)
+        if start == -1:
+            return blocks
+        after_start = start + len(SENTINEL_START)
+        # Ours only if the workshop header opens the block (tolerating the
+        # newline(s) between the marker and the heading). This is the signal that
+        # distinguishes the workshop's block from a stray/personal sentinel.
+        if text[after_start:].lstrip("\r\n").startswith(HINTS_HEADER):
+            end = text.find(SENTINEL_END, after_start)
+            next_start = text.find(SENTINEL_START, after_start)
+            # A well-formed block has an end, and no further start before that
+            # end. If another start intervenes, THIS start is malformed/unclosed
+            # — skip it so the later (real) start gets paired instead.
+            if end != -1 and (next_start == -1 or next_start > end):
+                span_end = end + len(SENTINEL_END)
+                # The block always ships one trailing newline; fold it into the
+                # span so a strip of an appended block restores the file exactly.
+                if text[span_end : span_end + 1] == "\n":
+                    span_end += 1
+                blocks.append((start, span_end))
+                i = span_end
+                continue
+        # Not a workshop block (no header, no closing marker, or an intervening
+        # start): leave it as personal content and resume just past this marker.
+        i = after_start
 
 
 def merge_block(existing_text: str, block: str) -> str:
-    """Splice ``block`` into ``existing_text``, preserving personal content.
+    """Splice ``block`` into ``existing_text``, preserving personal content exactly.
 
-    If a workshop block is already present it is replaced **in place** (so a
-    re-run with a changed domain/repo-root updates cleanly); otherwise the block
-    is appended after the existing content. Everything outside the sentinels is
-    preserved verbatim. Idempotent: merging the same block twice yields the same
-    result.
+    Guarantees **exactly one** workshop block afterward and leaves every byte
+    outside the workshop block(s) untouched:
+
+    * No existing block → the block is appended to ``existing_text`` verbatim (no
+      separator is inserted, so the participant's own trailing whitespace is never
+      mutated; the block's own leading marker line and ``existing_text``'s own
+      trailing newline provide the boundary).
+    * One existing block → it is replaced **in place**, preserving position and
+      surrounding whitespace.
+    * Several existing blocks → the first is replaced in place and the rest are
+      removed, collapsing to a single block while keeping the personal content
+      between them.
+
+    Idempotent: merging the same block again reproduces the result byte-for-byte.
 
     Args:
         existing_text: Current contents of the personal file (may be empty).
@@ -133,42 +190,45 @@ def merge_block(existing_text: str, block: str) -> str:
     Returns:
         The merged file contents.
     """
-    # Replace in place: keep everything before/after the sentinels byte-for-byte
-    # and drop the block's trailing newline so a re-merge reproduces this exactly.
-    found = _find_block(existing_text)
-    if found is not None:
-        start, end = found
-        return existing_text[:start] + block.rstrip("\n") + existing_text[end:]
+    blocks = _find_blocks(existing_text)
+    if not blocks:
+        # Append verbatim. `"" + block == block`, and for non-empty content the
+        # block follows directly — no inserted separator to mutate on round trip.
+        return existing_text + block
 
-    # Append: no prior block. Empty/blank file → just the block.
-    if not existing_text.strip():
-        return block
-    return existing_text.rstrip("\n") + "\n\n" + block
+    first_start, first_end = blocks[0]
+    parts = [existing_text[:first_start], block]
+    prev_end = first_end
+    for start, end in blocks[1:]:
+        parts.append(existing_text[prev_end:start])  # personal text between blocks
+        prev_end = end  # drop this extra block
+    parts.append(existing_text[prev_end:])
+    return "".join(parts)
 
 
 def strip_block(existing_text: str) -> str:
-    """Remove only the workshop block, restoring the personal content.
+    """Remove every workshop block, restoring the personal content byte-for-byte.
 
-    Deletes the region from :data:`SENTINEL_START` through :data:`SENTINEL_END`
-    (inclusive) and collapses the blank separator the injection introduced, so a
-    file that only ever held appended personal content plus one workshop block
-    round-trips back to that personal content. Text with no workshop block (or a
-    malformed half-block) is returned unchanged. Idempotent.
+    Deletes each well-formed workshop block span (see :func:`_find_blocks`) and
+    leaves everything else exactly as it was — including leading/trailing blank
+    lines, whitespace-only files, and files with no final newline. A
+    ``build → merge → strip`` round trip returns the original personal text
+    unchanged. Text with no workshop block (or only malformed/half sentinels) is
+    returned untouched. Idempotent.
 
     Args:
         existing_text: Current contents of the personal file.
 
     Returns:
-        The file contents with the workshop block removed.
+        The file contents with every workshop block removed.
     """
-    found = _find_block(existing_text)
-    if found is None:
+    blocks = _find_blocks(existing_text)
+    if not blocks:
         return existing_text
-    start, end = found
-    before = existing_text[:start].rstrip("\n")
-    after = existing_text[end:].lstrip("\n")
-    if before and after:
-        return f"{before}\n\n{after}"
-    if before:
-        return f"{before}\n"
-    return after
+    parts: list[str] = []
+    prev_end = 0
+    for start, end in blocks:
+        parts.append(existing_text[prev_end:start])
+        prev_end = end
+    parts.append(existing_text[prev_end:])
+    return "".join(parts)

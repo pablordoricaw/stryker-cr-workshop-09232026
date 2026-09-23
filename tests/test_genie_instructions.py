@@ -110,7 +110,13 @@ def test_merge_appends_when_no_block_present_and_preserves_personal() -> None:
 def test_merge_into_empty_file_is_just_the_block() -> None:
     block = build_injection_block(_source(), "/repo", "finance")
     assert merge_block("", block) == block
-    assert merge_block("   \n\n", block) == block
+
+
+def test_merge_preserves_a_whitespace_only_file_byte_for_byte() -> None:
+    # Regression (B1): a whitespace-only personal file must be preserved exactly,
+    # not collapsed away. The block is appended after the untouched whitespace.
+    block = build_injection_block(_source(), "/repo", "finance")
+    assert merge_block("   \n\n", block) == "   \n\n" + block
 
 
 def test_merge_replaces_existing_block_in_place_preserving_personal() -> None:
@@ -187,3 +193,130 @@ def test_strip_ignores_a_malformed_half_block() -> None:
     # A dangling START with no END must not eat the rest of the file.
     text = f"# Notes\n{SENTINEL_START}\nhalf a block, no end\n"
     assert strip_block(text) == text
+
+
+# --------------------------------------------------------------------------- #
+# B1: byte-exact preservation — build → merge → strip round-trips personal text
+#     unchanged, including surrounding whitespace no editor would normalize.
+# --------------------------------------------------------------------------- #
+def test_build_merge_strip_round_trip_is_byte_exact() -> None:
+    block = build_injection_block(_source(), "/repo", "security")
+    cases = {
+        "trailing blank lines": "# My notes\nkeep\n\n\n",
+        "whitespace-only file": "   \n\n",
+        "empty file": "",
+        "no trailing newline": "# My notes without a final newline",
+        "windows-ish trailing": "# notes\r\n\r\n",
+        "leading blank lines": "\n\n# notes\n",
+    }
+    for label, personal in cases.items():
+        merged = merge_block(personal, block)
+        # Personal bytes are still present verbatim, and exactly one block exists.
+        assert personal in merged, f"{label}: personal content not preserved verbatim"
+        assert merged.count(SENTINEL_START) == 1, f"{label}: not exactly one START"
+        assert merged.count(SENTINEL_END) == 1, f"{label}: not exactly one END"
+        # And the round trip restores the original personal text byte-for-byte.
+        assert strip_block(merged) == personal, f"{label}: round trip not byte-exact"
+
+
+# --------------------------------------------------------------------------- #
+# B2: robust sentinel handling — single-block invariant + never clobber personal
+#     text that merely contains (or dangles) the sentinel strings.
+# --------------------------------------------------------------------------- #
+def test_merge_and_strip_preserve_sentinel_strings_in_personal_text() -> None:
+    # The participant's own file mentions the sentinel strings inline and leaves a
+    # lone (unpaired) END. Neither is the workshop block, so both must survive a
+    # merge, and a strip must remove ONLY the real block, restoring the mentions.
+    personal = (
+        f"# My notes\n"
+        f"I document the {SENTINEL_START} marker inline here.\n"
+        f"And a lone {SENTINEL_END} on its own below.\n"
+    )
+    block = build_injection_block(_source(), "/repo", "finance")
+    merged = merge_block(personal, block)
+    assert personal in merged, "inline/unpaired sentinel mentions were mutated"
+    assert merged.count(HINTS_HEADER) == 1, "expected exactly one real block"
+    assert strip_block(merged) == personal, "strip clobbered personal sentinel text"
+
+
+def test_merge_and_strip_leave_a_non_workshop_sentinel_pair_intact() -> None:
+    # A full START..END pair that is NOT the workshop's (no HINTS_HEADER) must be
+    # treated as personal content — never replaced or removed.
+    personal = f"{SENTINEL_START}\nmy own bracketed note, not the workshop\n{SENTINEL_END}\n"
+    block = build_injection_block(_source(), "/repo", "finance")
+    merged = merge_block(personal, block)
+    assert personal in merged, "a non-workshop sentinel pair was clobbered on merge"
+    assert strip_block(merged) == personal, "a non-workshop sentinel pair was stripped"
+    # And stripping a file that has ONLY the non-workshop pair changes nothing.
+    assert strip_block(personal) == personal
+
+
+def test_merge_collapses_multiple_workshop_blocks_to_exactly_one() -> None:
+    # A file that somehow accrued two real workshop blocks (older + newer) must
+    # collapse to a single block on the next merge, preserving the personal text
+    # between and around them.
+    old_a = build_injection_block(_source(), "/old/a", "finance")
+    old_b = build_injection_block(_source(), "/old/b", "itsm")
+    existing = "top personal\n" + old_a + "middle personal\n" + old_b + "bottom personal\n"
+    assert existing.count(SENTINEL_START) == 2  # precondition: two blocks
+
+    new = build_injection_block(_source(), "/new", "security")
+    merged = merge_block(existing, new)
+
+    assert merged.count(SENTINEL_START) == 1, "did not collapse to a single block"
+    assert merged.count(SENTINEL_END) == 1
+    assert "My domain: security" in merged
+    assert "/old/a" not in merged and "/old/b" not in merged
+    for chunk in ("top personal", "middle personal", "bottom personal"):
+        assert chunk in merged, f"personal content {chunk!r} lost on collapse"
+
+    # Strip removes ALL workshop blocks, leaving only the personal content.
+    stripped = strip_block(existing)
+    assert SENTINEL_START not in stripped and SENTINEL_END not in stripped
+    for chunk in ("top personal", "middle personal", "bottom personal"):
+        assert chunk in stripped
+
+
+def test_dangling_personal_start_does_not_consume_the_real_block() -> None:
+    # A personal line that includes the START string but is NOT header-anchored
+    # must never swallow the intervening content up to the real block's END.
+    dangling = f"note: the {SENTINEL_START} appears here, unpaired, no header\n"
+    tail = "some more personal notes\n"
+    block = build_injection_block(_source(), "/repo", "finance")
+    existing = dangling + block + tail
+
+    # Merge updates the real block in place and leaves the dangling line alone.
+    updated = build_injection_block(_source(), "/repo2", "security")
+    merged = merge_block(existing, updated)
+    assert dangling in merged, "dangling personal START line was consumed on merge"
+    assert tail in merged
+    assert merged.count(HINTS_HEADER) == 1
+    assert "My domain: security" in merged
+
+    # Strip removes only the real block; the dangling line and tail survive.
+    assert strip_block(existing) == dangling + tail
+
+
+def test_mixed_malformed_and_valid_blocks() -> None:
+    # A header-anchored START with no closing END is malformed: it must be left as
+    # personal content (not consumed to EOF), while a real, well-formed block that
+    # follows is still recognized and handled.
+    malformed = f"{SENTINEL_START}\n{HINTS_HEADER}\nbody, but nobody closed me\n"
+    real = build_injection_block(_source(), "/repo", "finance")
+    existing = malformed + "personal divider\n" + real
+
+    # Strip removes only the well-formed block; the malformed remnant stays.
+    stripped = strip_block(existing)
+    assert malformed in stripped, "malformed half-block was consumed"
+    assert "personal divider" in stripped
+    assert stripped.count(SENTINEL_END) == 0, "the only real END should be gone"
+
+    # Merge still yields exactly one well-formed block (the real one, refreshed),
+    # and never turns the malformed remnant into a second managed block.
+    new = build_injection_block(_source(), "/repo3", "itsm")
+    merged = merge_block(existing, new)
+    assert malformed in merged
+    assert "My domain: itsm" in merged
+    # Exactly one *closed* workshop block: one END, and the START count is the
+    # malformed remnant's START plus the one real block's START.
+    assert merged.count(SENTINEL_END) == 1
