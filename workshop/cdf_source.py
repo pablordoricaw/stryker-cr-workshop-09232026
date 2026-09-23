@@ -189,11 +189,13 @@ def ensure_txn_cdf_source(
     lakebase_project_used = None
     lakebase_db_resource_path = None
     lakebase_project_created = False
+    discovered_uc_table = None
 
     if w is not None:
         try:
             logger(f"[CDF] Attempting Lakebase provisioning...")
-            lakebase_project_used, lakebase_db_resource_path, lakebase_project_created = (
+            (lakebase_project_used, lakebase_db_resource_path,
+             discovered_uc_table, lakebase_project_created) = (
                 _provision_lakebase_cdf_config(
                     w=w,
                     config=config,
@@ -220,23 +222,33 @@ def ensure_txn_cdf_source(
     )
 
     # --- Synthesize fallback: build history table from seed ---
+    actual_history_table = spec_table  # Default to spec name
+    if mode == "provisioned" and discovered_uc_table:
+        # Use the discovered CDF-created table name for provisioned mode
+        actual_history_table = discovered_uc_table
+
     if mode == "synthesized":
+        actual_history_table = spec_table  # Synthesized uses the spec name
         try:
             logger(f"[CDF] Synthesizing fallback: building history table from seed...")
+            history_table_fq_synth = f"{catalog}.{schema}.`{actual_history_table}`"
             _synthesize_history_table(
                 spark=spark,
                 config=config,
                 spec=spec,
                 repo_root=repo_root,
-                history_table_fq=history_table_fq,
+                history_table_fq=history_table_fq_synth,
                 logger=logger,
             )
-            logger(f"[CDF] Synthesized history table {spec_table}.")
+            logger(f"[CDF] Synthesized history table {actual_history_table}.")
         except Exception as e:
             raise RuntimeError(
                 f"Failed to synthesize CDF history table (even after provisioning "
                 f"failure): {type(e).__name__}: {e}"
             ) from e
+
+    # --- Build fully-qualified table name with actual table name ---
+    actual_history_table_fq = f"{catalog}.{schema}.`{actual_history_table}`"
 
     # --- Save metadata for teardown to find ---
     try:
@@ -244,13 +256,13 @@ def ensure_txn_cdf_source(
 
         report_obj = {
             "mode": mode,
-            "cdf_history_table": history_table_fq,
+            "cdf_history_table": actual_history_table_fq,
             "lakebase_project": lakebase_project_used,
             "lakebase_project_created": lakebase_project_created,
             "lakebase_database_resource_path": lakebase_db_resource_path,
             "domain": config.domain,
             "notes": (
-                f"Mode: {mode}. History table: {spec_table}. "
+                f"Mode: {mode}. History table: {actual_history_table}. "
                 f"Lakebase project: {lakebase_project_used or 'none'}."
             ),
         }
@@ -267,12 +279,12 @@ def ensure_txn_cdf_source(
 
     return CdfSourceReport(
         mode=mode,
-        cdf_history_table=history_table_fq,
+        cdf_history_table=actual_history_table_fq,
         lakebase_project=lakebase_project_used,
         lakebase_database_resource_path=lakebase_db_resource_path,
         lakebase_project_created=lakebase_project_created,
         notes=(
-            f"Mode: {mode}. History table: {spec_table}. "
+            f"Mode: {mode}. History table: {actual_history_table}. "
             f"Lakebase project: {lakebase_project_used or 'none'}."
         ),
     )
@@ -288,7 +300,7 @@ def _provision_lakebase_cdf_config(
     lakebase_database: Optional[str],
     timeout_s: float,
     logger: Any,
-) -> tuple[str, str, bool]:
+) -> tuple[str, str, str, bool]:
     """Provision Lakebase Postgres + seed + CDF config → UC, with readability verification.
 
     Performs the full three-step sequence:
@@ -299,8 +311,9 @@ def _provision_lakebase_cdf_config(
     Only returns successfully if all steps complete AND the UC table is verified readable.
 
     Returns:
-        (project_id, database_resource_path, created_new_project) — the identities
-        for later cleanup and a flag indicating whether THIS run created the project.
+        (project_id, database_resource_path, discovered_uc_table, created_new_project)
+        — the identities for later cleanup, the actual UC table created by CDF,
+        and a flag indicating whether THIS run created the project.
 
     Raises:
         Exception: If any step fails (CDF unsupported, SDK errors, timeout, table not
@@ -317,7 +330,7 @@ def _provision_lakebase_cdf_config(
     - parent for CDF is DATABASE resource path, not project or database name
     - list_cdf_statuses catches NotFound (404) when none exist
     """
-    from databricks.sdk.service.postgres import CdfConfig
+    from databricks.sdk.service.postgres import CdfConfig, Project, ProjectSpec, EndpointType
 
     domain = config.domain
     postgres_schema = f"{domain}_seed"
@@ -345,10 +358,18 @@ def _provision_lakebase_cdf_config(
             # Create project (auto-creates production branch + primary endpoint).
             # Reuse if already exists by catching the error.
             try:
-                w.postgres.create_project(
-                    name=project_id,
-                    spec={"display_name": f"Workshop {domain} Lakebase project"}
+                project_obj = Project(
+                    spec=ProjectSpec(
+                        display_name=f"Workshop {domain} Lakebase project",
+                        pg_version=17
+                    )
                 )
+                op = w.postgres.create_project(
+                    project=project_obj,
+                    project_id=project_id
+                )
+                # Wait for the LRO to complete
+                op.wait()
                 logger(f"[CDF] Created Lakebase project {project_id}")
                 created_new_project = True
             except Exception as e:
@@ -361,16 +382,19 @@ def _provision_lakebase_cdf_config(
         # --- Discover the production branch and database ---
         logger(f"[CDF] Discovering branch and database for project {project_id}...")
 
-        # List branches to get the production branch id
+        # List branches to get the default branch
         branches = list(w.postgres.list_branches(parent=f"projects/{project_id}"))
         production_branch = None
+
+        # Find the branch marked as default
         for branch in branches:
-            if "production" in branch.name.lower():
-                production_branch = branch.name
-                break
+            if hasattr(branch, "status") and hasattr(branch.status, "default"):
+                if branch.status.default:
+                    production_branch = branch.name
+                    break
 
         if not production_branch:
-            # Fallback: use the first branch (likely production)
+            # Fallback: use the first branch
             if branches:
                 production_branch = branches[0].name
             else:
@@ -401,7 +425,18 @@ def _provision_lakebase_cdf_config(
         if not endpoints:
             raise RuntimeError(f"No endpoints found in {production_branch}")
 
-        endpoint = endpoints[0]  # Use primary endpoint
+        # Prefer read-write endpoint
+        endpoint = None
+        for ep in endpoints:
+            if (hasattr(ep, "spec") and hasattr(ep.spec, "endpoint_type") and
+                ep.spec.endpoint_type == EndpointType.ENDPOINT_TYPE_READ_WRITE):
+                endpoint = ep
+                break
+
+        if not endpoint:
+            # Fallback to first endpoint
+            endpoint = endpoints[0]
+
         endpoint_fq = endpoint.name
         logger(f"[CDF] Using endpoint: {endpoint_fq}")
 
@@ -415,7 +450,7 @@ def _provision_lakebase_cdf_config(
 
         # Generate OAuth token for Postgres
         logger(f"[CDF] Generating OAuth token for Postgres...")
-        cred = w.postgres.generate_database_credential(name=endpoint_fq)
+        cred = w.postgres.generate_database_credential(endpoint=endpoint_fq)
         if not cred or not hasattr(cred, "token"):
             raise RuntimeError(f"Failed to generate Postgres credential")
 
@@ -451,18 +486,24 @@ def _provision_lakebase_cdf_config(
             cdf_config_id=cdf_config_id,
         )
 
-        # --- Poll CDF status until ONLINE ---
-        logger(f"[CDF] Polling CDF status until ONLINE (timeout: {timeout_s}s)...")
-        _poll_cdf_status(
+        # --- Poll CDF status until STREAMING and discover actual UC table ---
+        logger(f"[CDF] Polling CDF status until STREAMING (timeout: {timeout_s}s)...")
+        discovered_uc_table = _poll_cdf_status(
             w=w,
             db_resource_path=db_resource_path,
             cdf_config_id=cdf_config_id,
+            postgres_table_seed=spec.txn_seed_dir,
             timeout_s=timeout_s,
             logger=logger,
         )
 
         # --- Verify UC history table is readable (post-provision verification) ---
-        history_table_fq = f"{catalog}.{uc_schema}.`{spec.lakebase_cdf_table}`"
+        # Use the discovered UC table name
+        if not discovered_uc_table:
+            # Fallback to spec-assumed name if discovery didn't return a table
+            discovered_uc_table = spec.lakebase_cdf_table
+
+        history_table_fq = f"{catalog}.{uc_schema}.`{discovered_uc_table}`"
         logger(f"[CDF] Verifying UC history table is readable: {history_table_fq}...")
         _verify_history_table_readable(
             spark=spark,
@@ -471,14 +512,14 @@ def _provision_lakebase_cdf_config(
             logger=logger,
         )
 
-        return project_id, db_resource_path, created_new_project
+        return project_id, db_resource_path, discovered_uc_table, created_new_project
 
     except Exception as e:
         # If we created a new project and any step failed, attempt cleanup
         if created_new_project and project_id:
             logger(f"[CDF] Provisioning failed; attempting to clean up project {project_id}...")
             try:
-                w.postgres.delete_project(name=project_id)
+                w.postgres.delete_project(name=f"projects/{project_id}")
                 logger(f"[CDF] Successfully deleted project {project_id}")
             except Exception as del_err:
                 logger(
@@ -558,23 +599,29 @@ def _seed_postgres(
 
 
 def _poll_cdf_status(
-    w: Any, db_resource_path: str, cdf_config_id: str, timeout_s: float, logger: Any
-) -> None:
-    """Poll CDF status until ONLINE or timeout.
+    w: Any, db_resource_path: str, cdf_config_id: str, postgres_table_seed: str,
+    timeout_s: float, logger: Any
+) -> Optional[str]:
+    """Poll CDF status until STREAMING and return discovered UC table name.
 
     Args:
         w: WorkspaceClient.
         db_resource_path: Database resource path.
         cdf_config_id: CDF config ID.
+        postgres_table_seed: The postgres table seed name to match (for discovery).
         timeout_s: Timeout in seconds.
         logger: Logging callable.
 
+    Returns:
+        The discovered UC table name (from status.uc_table) when CDF reaches STREAMING.
+
     Raises:
-        TimeoutError: If ONLINE is not reached within timeout.
-        RuntimeError: If status is ERROR.
+        TimeoutError: If STREAMING is not reached within timeout.
+        RuntimeError: If status is TERMINATED.
     """
     import time
     from databricks.sdk.errors.platform import NotFound
+    from databricks.sdk.service.postgres import CdfState
 
     start = time.time()
     while time.time() - start < timeout_s:
@@ -588,22 +635,43 @@ def _poll_cdf_status(
             logger(f"[CDF] Error listing CDF statuses: {e}; retrying...")
             statuses = []
 
+        # Find the matching CdfStatus by postgres_table
+        matching_status = None
         for status in statuses:
-            if status.config_id == cdf_config_id:
-                status_str = getattr(status, "status", "UNKNOWN")
-                logger(f"[CDF] CDF status: {status_str}")
-                if status_str == "ONLINE":
-                    logger(f"[CDF] CDF is ONLINE")
-                    return
-                elif status_str == "ERROR":
-                    error_msg = getattr(status, "error_message", "no error message")
-                    raise RuntimeError(
-                        f"CDF config {cdf_config_id} is in ERROR state: {error_msg}"
-                    )
+            # Match by postgres_table containing the seed directory name
+            postgres_table = getattr(status, "postgres_table", "")
+            if postgres_table and postgres_table_seed in postgres_table:
+                matching_status = status
+                break
+
+        # Fallback: if only one status, assume it's ours
+        if not matching_status and len(statuses) == 1:
+            matching_status = statuses[0]
+
+        if matching_status:
+            state = getattr(matching_status, "state", None)
+            postgres_table = getattr(matching_status, "postgres_table", "")
+            uc_table = getattr(matching_status, "uc_table", "")
+            status_detail = getattr(matching_status, "status_detail", "")
+
+            logger(
+                f"[CDF] CDF status: state={state}, postgres_table={postgres_table}, "
+                f"uc_table={uc_table}, detail={status_detail}"
+            )
+
+            if state == CdfState.CDF_STATE_STREAMING:
+                logger(f"[CDF] CDF is STREAMING")
+                return uc_table
+            elif state == CdfState.CDF_STATE_TERMINATED:
+                raise RuntimeError(
+                    f"CDF for {postgres_table} terminated: {status_detail}"
+                )
+            # else: SNAPSHOTTING, SKIPPED, or other non-final states; keep polling
+
         time.sleep(5)
 
     raise TimeoutError(
-        f"CDF config {cdf_config_id} did not reach ONLINE within {timeout_s}s"
+        f"CDF config {cdf_config_id} did not reach STREAMING within {timeout_s}s"
     )
 
 
