@@ -90,6 +90,26 @@ def shape_seed_to_cdc(
     return [_cdc_row_shape(row, include_cols=include_cols) for row in seed_rows]
 
 
+def _history_table_readable(spark: Any, history_table_fq: str) -> bool:
+    """Check if a history table is readable in UC.
+
+    Attempts a simple SELECT 1 query to verify the table exists and is accessible.
+    This is a pure readability check without side effects.
+
+    Args:
+        spark: SparkSession.
+        history_table_fq: Fully-qualified table name (e.g., "catalog.schema.table").
+
+    Returns:
+        True if the table is readable, False if any error occurs.
+    """
+    try:
+        spark.sql(f"SELECT 1 FROM {history_table_fq} LIMIT 1").collect()
+        return True
+    except Exception:
+        return False
+
+
 def _resolve_mode(
     history_table_exists: bool, provisioning_succeeded: bool
 ) -> str:
@@ -97,7 +117,8 @@ def _resolve_mode(
 
     Args:
         history_table_exists: True if the history table is already present.
-        provisioning_succeeded: True if provisioning completed ONLINE.
+        provisioning_succeeded: True if provisioning completed, CDF reached ONLINE,
+            AND the UC history table is readable (verified post-provision).
 
     Returns:
         The mode: "preexisting", "provisioned", or "synthesized".
@@ -155,16 +176,13 @@ def ensure_txn_cdf_source(
     logger(f"[CDF] Ensuring CDF history table: {history_table_fq}")
 
     # --- Detect: is the history table already there? ---
-    try:
-        result = spark.sql(f"SELECT 1 FROM {history_table_fq} LIMIT 1")
+    if _history_table_readable(spark, history_table_fq):
         logger(f"[CDF] History table {spec_table} already exists (preexisting).")
         return CdfSourceReport(
             mode="preexisting",
             cdf_history_table=history_table_fq,
             notes=f"History table {spec_table} was already present.",
         )
-    except Exception:
-        pass
 
     # --- Attempt Provision: Lakebase Postgres + CDF → UC ---
     provisioning_succeeded = False
@@ -271,15 +289,24 @@ def _provision_lakebase_cdf_config(
     timeout_s: float,
     logger: Any,
 ) -> tuple[str, str, bool]:
-    """Provision Lakebase Postgres + seed + CDF config → UC.
+    """Provision Lakebase Postgres + seed + CDF config → UC, with readability verification.
+
+    Performs the full three-step sequence:
+    1. Create/reuse Lakebase project and seed Postgres schema + table.
+    2. Configure CDF and poll until ONLINE.
+    3. Verify the UC history table is readable (post-provision verification).
+
+    Only returns successfully if all steps complete AND the UC table is verified readable.
 
     Returns:
         (project_id, database_resource_path, created_new_project) — the identities
         for later cleanup and a flag indicating whether THIS run created the project.
 
     Raises:
-        Exception: If any step fails (CDF unsupported, SDK errors, timeout, etc).
-            The caller handles the exception and falls back to synthesis.
+        Exception: If any step fails (CDF unsupported, SDK errors, timeout, table not
+            readable after ONLINE, etc). The caller handles the exception and falls
+            back to synthesis. If this run created a new project, it is cleaned up
+            before raising.
 
     API Reference (per authoritative lakehouse-sync.md):
     - project: projects/<PROJECT_ID>
@@ -434,6 +461,16 @@ def _provision_lakebase_cdf_config(
             logger=logger,
         )
 
+        # --- Verify UC history table is readable (post-provision verification) ---
+        history_table_fq = f"{catalog}.{uc_schema}.`{spec.lakebase_cdf_table}`"
+        logger(f"[CDF] Verifying UC history table is readable: {history_table_fq}...")
+        _verify_history_table_readable(
+            spark=spark,
+            history_table_fq=history_table_fq,
+            timeout_s=30.0,
+            logger=logger,
+        )
+
         return project_id, db_resource_path, created_new_project
 
     except Exception as e:
@@ -567,6 +604,43 @@ def _poll_cdf_status(
 
     raise TimeoutError(
         f"CDF config {cdf_config_id} did not reach ONLINE within {timeout_s}s"
+    )
+
+
+def _verify_history_table_readable(
+    spark: Any, history_table_fq: str, timeout_s: float = 30.0, logger: Any = None
+) -> None:
+    """Verify UC history table is readable with a bounded grace poll.
+
+    After CDF reaches ONLINE, the synced Delta table may not be immediately
+    accessible. This function polls until the table is readable or a grace
+    timeout is reached.
+
+    Args:
+        spark: SparkSession.
+        history_table_fq: Fully-qualified UC table name.
+        timeout_s: Grace timeout in seconds (default 30s).
+        logger: Logging callable (optional).
+
+    Raises:
+        RuntimeError: If the table is not readable within the grace timeout.
+    """
+    import time
+
+    if logger is None:
+        logger = lambda *args, **kwargs: None
+
+    start = time.time()
+    while time.time() - start < timeout_s:
+        if _history_table_readable(spark, history_table_fq):
+            logger(f"[CDF] History table {history_table_fq} is now readable")
+            return
+        logger(f"[CDF] History table not yet readable; polling (elapsed: {time.time() - start:.1f}s)...")
+        time.sleep(2)
+
+    raise RuntimeError(
+        f"History table {history_table_fq} did not become readable within {timeout_s}s "
+        f"after CDF reached ONLINE. CDF provisioning failed."
     )
 
 
