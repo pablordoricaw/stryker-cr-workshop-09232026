@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821
 # MAGIC %md
 # MAGIC # 🚀 Stretch · Add your own metrics + Genie questions
 # MAGIC

@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001
 # MAGIC # 05 · Governed Metric Views — SOLUTION (ITSM)
 import os
 import sys

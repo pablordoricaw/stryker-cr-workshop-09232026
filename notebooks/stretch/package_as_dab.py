@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821
 # MAGIC %md
 # MAGIC # 🚀 Stretch · Package your work as a DAB (Finance gap)
 # MAGIC

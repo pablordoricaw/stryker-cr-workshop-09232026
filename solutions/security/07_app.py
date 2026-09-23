@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001
 # MAGIC %md
 # MAGIC # 07 · Data app over a Lakebase synced table — SOLUTION (Security)
 # MAGIC

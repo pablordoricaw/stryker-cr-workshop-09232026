@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001
 # MAGIC %md
 # MAGIC # 06 · Genie agent over gold + metrics — SOLUTION (Security)
 # MAGIC

@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821
 # MAGIC %md
 # MAGIC # 07 · Data app over a Lakebase synced table
 # MAGIC

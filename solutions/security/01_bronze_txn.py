@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())

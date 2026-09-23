@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001, BLE001
 # MAGIC %md
 # MAGIC # 04 · Governed metadata with dbxmetagen — SOLUTION (Finance)
 # MAGIC

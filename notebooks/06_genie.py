@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821
 # MAGIC %md
 # MAGIC # 06 · Genie agent over gold + metrics
 # MAGIC
@@ -245,7 +244,7 @@ result = workshop.check(
     schema=config.schema,
     genie=WorkspaceClient(),
     namespace=ns,  # derives your agent name AND owner_path (one source of truth)
-    genie_space_id=space_id,  # optional; omit to resolve by name
+    genie_space_id=space_id,  # noqa: F821 — participant defines space_id above; optional, omit to resolve by name
     # Domain expected sources + benchmark questions for the shared checkpoint.
     expected_sources=list(spec.genie_expected_sources),
     benchmark_questions=benchmark_questions,

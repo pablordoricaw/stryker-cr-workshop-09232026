@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F821
 # MAGIC %md
 # MAGIC # 99 · Teardown — remove the workshop hints from Genie Code
 # MAGIC

@@ -1,5 +1,4 @@
 # Databricks notebook source
-# ruff: noqa: F401, F821, I001
 # MAGIC %md
 # MAGIC # 03 · Gold medallion layer
 # MAGIC
