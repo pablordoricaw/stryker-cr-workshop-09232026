@@ -186,14 +186,20 @@
     overflow: auto;                    /* graceful scroll on very narrow screens */
     box-shadow: var(--shadow);
   }
-  .diagram-img {
+  /* The repo SVG is a React-Flow render: all content lives inside a root
+     <foreignObject>, which browsers refuse to paint when the SVG is loaded via
+     <img>. So embed it as a document with <object> — that renders foreignObject
+     and scales the wide viewBox (2782x826) to the container. */
+  .diagram-object {
     display: block;
     margin: 0 auto;
-    max-width: 100%;                   /* fit the slide width */
-    max-height: 54vh;                  /* contain on laptop + projector, never cut off */
-    height: auto;
-    width: auto;
+    width: 100%;                       /* fit the slide width */
+    aspect-ratio: 2782 / 826;          /* preserve the diagram's proportions */
+    max-height: 54vh;                  /* contain on laptop + projector, never cropped */
+    border: 0;
+    background: #ffffff;
   }
+  .diagram-object a { color: var(--accent); font-weight: 600; }
   .figcap { font-size: .85rem; color: var(--ink-mute); text-align: center; margin-top: .5em; }
 
   /* ---- Rungs (hint ladder) ---- */
@@ -340,9 +346,12 @@
     <p>You start from synthetic <strong>documents (PDFs)</strong> and <strong>transactional data</strong> and finish with an app people can ask questions in plain language. Every stage is a checkpoint you validate before moving on — and <strong>you build all of it yourself</strong>.</p>
 
     <div class="diagram-frame">
-      <img class="diagram-img"
-           src="../../assets/diagrams/workshop-architecture.svg"
-           alt="Workshop architecture: Finance, Security, and ITSM source domains flow through bronze, silver, and gold medallion layers into governance metadata and UC Metric Views, then a Genie agent and a Databricks data app.">
+      <object class="diagram-object"
+              type="image/svg+xml"
+              data="../../assets/diagrams/workshop-architecture.svg"
+              aria-label="Workshop architecture: Finance, Security, and ITSM source domains flow through bronze, silver, and gold medallion layers into governance metadata and UC Metric Views, then a Genie agent and a Databricks data app.">
+        <a href="../../assets/diagrams/workshop-architecture.svg">Open the workshop architecture diagram</a>
+      </object>
     </div>
     <p class="figcap">The same architecture for every team — only the dataset changes.</p>
   </section>
