@@ -1,0 +1,80 @@
+# The medallion build as a serverless Lakeflow Job. Each task runs one of the
+# workshop notebooks (by workspace path) and passes the same widget values the
+# notebooks read, so a job run reproduces exactly what running the notebooks by
+# hand produces. Tasks have no `new_cluster` / `job_cluster_key`, so they run on
+# serverless compute (serverless-first).
+#
+# base_parameters feed the notebook widgets: catalog, domain, schema, volume.
+# The task DAG mirrors the medallion dependencies: docs and txn bronze run in
+# parallel; silver depends on bronze docs; gold depends on both silver docs and
+# bronze txn; metadata and metric views depend on gold.
+resources:
+  jobs:
+    medallion_build:
+      name: ${bundle.name}-${var.schema}
+      tasks:
+        - task_key: bronze_txn
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/01_bronze_txn.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+        - task_key: bronze_docs
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/01_bronze_docs.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+        - task_key: silver_docs
+          depends_on:
+            - task_key: bronze_docs
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/02_silver_docs.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+        - task_key: gold
+          depends_on:
+            - task_key: bronze_txn
+            - task_key: silver_docs
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/03_gold.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+        - task_key: metadata
+          depends_on:
+            - task_key: gold
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/04_metadata.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+        - task_key: metric_views
+          depends_on:
+            - task_key: gold
+          notebook_task:
+            notebook_path: ${var.notebooks_root}/05_metric_views.py
+            base_parameters:
+              catalog: ${var.catalog}
+              domain: ${var.domain}
+              schema: ${var.schema}
+              volume: ${var.volume}
+
+      queue:
+        enabled: true

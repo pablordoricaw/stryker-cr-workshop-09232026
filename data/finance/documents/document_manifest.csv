@@ -1,0 +1,26 @@
+file_path,document_id,expected_class,document_subtype,page_count,language
+vendor_invoice/vendor_invoice_01.pdf,INV-260900,vendor_invoice,Tax Invoice,2,en
+vendor_invoice/vendor_invoice_02.pdf,BILL-260917,vendor_invoice,Statement of Goods Supplied,2,en
+vendor_invoice/vendor_invoice_03.pdf,ACCT-260934,vendor_invoice,Commercial Account,2,en
+vendor_invoice/vendor_invoice_04.pdf,CHG-260951,vendor_invoice,Charges & Delivery Detail,2,en
+vendor_invoice/vendor_invoice_05.pdf,STM-260968,vendor_invoice,Vendor Billing Statement,2,en
+purchase_order/purchase_order_01.pdf,PO-STR-26-5100,purchase_order,Purchase Order,2,en
+purchase_order/purchase_order_02.pdf,PO-STR-26-5129,purchase_order,Procurement Release,2,en
+purchase_order/purchase_order_03.pdf,PO-STR-26-5158,purchase_order,Supply Authorization,2,en
+purchase_order/purchase_order_04.pdf,PO-STR-26-5187,purchase_order,Blanket Order Call-Off,2,en
+purchase_order/purchase_order_05.pdf,PO-STR-26-5216,purchase_order,Materials Commitment,2,en
+sales_contract_pricing_agreement/sales_contract_pricing_agreement_01.pdf,AGR-ORTHO-26-310,sales_contract_pricing_agreement,Implant Pricing Agreement,2,en
+sales_contract_pricing_agreement/sales_contract_pricing_agreement_02.pdf,AGR-ORTHO-26-317,sales_contract_pricing_agreement,Commercial Terms Addendum,2,en
+sales_contract_pricing_agreement/sales_contract_pricing_agreement_03.pdf,AGR-ORTHO-26-324,sales_contract_pricing_agreement,Enterprise Supply Schedule,2,en
+sales_contract_pricing_agreement/sales_contract_pricing_agreement_04.pdf,AGR-ORTHO-26-331,sales_contract_pricing_agreement,Orthopaedic Portfolio Agreement,2,en
+sales_contract_pricing_agreement/sales_contract_pricing_agreement_05.pdf,AGR-ORTHO-26-338,sales_contract_pricing_agreement,Procedure Pricing Exhibit,2,en
+quarterly_financial_statement/quarterly_financial_statement_01.pdf,FIN-Q2-2026-ORTHO,quarterly_financial_statement,Quarterly Financial Statement,2,en
+quarterly_financial_statement/quarterly_financial_statement_02.pdf,FIN-Q1-2026-ORTHO,quarterly_financial_statement,Management Results — Quarter End,2,en
+quarterly_financial_statement/quarterly_financial_statement_03.pdf,FIN-Q4-2025-ORTHO,quarterly_financial_statement,Condensed Segment Accounts,2,en
+quarterly_financial_statement/quarterly_financial_statement_04.pdf,FIN-Q3-2025-ORTHO,quarterly_financial_statement,Quarterly Performance Book,2,en
+quarterly_financial_statement/quarterly_financial_statement_05.pdf,FIN-Q2-2025-ORTHO,quarterly_financial_statement,Form 10-Q Segment Extract,2,en
+other/other_01.pdf,CM-772041,other,Supplier Credit Memorandum,2,en
+other/other_02.pdf,EXP-2608-114,other,Field Expense Report,2,en
+other/other_03.pdf,REM-900184,other,Customer Remittance Advice,2,en
+other/other_04.pdf,REC-0726-03,other,Bank Reconciliation,2,en
+other/other_05.pdf,CAPEX-26-088,other,Capital Expenditure Request,2,en

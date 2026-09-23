@@ -1,0 +1,49 @@
+# Stryker workshop — maintainer-owned Databricks Asset Bundle (DAB).
+#
+# This bundle is the *reproducibility* mechanism: it versions the workshop's
+# provided infrastructure (schema + UC Volume, created inside an existing
+# catalog) and the data app so the environment is re-creatable and reviewable in
+# source control. It is NOT the participant provisioning path — participants
+# provision from the setup notebook (notebooks/00_setup) in the Workspace UI
+# (decision Q20 = B). The bundle is also the basis of the optional Finance
+# "package your work as a DAB" stretch.
+#
+# Bring-your-own-catalog: participants (and this bundle) do not create catalogs.
+# The `catalog` variable names an EXISTING catalog to target; the bundle defines
+# only the schema and volume inside it, plus the app.
+#
+# `databricks bundle validate --profile <your-profile>` must pass cleanly.
+#
+# Note on names: targets deliberately do NOT set `mode: development`, so resource
+# names stay deterministic and match what the setup notebook creates ("the same
+# infra"). Development-mode name prefixing would inject characters that are not
+# legal in Unity Catalog names.
+
+bundle:
+  name: stryker-workshop
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog to target (the bundle does not create it).
+    default: main
+  schema:
+    description: Schema created within the catalog (defaults to the Finance domain).
+    default: finance
+  volume:
+    description: UC Volume where source documents land.
+    default: landing
+  app_name:
+    description: Name of the provided data app.
+    default: stryker-workshop-app
+
+targets:
+  # Default target for maintainers validating/deploying against a dev workspace.
+  dev:
+    default: true
+
+  # A parallel target for a separate workspace; override variables per target as
+  # needed (e.g. a different existing catalog name).
+  prod: {}

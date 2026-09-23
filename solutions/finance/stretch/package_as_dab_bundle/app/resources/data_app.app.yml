@@ -1,0 +1,17 @@
+# The provided Streamlit data app, shipped from bundle-local source. App env vars
+# (SERVING_TABLE, warehouse, etc.) live in app/app.yaml in the source directory,
+# NOT here. The app's Genie space ("genie-space", Can run) and Lakebase database
+# ("postgres", Can connect and create) resources are added in the Apps UI
+# (Edit -> Resources) — they point at workspace-scoped objects created
+# out-of-band (06_genie / 07_app), so they are wired by resource key rather than
+# declared as bundle resources.
+#
+# source_code_path is a LOCAL path (via ${var.app_source_path}, resolved relative
+# to this resources/ file): `bundle deploy` uploads that app source. It is NOT a
+# Workspace path — the bundle does not depend on a pre-existing checkout.
+resources:
+  apps:
+    data_app:
+      name: ${var.app_name}
+      description: "Stryker workshop data app — wired to a Genie agent and a Lakebase-synced gold table."
+      source_code_path: ${var.app_source_path}

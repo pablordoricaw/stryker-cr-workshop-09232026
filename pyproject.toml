@@ -1,0 +1,43 @@
+[project]
+name = "stryker-workshop"
+version = "0.1.0"
+description = "The Stryker Databricks hands-on workshop: repo skeleton and the workshop.check() validation seam."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+# Participants never install this package: in a Databricks Git folder the repo
+# root is already on sys.path, so `import workshop` just works. This project
+# config exists only for local development and maintainer CI (running the
+# framework tests). Marking the project non-package keeps `uv run` from trying
+# to build a wheel.
+[tool.uv]
+package = false
+
+[dependency-groups]
+# pytest for the framework tests; streamlit lets the app/ smoke tests
+# (tests/test_app_smoke.py) drive the provided Streamlit app via AppTest.
+dev = ["pytest>=8", "streamlit>=1.38"]
+
+[tool.ruff]
+# Databricks injects these into the notebook namespace at runtime (never
+# imported), so ruff would otherwise flag them as F821 undefined names.
+# Listing them here resolves the injected globals while keeping F821 active
+# for genuine undefined-name bugs. Only the names ruff actually reports across
+# notebooks/ and solutions/ are listed (minimal set); add others such as
+# displayHTML/sqlContext/sc/getArgument here if future notebooks reference them.
+builtins = ["spark", "dbutils", "display"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebook-idiomatic patterns: imports kept for participant reference but
+# unused in-file (F401), unsorted import blocks (I001), and intentional
+# broad `except Exception` in staging/teardown (BLE001).
+"notebooks/**/*.py" = ["F401", "I001", "BLE001"]
+"solutions/**/*.py" = ["F401", "I001", "BLE001"]
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so tests import `workshop` without an install,
+# mirroring how notebooks import it inside a Databricks Git folder.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

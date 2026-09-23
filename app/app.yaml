@@ -1,0 +1,24 @@
+# Databricks Apps runtime config for the provided workshop data app (Streamlit).
+#
+# Run with the Streamlit CLI (never a bare dev server). The Apps runtime
+# auto-binds DATABRICKS_APP_PORT for Streamlit, so no host/port flags are needed.
+command: ["streamlit", "run", "app.py"]
+
+# Resource ids come from wired app resources via `valueFrom` — never hardcoded.
+# Add these resources to the app (Apps UI → Edit → Resources, or via the CLI):
+#   * a Genie space  → key `genie-space`  (permission: Can run)   → GENIE_SPACE_ID
+#   * a Lakebase DB  → key `postgres`     (Can connect and create) → auto-injects
+#                      PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD + LAKEBASE_ENDPOINT
+#
+# SERVING_TABLE / SERVING_LIMIT are plain config: point them at YOUR synced
+# serving table as <schema>.<table> in Postgres. A synced table lands in a
+# Postgres schema matching its Unity Catalog schema (your participant schema) —
+# e.g. `finance.gold_contract_performance_served_<suffix>` — so set this per
+# participant. The value below is only a placeholder.
+env:
+  - name: GENIE_SPACE_ID
+    valueFrom: genie-space
+  - name: SERVING_TABLE
+    value: "finance.gold_contract_performance_served"
+  - name: SERVING_LIMIT
+    value: "100"

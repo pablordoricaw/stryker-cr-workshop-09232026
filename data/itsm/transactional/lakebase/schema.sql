@@ -1,0 +1,3 @@
+CREATE SCHEMA IF NOT EXISTS itsm_seed;
+CREATE TABLE IF NOT EXISTS itsm_seed.service_tickets (ticket_id varchar(20) PRIMARY KEY, incident_id varchar(20) NOT NULL UNIQUE, opened_at timestamptz NOT NULL, resolved_at timestamptz NOT NULL, priority varchar(2) NOT NULL, status varchar(20) NOT NULL, assignment_group varchar(80) NOT NULL, service varchar(100) NOT NULL, configuration_item varchar(100) NOT NULL, category varchar(60) NOT NULL, resolution_hours numeric(8,2) NOT NULL, sla_breached boolean NOT NULL, root_cause_code varchar(80) NOT NULL, source_updated_at timestamptz NOT NULL);
+ALTER TABLE itsm_seed.service_tickets REPLICA IDENTITY FULL;

@@ -1,0 +1,4 @@
+configuration_item,service,environment,owner_team,criticality
+svc-patient-portal,Patient Operations Portal,production,Digital Operations,critical
+svc-order-mgmt,Order Management,production,Service Desk,high
+svc-identity-gateway,Identity Gateway,production,Digital Operations,critical
