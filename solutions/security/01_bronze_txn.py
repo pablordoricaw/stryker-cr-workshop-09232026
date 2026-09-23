@@ -55,30 +55,52 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
-dbutils.widgets.text("volume", "landing", "UC Volume")
+# MAGIC %md
+# MAGIC ## Configuration widgets
+# MAGIC
+# MAGIC Configure your notebook using the widgets below. The `catalog` and `domain` are required; the Lakebase widgets are optional (leave blank for automatic setup).
+# MAGIC
+# MAGIC ### Widget reference
+# MAGIC
+# MAGIC | Widget | What to enter | Leave blank? |
+# MAGIC |--------|---------------|--------------|
+# MAGIC | **catalog** | Your existing workshop catalog — **required** | No — must always provide |
+# MAGIC | **domain** | Security (locked to this solution) | Never — selects the Security transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
+# MAGIC | **lakebase_project** | (Advanced / optional) Leave blank to auto-derive/create; fill only if reusing an existing Lakebase project | Yes — blank is the recommended default |
+# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the Security default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC
+# MAGIC **Setup:** enter your **catalog**, leave the **domain** as Security, and leave everything else blank or as-is.
+
+# COMMAND ----------
+
+dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
+dbutils.widgets.dropdown("domain", "security", ["security"], "Domain (Security — locked to this solution)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
     "auto",
     ["auto", "delta_fallback", "lakebase_cdf"],
-    "Transactional source",
+    "Transactional source (auto recommended)",
 )
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "Lakebase project (blank = auto-derive/create)",
+    "(Advanced) Lakebase project — leave blank for auto",
 )
 dbutils.widgets.text(
     "lakebase_database",
     "",
-    "Lakebase database resource path (blank = default)",
+    "(Advanced) Lakebase database — leave blank for default",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
     "",
-    "Lakebase CDF history table (blank = your domain's default)",
+    "(Advanced) Lakebase CDF table — leave blank for Security default",
 )
 
 # COMMAND ----------
