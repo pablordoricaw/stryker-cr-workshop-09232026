@@ -1,5 +1,19 @@
 # Databricks notebook source
+# MAGIC %md
 # MAGIC # 05 · Governed Metric Views — SOLUTION (ITSM)
+# MAGIC
+# MAGIC This solution creates two Unity Catalog Metric Views in the participant's
+# MAGIC existing resolved schema. They are semantic definitions over the #8 gold
+# MAGIC tables, not copies of data: `itsm_incident_metrics` provides incident
+# MAGIC volume, MTTR, and SLA-breach slices by priority, service, and assignment
+# MAGIC group; and `itsm_service_metrics` provides per-service performance KPIs.
+# MAGIC No catalog or additional schema is created.
+# MAGIC
+# MAGIC **Compute requirement:** `WITH METRICS ... version: 1.1` needs DBR 17.2+
+# MAGIC and `DESCRIBE ... AS JSON` needs DBR 16.2+, so use DBR 17.2+ overall.
+
+# COMMAND ----------
+
 import os
 import sys
 
