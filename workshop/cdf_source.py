@@ -24,6 +24,7 @@ Key fixes (vs. initial version):
 
 from __future__ import annotations
 
+import csv
 import os
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -42,6 +43,8 @@ class CdfSourceReport:
             None if the history was preexisting or synthesized.
         lakebase_database_resource_path: The database RESOURCE path (for CDF config),
             or None if no provisioning occurred.
+        lakebase_project_created: True if the Lakebase project was created by this run
+            (vs. supplied/reused). Only meaningful if mode == "provisioned".
         notes: Human-readable step notes explaining what happened.
     """
 
@@ -49,6 +52,7 @@ class CdfSourceReport:
     cdf_history_table: str
     lakebase_project: Optional[str] = None
     lakebase_database_resource_path: Optional[str] = None
+    lakebase_project_created: bool = False
     notes: Optional[str] = None
 
 
@@ -166,11 +170,12 @@ def ensure_txn_cdf_source(
     provisioning_succeeded = False
     lakebase_project_used = None
     lakebase_db_resource_path = None
+    lakebase_project_created = False
 
     if w is not None:
         try:
             logger(f"[CDF] Attempting Lakebase provisioning...")
-            lakebase_project_used, lakebase_db_resource_path = (
+            lakebase_project_used, lakebase_db_resource_path, lakebase_project_created = (
                 _provision_lakebase_cdf_config(
                     w=w,
                     config=config,
@@ -223,6 +228,7 @@ def ensure_txn_cdf_source(
             "mode": mode,
             "cdf_history_table": history_table_fq,
             "lakebase_project": lakebase_project_used,
+            "lakebase_project_created": lakebase_project_created,
             "lakebase_database_resource_path": lakebase_db_resource_path,
             "domain": config.domain,
             "notes": (
@@ -246,6 +252,7 @@ def ensure_txn_cdf_source(
         cdf_history_table=history_table_fq,
         lakebase_project=lakebase_project_used,
         lakebase_database_resource_path=lakebase_db_resource_path,
+        lakebase_project_created=lakebase_project_created,
         notes=(
             f"Mode: {mode}. History table: {spec_table}. "
             f"Lakebase project: {lakebase_project_used or 'none'}."
@@ -263,11 +270,12 @@ def _provision_lakebase_cdf_config(
     lakebase_database: Optional[str],
     timeout_s: float,
     logger: Any,
-) -> tuple[str, str]:
+) -> tuple[str, str, bool]:
     """Provision Lakebase Postgres + seed + CDF config → UC.
 
     Returns:
-        (project_id, database_resource_path) — the identities for later cleanup.
+        (project_id, database_resource_path, created_new_project) — the identities
+        for later cleanup and a flag indicating whether THIS run created the project.
 
     Raises:
         Exception: If any step fails (CDF unsupported, SDK errors, timeout, etc).
@@ -289,136 +297,159 @@ def _provision_lakebase_cdf_config(
     catalog = config.catalog
     uc_schema = config.schema
 
-    # --- Create or reuse Lakebase project ---
-    if lakebase_project:
-        logger(f"[CDF] Reusing supplied Lakebase project: {lakebase_project}")
-        project_id = lakebase_project
-    else:
-        from workshop import namespace
+    # Track whether THIS run created the project (vs. BYO or reuse)
+    created_new_project = False
+    project_id = None
 
-        me = spark.sql("SELECT current_user()").collect()[0][0]
-        ns = namespace(me, domain=domain)
-        project_id = ns.lakebase_project()
-        logger(f"[CDF] Creating or reusing derived Lakebase project: {project_id}")
-
-        # Create project (auto-creates production branch + primary endpoint).
-        # Reuse if already exists by catching the error.
-        try:
-            w.postgres.create_project(
-                name=project_id,
-                spec={"display_name": f"Workshop {domain} Lakebase project"}
-            )
-            logger(f"[CDF] Created Lakebase project {project_id}")
-        except Exception as e:
-            if "already exists" in str(e).lower() or "conflict" in str(e).lower():
-                logger(f"[CDF] Project {project_id} already exists (reusing)")
-            else:
-                raise
-
-    # --- Discover the production branch and database ---
-    logger(f"[CDF] Discovering branch and database for project {project_id}...")
-
-    # List branches to get the production branch id
-    branches = list(w.postgres.list_branches(parent=f"projects/{project_id}"))
-    production_branch = None
-    for branch in branches:
-        if "production" in branch.name.lower():
-            production_branch = branch.name
-            break
-
-    if not production_branch:
-        # Fallback: use the first branch (likely production)
-        if branches:
-            production_branch = branches[0].name
+    try:
+        # --- Create or reuse Lakebase project ---
+        if lakebase_project:
+            logger(f"[CDF] Reusing supplied Lakebase project: {lakebase_project}")
+            project_id = lakebase_project
+            created_new_project = False
         else:
-            raise RuntimeError(f"No branches found in project {project_id}")
+            from workshop import namespace
 
-    logger(f"[CDF] Using branch: {production_branch}")
+            me = spark.sql("SELECT current_user()").collect()[0][0]
+            ns = namespace(me, domain=domain)
+            project_id = ns.lakebase_project()
+            logger(f"[CDF] Creating or reusing derived Lakebase project: {project_id}")
 
-    # List databases in the production branch
-    databases = list(w.postgres.list_databases(parent=production_branch))
-    db_resource_path = None
-    for db in databases:
-        # Match on postgres_database name
-        if hasattr(db, "status") and hasattr(db.status, "postgres_database"):
-            if db.status.postgres_database == "databricks_postgres":
-                db_resource_path = db.name
+            # Create project (auto-creates production branch + primary endpoint).
+            # Reuse if already exists by catching the error.
+            try:
+                w.postgres.create_project(
+                    name=project_id,
+                    spec={"display_name": f"Workshop {domain} Lakebase project"}
+                )
+                logger(f"[CDF] Created Lakebase project {project_id}")
+                created_new_project = True
+            except Exception as e:
+                if "already exists" in str(e).lower() or "conflict" in str(e).lower():
+                    logger(f"[CDF] Project {project_id} already exists (reusing)")
+                    created_new_project = False
+                else:
+                    raise
+
+        # --- Discover the production branch and database ---
+        logger(f"[CDF] Discovering branch and database for project {project_id}...")
+
+        # List branches to get the production branch id
+        branches = list(w.postgres.list_branches(parent=f"projects/{project_id}"))
+        production_branch = None
+        for branch in branches:
+            if "production" in branch.name.lower():
+                production_branch = branch.name
                 break
 
-    if not db_resource_path:
-        raise RuntimeError(
-            f"Could not find databricks_postgres database in {production_branch}"
+        if not production_branch:
+            # Fallback: use the first branch (likely production)
+            if branches:
+                production_branch = branches[0].name
+            else:
+                raise RuntimeError(f"No branches found in project {project_id}")
+
+        logger(f"[CDF] Using branch: {production_branch}")
+
+        # List databases in the production branch
+        databases = list(w.postgres.list_databases(parent=production_branch))
+        db_resource_path = None
+        for db in databases:
+            # Match on postgres_database name
+            if hasattr(db, "status") and hasattr(db.status, "postgres_database"):
+                if db.status.postgres_database == "databricks_postgres":
+                    db_resource_path = db.name
+                    break
+
+        if not db_resource_path:
+            raise RuntimeError(
+                f"Could not find databricks_postgres database in {production_branch}"
+            )
+
+        logger(f"[CDF] Using database: {db_resource_path}")
+
+        # --- Get endpoint for Postgres connection ---
+        logger(f"[CDF] Retrieving Postgres endpoint...")
+        endpoints = list(w.postgres.list_endpoints(parent=production_branch))
+        if not endpoints:
+            raise RuntimeError(f"No endpoints found in {production_branch}")
+
+        endpoint = endpoints[0]  # Use primary endpoint
+        endpoint_fq = endpoint.name
+        logger(f"[CDF] Using endpoint: {endpoint_fq}")
+
+        # Get full endpoint details for host
+        endpoint_obj = w.postgres.get_endpoint(name=endpoint_fq)
+        if not hasattr(endpoint_obj, "status") or not hasattr(endpoint_obj.status, "hosts"):
+            raise RuntimeError(f"Endpoint missing host information")
+
+        host = endpoint_obj.status.hosts.host
+        logger(f"[CDF] Postgres host: {host}")
+
+        # Generate OAuth token for Postgres
+        logger(f"[CDF] Generating OAuth token for Postgres...")
+        cred = w.postgres.generate_database_credential(name=endpoint_fq)
+        if not cred or not hasattr(cred, "token"):
+            raise RuntimeError(f"Failed to generate Postgres credential")
+
+        auth_token = cred.token
+
+        # --- Seed Postgres schema + table + data ---
+        me_user = spark.sql("SELECT current_user()").collect()[0][0]
+        logger(f"[CDF] Seeding Postgres schema {postgres_schema}...")
+        _seed_postgres(
+            config=config,
+            spec=spec,
+            repo_root=repo_root,
+            host=host,
+            user=me_user,
+            token=auth_token,
+            schema=postgres_schema,
+            logger=logger,
         )
 
-    logger(f"[CDF] Using database: {db_resource_path}")
+        # --- Create CDF config ---
+        logger(
+            f"[CDF] Creating CDF config: {postgres_schema} → "
+            f"{catalog}.{uc_schema}..."
+        )
+        cdf_config_id = f"{domain}_cdf"
+        w.postgres.create_cdf_config(
+            parent=db_resource_path,
+            cdf_config=CdfConfig(
+                catalog=catalog,
+                schema=uc_schema,
+                postgres_schema=postgres_schema,
+            ),
+            cdf_config_id=cdf_config_id,
+        )
 
-    # --- Get endpoint for Postgres connection ---
-    logger(f"[CDF] Retrieving Postgres endpoint...")
-    endpoints = list(w.postgres.list_endpoints(parent=production_branch))
-    if not endpoints:
-        raise RuntimeError(f"No endpoints found in {production_branch}")
+        # --- Poll CDF status until ONLINE ---
+        logger(f"[CDF] Polling CDF status until ONLINE (timeout: {timeout_s}s)...")
+        _poll_cdf_status(
+            w=w,
+            db_resource_path=db_resource_path,
+            cdf_config_id=cdf_config_id,
+            timeout_s=timeout_s,
+            logger=logger,
+        )
 
-    endpoint = endpoints[0]  # Use primary endpoint
-    endpoint_fq = endpoint.name
-    logger(f"[CDF] Using endpoint: {endpoint_fq}")
+        return project_id, db_resource_path, created_new_project
 
-    # Get full endpoint details for host
-    endpoint_obj = w.postgres.get_endpoint(name=endpoint_fq)
-    if not hasattr(endpoint_obj, "status") or not hasattr(endpoint_obj.status, "hosts"):
-        raise RuntimeError(f"Endpoint missing host information")
-
-    host = endpoint_obj.status.hosts.host
-    logger(f"[CDF] Postgres host: {host}")
-
-    # Generate OAuth token for Postgres
-    logger(f"[CDF] Generating OAuth token for Postgres...")
-    cred = w.postgres.generate_database_credential(name=endpoint_fq)
-    if not cred or not hasattr(cred, "token"):
-        raise RuntimeError(f"Failed to generate Postgres credential")
-
-    auth_token = cred.token
-
-    # --- Seed Postgres schema + table + data ---
-    me_user = spark.sql("SELECT current_user()").collect()[0][0]
-    logger(f"[CDF] Seeding Postgres schema {postgres_schema}...")
-    _seed_postgres(
-        config=config,
-        spec=spec,
-        repo_root=repo_root,
-        host=host,
-        user=me_user,
-        token=auth_token,
-        schema=postgres_schema,
-        logger=logger,
-    )
-
-    # --- Create CDF config ---
-    logger(
-        f"[CDF] Creating CDF config: {postgres_schema} → "
-        f"{catalog}.{uc_schema}..."
-    )
-    cdf_config_id = f"{domain}_cdf"
-    w.postgres.create_cdf_config(
-        parent=db_resource_path,
-        cdf_config=CdfConfig(
-            catalog=catalog,
-            schema=uc_schema,
-            postgres_schema=postgres_schema,
-        ),
-        cdf_config_id=cdf_config_id,
-    )
-
-    # --- Poll CDF status until ONLINE ---
-    logger(f"[CDF] Polling CDF status until ONLINE (timeout: {timeout_s}s)...")
-    _poll_cdf_status(
-        w=w,
-        db_resource_path=db_resource_path,
-        cdf_config_id=cdf_config_id,
-        timeout_s=timeout_s,
-        logger=logger,
-    )
-
-    return project_id, db_resource_path
+    except Exception as e:
+        # If we created a new project and any step failed, attempt cleanup
+        if created_new_project and project_id:
+            logger(f"[CDF] Provisioning failed; attempting to clean up project {project_id}...")
+            try:
+                w.postgres.delete_project(name=project_id)
+                logger(f"[CDF] Successfully deleted project {project_id}")
+            except Exception as del_err:
+                logger(
+                    f"[CDF] Warning: could not delete project {project_id}: {del_err}. "
+                    f"Manual cleanup may be needed."
+                )
+        # Re-raise the original exception
+        raise
 
 
 def _seed_postgres(
@@ -563,7 +594,7 @@ def _synthesize_history_table(
     import shutil
 
     from pyspark.sql import functions as F
-    from pyspark.sql.types import LongType, TimestampType
+    from pyspark.sql.types import IntegerType, LongType, TimestampNTZType
 
     domain = config.domain
     volume_path = config.volume_path
@@ -595,13 +626,13 @@ def _synthesize_history_table(
     logger(f"[CDF] Adding CDC metadata columns")
     seed_df = seed_df.withColumn("_pg_change_type", F.lit("insert"))
 
-    # Use a single monotonically_increasing_id for both _pg_lsn and _sort_by
-    # This ensures consistent ordering
+    # Use a single monotonically_increasing_id() and assign to both _pg_lsn and _sort_by
+    # to ensure they have the same value and consistent ordering
     mono_id = F.monotonically_increasing_id().cast(LongType())
     seed_df = seed_df.withColumn("_pg_lsn", mono_id)
-    seed_df = seed_df.withColumn("_sort_by", mono_id)
-    seed_df = seed_df.withColumn("_pg_xid", F.lit(None).cast(LongType()))
-    seed_df = seed_df.withColumn("_timestamp", F.current_timestamp().cast(TimestampType()))
+    seed_df = seed_df.withColumn("_sort_by", F.col("_pg_lsn"))
+    seed_df = seed_df.withColumn("_pg_xid", F.lit(None).cast(IntegerType()))
+    seed_df = seed_df.withColumn("_timestamp", F.current_timestamp().cast(TimestampNTZType()))
 
     logger(f"[CDF] Writing {seed_df.count()} rows to {history_table_fq}")
     (
