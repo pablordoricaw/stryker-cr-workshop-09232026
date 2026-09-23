@@ -1,4 +1,4 @@
-# The provided FastAPI data app, shipped from bundle-local source. App env vars
+# The provided Streamlit data app, shipped from bundle-local source. App env vars
 # (SERVING_TABLE, warehouse, etc.) live in app/app.yaml in the source directory,
 # NOT here. The app's Genie space ("genie-space", Can run) and Lakebase database
 # ("postgres", Can connect and create) resources are added in the Apps UI

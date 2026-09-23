@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 07 · Data app over a Lakebase synced table — SOLUTION (Finance)
 # MAGIC
-# MAGIC **Gated reference solution.** Ships the provided FastAPI app (`app/`) wired
+# MAGIC **Gated reference solution.** Ships the provided Streamlit app (`app/`) wired
 # MAGIC to a per-participant **Genie agent** (#11) and a **Lakebase synced table**
 # MAGIC created from `gold_contract_performance` (#8). It shows the complete code for
 # MAGIC the two participant gaps in `app/backend.py`, the Lakebase + app lifecycle

@@ -1,8 +1,8 @@
-# Databricks Apps runtime config for the provided workshop data app (FastAPI).
+# Databricks Apps runtime config for the provided workshop data app (Streamlit).
 #
-# Deploy with uvicorn (never a dev server). The app binds 0.0.0.0:8000 — the
-# Apps runtime routes DATABRICKS_APP_PORT to it.
-command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run with the Streamlit CLI (never a bare dev server). The Apps runtime
+# auto-binds DATABRICKS_APP_PORT for Streamlit, so no host/port flags are needed.
+command: ["streamlit", "run", "app.py"]
 
 # Resource ids come from wired app resources via `valueFrom` — never hardcoded.
 # Add these resources to the app (Apps UI → Edit → Resources, or via the CLI):

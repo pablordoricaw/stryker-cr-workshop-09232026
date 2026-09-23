@@ -1,4 +1,4 @@
-# The provided data app (FastAPI) participants wire to their Genie agent and a
+# The provided data app (Streamlit) participants wire to their Genie agent and a
 # Lakebase-synced gold table. The app code lives in ../app (added by #12); this
 # resource declares and versions the app so the bundle packages the same app the
 # workshop ships. `source_code_path` points at the app directory in this repo.

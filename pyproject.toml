@@ -15,9 +15,9 @@ dependencies = []
 package = false
 
 [dependency-groups]
-# pytest for the framework tests; fastapi + httpx let the app/ smoke tests
-# (tests/test_app_smoke.py) drive the provided FastAPI app via TestClient.
-dev = ["pytest>=8", "fastapi>=0.115", "httpx>=0.27"]
+# pytest for the framework tests; streamlit lets the app/ smoke tests
+# (tests/test_app_smoke.py) drive the provided Streamlit app via AppTest.
+dev = ["pytest>=8", "streamlit>=1.38"]
 
 [tool.ruff]
 # Databricks injects these into the notebook namespace at runtime (never

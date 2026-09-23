@@ -1,0 +1,26 @@
+# Dependency manifest for the provided workshop data app.
+#
+# Databricks Apps installs with **uv** when the app directory has a
+# `pyproject.toml` + `uv.lock` and NO `requirements.txt` (a `requirements.txt`
+# always forces the pip path). See:
+# https://docs.databricks.com/aws/en/dev-tools/databricks-apps/dependencies/
+#
+# The uv path ships NO pre-installed libraries, so every runtime dependency is
+# declared here, including streamlit and pandas (which the pip runtime would
+# otherwise pre-install). Regenerate the lock after editing: `cd app && uv lock`.
+[project]
+name = "stryker-workshop-app"
+version = "0.1.0"
+description = "The provided Stryker workshop data app (Streamlit): Genie agent + Lakebase synced serving table."
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.38,<2",
+    "pandas>=2.2,<3",
+    "databricks-sdk>=0.81,<1",
+    "psycopg[binary]>=3.2,<4",
+]
+
+# The app is run (`streamlit run app.py`), never built or imported as a package,
+# so keep uv from trying to build a wheel for it.
+[tool.uv]
+package = false

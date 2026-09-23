@@ -94,7 +94,7 @@ the curated data (a source name in a string, comment, alias, or CTE name does
 not count). The agent must actually answer, so if the Conversation API is gated
 the checkpoint stays RED (enable Partner-powered AI) rather than passing.
 
-`07_app.py` (added by #12) ships the **provided FastAPI data app** (`app/`) wired
+`07_app.py` (added by #12) ships the **provided Streamlit data app** (`app/`) wired
 to a **Lakebase synced table** created from the `gold_contract_performance` gold
 table (#8) and the participant's **Genie agent** (#11). It has the participant
 create a per-participant Lakebase project + synced table, deploy and explicitly

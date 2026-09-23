@@ -13,7 +13,7 @@
 [
   {
     "name": "Multi-Domain Workshop",
-    "story": "A 4-hour self-paced workshop where ~30 participants across three domains (Finance/Orthopedics, Security/Infrastructure, ITSM/IT-Ops) build ONE shared parameterized architecture on synthetic data. Domain PDFs land in a per-participant UC Volume and pass ai_classify → ai_parse_document → ai_extract into Silver; transactional data arrives from Lakebase Postgres via Lakebase CDF (dashed pre-seeded Delta fallback) — all refined Bronze→Silver→Gold. Gold feeds dbxmetagen (staged comments · PI classification · domain tags → review → apply) and UC Metric Views as the governed semantic layer, served through a shared serverless SQL warehouse. A participant-unique Genie agent and a FastAPI Databricks App (Genie Conversation API + a Lakebase-synced low-latency serving table) let a business user ask questions in plain language. Everything sits under a Unity Catalog governance banner. Agent Bricks / KA / Supervisor, Lakeflow Connect Postgres CDC, local dev and terminal deployment are out of scope.",
+    "story": "A 4-hour self-paced workshop where ~30 participants across three domains (Finance/Orthopedics, Security/Infrastructure, ITSM/IT-Ops) build ONE shared parameterized architecture on synthetic data. Domain PDFs land in a per-participant UC Volume and pass ai_classify → ai_parse_document → ai_extract into Silver; transactional data arrives from Lakebase Postgres via Lakebase CDF (dashed pre-seeded Delta fallback) — all refined Bronze→Silver→Gold. Gold feeds dbxmetagen (staged comments · PI classification · domain tags → review → apply) and UC Metric Views as the governed semantic layer, served through a shared serverless SQL warehouse. A participant-unique Genie agent and a Streamlit Databricks App (Genie Conversation API + a Lakebase-synced low-latency serving table) let a business user ask questions in plain language. Everything sits under a Unity Catalog governance banner. Agent Bricks / KA / Supervisor, Lakeflow Connect Postgres CDC, local dev and terminal deployment are out of scope.",
     "aspect": "16:9",
     "theme": "slide",
     "direction": "horizontal",
@@ -37,7 +37,7 @@
           2131,
           -69
         ],
-        "ai_reasoning": "participant-unique Python/FastAPI Databricks App: connects to the Genie Conversation API and a low-latency Lakebase synced serving table",
+        "ai_reasoning": "participant-unique Python/Streamlit Databricks App: connects to the Genie Conversation API and a low-latency Lakebase synced serving table",
         "label": "Databricks App"
       },
       {

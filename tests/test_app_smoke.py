@@ -1,47 +1,45 @@
-"""FastAPI smoke tests for the provided workshop app (``app/``).
+"""Streamlit smoke tests for the provided workshop app (``app/``).
 
 Guards the core acceptance behaviors of the shipped app:
-  * it imports and starts with BOTH participant gaps unfilled (no exception at
-    import/startup — the gaps raise only when their route is hit);
-  * ``GET /`` and ``GET /api/health`` work regardless of the gaps; and
-  * the two gap routes return HTTP 501 only when called, and request bodies are
-    validated (422).
+  * it renders with BOTH participant gaps unfilled (no exception on the initial
+    run; the gaps raise only when their serving/chat action is triggered);
+  * a visible title is shown; and
+  * triggering each gap surfaces its ``PARTICIPANT GAP`` message in the UI rather
+    than crashing the app.
 
 The app lives in ``<repo>/app/`` as a standalone app (not a package), so the
-fixture puts that directory on ``sys.path`` and imports it exactly as the Apps
-runtime would. Requires ``fastapi`` + ``httpx`` (dev dependencies); skipped if
-absent so the framework test run never hard-fails on an optional dep.
+fixture puts that directory on ``sys.path`` and drives ``app.py`` through
+Streamlit's headless ``AppTest`` exactly as the Apps runtime would import it.
+Requires ``streamlit`` (a dev dependency); skipped if absent so the framework
+test run never hard-fails on an optional dep.
 """
 
 from __future__ import annotations
 
-import importlib
 import os
 import sys
 
 import pytest
 
-pytest.importorskip("fastapi")
-pytest.importorskip("httpx")
+pytest.importorskip("streamlit")
 
-from fastapi.testclient import TestClient
+from streamlit.testing.v1 import AppTest
 
 APP_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app"
 )
-_APP_MODULES = ("app", "backend", "models")
+APP_PY = os.path.join(APP_DIR, "app.py")
+_APP_MODULES = ("backend",)
 
 
 @pytest.fixture
-def client():
-    """Import the app fresh from app/ and yield a TestClient (startup runs here)."""
+def at():
+    """Build an AppTest for app/app.py with app/ importable, then run it once."""
     sys.path.insert(0, APP_DIR)
     for name in _APP_MODULES:
         sys.modules.pop(name, None)
     try:
-        appmod = importlib.import_module("app")
-        with TestClient(appmod.app) as test_client:
-            yield test_client
+        yield AppTest.from_file(APP_PY, default_timeout=30).run()
     finally:
         for name in _APP_MODULES:
             sys.modules.pop(name, None)
@@ -51,44 +49,25 @@ def client():
             pass
 
 
-def test_app_imports_and_starts_with_gaps_unfilled(client):
-    # Reaching here means import + startup succeeded even though neither gap is
-    # filled — the gaps must not raise at import/startup.
-    assert client is not None
+def test_app_renders_with_gaps_unfilled(at):
+    # A clean initial run means the page renders even though neither gap is
+    # filled; the gaps must not raise until their action is triggered.
+    assert not at.exception
 
 
-def test_index_ok(client):
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert b"<html" in resp.content.lower()
+def test_title_present(at):
+    assert any("Workshop data app" in t.value for t in at.title)
 
 
-def test_health_ok(client):
-    resp = client.get("/api/health")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["status"] == "ok"
-    # No resources wired in the test env, so both are reported unconfigured.
-    assert body["genie_configured"] is False
-    assert body["lakebase_configured"] is False
+def test_serving_gap_surfaces_message(at):
+    # Clicking "Load rows" triggers GAP 2 (the Lakebase read).
+    at.button[0].click().run()
+    assert not at.exception
+    assert any("GAP 2" in w.value for w in at.warning)
 
 
-def test_serving_gap_returns_501_when_hit(client):
-    resp = client.get("/api/serving")
-    assert resp.status_code == 501
-    assert "GAP 2" in resp.json()["detail"]
-
-
-def test_ask_gap_returns_501_when_hit(client):
-    resp = client.post("/api/ask", json={"question": "hi"})
-    assert resp.status_code == 501
-    assert "GAP 1" in resp.json()["detail"]
-
-
-def test_ask_request_validation_422(client):
-    resp = client.post("/api/ask", json={})
-    assert resp.status_code == 422
-
-
-def test_openapi_available(client):
-    assert client.get("/openapi.json").status_code == 200
+def test_ask_gap_surfaces_message(at):
+    # Submitting a question triggers GAP 1 (the Genie call).
+    at.chat_input[0].set_value("hi").run()
+    assert not at.exception
+    assert any("GAP 1" in m.value for m in at.markdown)

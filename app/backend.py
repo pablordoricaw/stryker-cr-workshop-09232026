@@ -6,11 +6,11 @@ fills in:
   * GAP 1 of 2 — :meth:`Backend.ask_genie`   (the Genie Conversation API call)
   * GAP 2 of 2 — :meth:`Backend.fetch_serving_rows`  (the Lakebase read)
 
-Everything around them — configuration, connection setup, health reporting, and
-error handling — is already written. Find each ``PARTICIPANT GAP`` banner below,
-replace the ``raise NotImplementedError(...)`` with the few lines it describes,
-then redeploy. The reference implementation is in
-``solutions/finance/07_app.py``.
+The Streamlit UI in :mod:`app` calls exactly these two methods. Everything around
+them — configuration, connection setup, health reporting, and error handling — is
+already written. Find each ``PARTICIPANT GAP`` banner below, replace the
+``raise NotImplementedError(...)`` with the few lines it describes, then redeploy.
+The reference implementation is in ``solutions/finance/07_app.py``.
 
 Design notes:
   * Authentication uses the Databricks SDK ``Config`` / ``WorkspaceClient`` — never
@@ -19,8 +19,9 @@ Design notes:
     ``valueFrom`` (Genie space) and Lakebase's auto-injected ``PG*`` /
     ``LAKEBASE_ENDPOINT`` vars — never hardcoded.
   * The app **starts cleanly even with the gaps unfilled**: the gaps raise only
-    when their route is called, so the app can be deployed and started (and the
-    ``07_app`` checkpoint's app-side can pass) before the gaps are filled.
+    when their serving/chat action is triggered, so the app can be deployed and
+    started (and the ``07_app`` checkpoint's app-side can pass) before the gaps
+    are filled.
 """
 
 from __future__ import annotations

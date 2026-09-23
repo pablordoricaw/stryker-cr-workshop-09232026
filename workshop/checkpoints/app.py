@@ -1,6 +1,6 @@
 """The ``07_app`` checkpoint: a deployed data app over a Lakebase synced table.
 
-Ticket #12 ships a **provided FastAPI app** that participants wire to two things —
+Ticket #12 ships a **provided Streamlit app** that participants wire to two things —
 their per-participant Genie Agent (#11) and a **Lakebase synced table** created
 from one of the #8 gold tables. This checkpoint proves the *deployed* slice using
 **only externally-observable platform state** — never the notebook, the app source,
@@ -33,8 +33,10 @@ Two independent facts are asserted, each hardened against a false pass:
   and its compute must be **running** — deploying an app can leave it stopped,
   and a stopped app answers nothing, so a stopped/starting/errored app is RED
   (the observable form of the "app start is handled explicitly" acceptance
-  criterion). When the app exposes a reachable health endpoint it is probed
-  best-effort; an explicit unhealthy response is RED.
+  criterion). The provided Streamlit app serves no ``/api/health`` route, so the
+  best-effort HTTP health probe is **off by default** (``probe_health=False``);
+  opt in for a framework that exposes ``/api/health``, where an explicit
+  unhealthy response is then RED.
 
 **Domain-generic.** No Finance-only object name is baked into the logic. The
 gold source table, the primary key, the expected row count, and the app/synced
@@ -96,8 +98,9 @@ Extras forwarded through ``ctx.extras``:
 * ``require_running`` — default ``True``; set ``False`` only to accept a
   successfully-deployed-but-stopped app (not recommended — a stopped app answers
   nothing).
-* ``probe_health`` — default ``True``; set ``False`` to skip the best-effort HTTP
-  health probe.
+* ``probe_health`` — default ``False`` (the provided Streamlit app has no
+  ``/api/health`` route); set ``True`` to enable the best-effort HTTP health
+  probe for a framework that exposes one.
 * ``lakebase_endpoint`` / ``lakebase_host`` / ``lakebase_user`` /
   ``lakebase_database`` — connection hints the live SDK adapter uses to read
   directly from Lakebase Postgres in the real participant flow: both the
@@ -785,7 +788,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
              "compute_state": app.compute_state, "app_state": app.app_state},
         )
 
-    probe_health = ctx.extras.get("probe_health", True)
+    probe_health = ctx.extras.get("probe_health", False)
     prober = getattr(client, "probe", None)
     if probe_health and callable(prober) and app.url:
         try:

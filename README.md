@@ -42,7 +42,7 @@ You build for **one domain** of your choice: Finance (Orthopedics), Security (in
 5. **Governance**: auto-generate metadata (comments, tags) on your gold layer.
 6. **Semantic layer**: author UC Metric Views over your gold tables.
 7. **Agent**: build a curated Genie agent as a natural-language interface.
-8. **App**: wire the provided FastAPI data app to your Genie agent and a Lakebase synced table.
+8. **App**: wire the provided Streamlit data app to your Genie agent and a Lakebase synced table.
 
 Each step is guided with `# TODO` cells, collapsible hints, and checkpoint validation. Everything runs in the **Databricks Workspace UI**: there is no terminal, no local `git`, no CLI, and no admin action required.
 
@@ -59,7 +59,7 @@ Here is the module sequence you will walk, from `00_setup` through `07_app`, plu
 04_metadata                 Auto-generate governance metadata with dbxmetagen
 05_metric_views             Author two UC Metric Views over gold tables
 06_genie                    Build a Genie agent over gold tables and metric views
-07_app                      Wire the provided FastAPI app to the Genie agent and Lakebase
+07_app                      Wire the provided Streamlit app to the Genie agent and Lakebase
 99_teardown                 Clean up your personal instructions file
 ```
 
@@ -82,14 +82,14 @@ stryker-cr-workshop-09232026/
 │   ├── 04_metadata.py           Auto-generate governance metadata
 │   ├── 05_metric_views.py       Author UC Metric Views
 │   ├── 06_genie.py              Build a Genie agent
-│   ├── 07_app.py                Wire the FastAPI data app
+│   ├── 07_app.py                Wire the Streamlit data app
 │   ├── 99_teardown.py           Cleanup
 │   └── stretch/
 │       ├── package_as_dab.py    (Optional) Package as DABs
 │       └── add_your_own.py      (Optional) Extend metrics and Genie
 ├── workshop/                    The workshop.check() validation framework
 ├── data/                        Synthetic PDFs and transactional seeds per domain (Finance/Security/ITSM)
-├── app/                         The provided FastAPI data app you wire to your Genie agent
+├── app/                         The provided Streamlit data app you wire to your Genie agent
 ├── solutions/                   Gated reference solutions, one per checkpoint, per domain (the last rung of the hint ladder)
 ├── resources/                   Databricks Asset Bundle (DAB) resource definitions
 ├── docs/

@@ -1,4 +1,4 @@
-# App bundle — the provided FastAPI data app, packaged as a self-contained DAB.
+# App bundle — the provided Streamlit data app, packaged as a self-contained DAB.
 #
 # ONE of TWO independently-deployable bundles (see ../README.md for the "why").
 # This one owns the product lifecycle: the Databricks App. It changes on the app

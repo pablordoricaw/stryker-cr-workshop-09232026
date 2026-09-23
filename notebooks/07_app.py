@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 07 · Data app over a Lakebase synced table
 # MAGIC
-# MAGIC Ship the **provided FastAPI app** (`app/`) wired to two things you already
+# MAGIC Ship the **provided Streamlit app** (`app/`) wired to two things you already
 # MAGIC built: your **Genie agent** (`06_genie`) and a **Lakebase synced table**
 # MAGIC created from one of your gold tables (`03_gold`). The app is complete except
 # MAGIC for **two gaps** you fill in `app/backend.py` — the Genie connection and the
@@ -318,7 +318,7 @@ assert result.passed, result.message
 # MAGIC %md
 # MAGIC ## Stretch
 # MAGIC
-# MAGIC - Add an `/api/ask` history panel, or a second serving screen over your
+# MAGIC - Add a chat-history sidebar, or a second serving screen over your
 # MAGIC   domain's other gold table.
 # MAGIC - Switch the sync to **Triggered** (enable Change Data Feed on the gold
 # MAGIC   table first) so the app sees fresh data on a schedule.

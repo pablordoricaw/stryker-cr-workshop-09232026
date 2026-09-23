@@ -1,19 +1,23 @@
 # app/
 
-The **provided data app** (Python / FastAPI) participants wire to their own Genie
-agent and a Lakebase-synced gold table. It is deployed and started from the
+The **provided data app** (Python / Streamlit) participants wire to their own
+Genie agent and a Lakebase-synced gold table. It is deployed and started from the
 Databricks Apps UI or a notebook step; no web terminal required. The driver
 notebook is `notebooks/07_app.py`; the full reference is
 `solutions/finance/07_app.py`.
 
-## What it serves
+## What it shows
 
-| Route | Purpose |
-| ----- | ------- |
-| `GET /` | Minimal single-page UI (`static/index.html`) |
-| `GET /api/health` | Liveness + wiring snapshot (never touches Genie/Lakebase) |
-| `GET /api/serving?limit=N` | Rows from the **Lakebase-synced serving table** |
-| `POST /api/ask` | An answer relayed from the participant's **Genie agent** |
+Three tabs:
+
+| Tab | Purpose |
+| --- | ------- |
+| **📊 Data app** | KPI strip, Lakebase-powered charts, and an interactive table of rows from the **Lakebase-synced serving table**, plus an **Ask Genie** chat that relays answers (and the generated SQL) from the participant's **Genie agent** |
+| **🎉 Congratulations** | A recap of the end-to-end pipeline built across the workshop checkpoints (`00_setup` → `07_app`) |
+| **ℹ️ About** | An overview of Databricks Apps and links to more resources |
+
+The KPIs and charts populate once the Lakebase read gap is wired; until then the
+Data app tab shows a friendly panel.
 
 ## The two participant gaps
 
@@ -23,20 +27,24 @@ each marked with a `PARTICIPANT GAP` banner and a `TODO`:
 1. **Genie connection**: `Backend.ask_genie` calls the Genie Conversation API.
 2. **Lakebase read**: `Backend.fetch_serving_rows` reads the synced serving table.
 
-The app **starts cleanly with the gaps unfilled**: each gap raises only when its
-route is called (returning HTTP 501), so you can deploy and start the app first
-and fill the gaps after. `GET /` and `GET /api/health` always work.
+The app **renders cleanly with the gaps unfilled**: the initial page never calls
+a gap, and the serving/chat actions catch the `NotImplementedError` a gap raises
+and show a friendly panel instead of crashing. So you can deploy and start the
+app first and fill the gaps after.
 
 ## Layout
 
-| File | Role |
-| ---- | ---- |
-| `app.py` | FastAPI routing, static hosting, health (complete; don't edit) |
-| `backend.py` | Data-access layer; **contains the two gaps you fill** |
-| `models.py` | Pydantic request/response models |
-| `static/index.html` | Minimal UI |
-| `app.yaml` | Apps runtime command + resource wiring (`valueFrom`) |
-| `requirements.txt` | `databricks-sdk` + `psycopg[binary]` (not pre-installed) |
+```
+app/
+├── app.py             # Streamlit UI: layout, widgets, error handling (complete; don't edit)
+├── backend.py         # Data-access layer: contains the two gaps you fill
+├── app.yaml           # Apps runtime command + resource wiring (valueFrom)
+├── pyproject.toml     # Dependency manifest: installed with uv on Databricks Apps
+├── uv.lock            # Pinned dependency lock (regenerate with: cd app && uv lock)
+├── README.md          # This file
+└── .streamlit/
+    └── config.toml    # Theme (light + Databricks accent)
+```
 
 ## Wiring (resources & config)
 
@@ -52,14 +60,27 @@ Resource ids are never hardcoded; they come from wired app resources via
   matching its Unity Catalog schema (your participant schema), so this is
   `<your_schema>.<your_served_table>`.
 
+## Dependencies
+
+Deps are installed with **uv** from `pyproject.toml` + `uv.lock`. Databricks Apps
+takes the uv path only when the app directory has both files and **no**
+`requirements.txt` (a `requirements.txt` always forces pip). The uv path ships
+**no pre-installed libraries**, so every runtime dep, including `streamlit` and
+`pandas`, is declared in `pyproject.toml`. After editing deps, regenerate the
+lock with `cd app && uv lock` and commit `uv.lock`.
+
 ## Run it
 
-- **Local dev:** `uvicorn app:app --port 8000` (health + UI work; the data routes
-  need a workspace + wired resources).
-- **Deploy + start:** deploy from the Apps UI or the CLI, then **start the app**: deploying can leave it stopped. See `notebooks/07_app.py`.
+- **Local dev:** `streamlit run app.py` (or `uv run streamlit run app.py` to use
+  the locked env). The UI renders; the serving/chat actions need a workspace +
+  wired resources, and show a friendly panel until the two gaps are filled.
+- **Deploy + start:** deploy from the Apps UI or the CLI, then **start the app**:
+  deploying can leave it stopped. See `notebooks/07_app.py`.
 
-Validated through `workshop.check("07_app", ...)` like every other checkpoint; it asserts the synced table serves the expected gold data and the app is deployed
-and running.
+Validated through `workshop.check("07_app", ...)` like every other checkpoint;
+it asserts the synced table serves the expected gold data and the app is deployed
+and running. (Streamlit serves no `/api/health`, so the checkpoint's optional HTTP
+health probe is off by default.)
 
 ## Per-participant naming
 

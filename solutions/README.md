@@ -19,7 +19,7 @@ solutions/
 │   ├── 04_metadata.py      # #9: dbxmetagen comment/pi/domain on the gold tables
 │   ├── 05_metric_views.py  # #10: governed UC Metric Views over the gold tables
 │   ├── 06_genie.py         # #11: per-participant Genie agent over gold + metrics
-│   ├── 07_app.py           # #12: provided FastAPI app + Lakebase synced table
+│   ├── 07_app.py           # #12: provided Streamlit app + Lakebase synced table
 │   └── stretch/            # #16: optional Tier-3 gated solutions
 │       ├── package_as_dab.py            # walkthrough of the bundle set below
 │       ├── package_as_dab_bundle/       # 2 independently-deployable DABs + the "why"
@@ -32,7 +32,7 @@ solutions/
 │   ├── 04_metadata.py      # dbxmetagen comment/pi/domain on the gold tables
 │   ├── 05_metric_views.py  # governed UC Metric Views over the gold tables
 │   ├── 06_genie.py         # per-participant Genie agent over gold + metrics
-│   └── 07_app.py           # provided FastAPI app + Lakebase synced table
+│   └── 07_app.py           # provided Streamlit app + Lakebase synced table
 └── itsm/
 ```
 
@@ -61,7 +61,7 @@ uses the Databricks SDK (`WorkspaceClient().genie`), asks a sample question to
 show the generated SQL, and ends on the `06_genie` checkpoint, which validates
 the agent by observable Genie state only.
 
-`07_app` ships the provided FastAPI app (`app/`) wired to a per-participant
+`07_app` ships the provided Streamlit app (`app/`) wired to a per-participant
 Lakebase synced table (created from `gold_contract_performance`) and the
 participant's Genie agent. It shows the complete code for the two participant
 gaps in `app/backend.py` (the Genie Conversation API call and the Lakebase read),

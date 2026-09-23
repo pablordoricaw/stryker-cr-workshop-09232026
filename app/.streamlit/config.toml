@@ -1,0 +1,11 @@
+# Streamlit theme for the provided workshop data app. A light theme with the
+# Databricks "Lava" accent so the app reads as a polished product rather than a
+# default Streamlit page. The Apps runtime handles the server/port, so this file
+# is theme-only.
+[theme]
+base = "light"
+primaryColor = "#FF3621"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F7F9"
+textColor = "#1B3139"
+font = "sans serif"

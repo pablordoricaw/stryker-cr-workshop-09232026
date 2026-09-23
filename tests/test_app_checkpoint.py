@@ -391,14 +391,17 @@ def test_failed_deployment_is_red():
     assert result.details["stage"] == "app_deployment"
 
 
-def test_unhealthy_probe_is_red():
-    result = _check(FakeApps(probe_status=503))
+def test_unhealthy_probe_is_red_when_opted_in():
+    # The HTTP health probe is opt-in (the provided Streamlit app has no
+    # /api/health); enabling it makes an explicit unhealthy response RED.
+    result = _check(FakeApps(probe_status=503), probe_health=True)
     assert result.passed is False
     assert result.details["stage"] == "app_health"
 
 
-def test_probe_disabled_skips_health():
-    result = _check(FakeApps(probe_status=503), probe_health=False)
+def test_probe_off_by_default_skips_health():
+    # Default: no probe, so an unhealthy endpoint does not fail the checkpoint.
+    result = _check(FakeApps(probe_status=503))
     assert result.passed is True
 
 
