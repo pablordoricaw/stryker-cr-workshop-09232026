@@ -24,6 +24,7 @@ The diagram traces the full path you'll build. You start by ingesting two kinds 
 - [Getting started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Get the workshop into your workspace](#get-the-workshop-into-your-workspace)
+  - [You've got the code, now what?](#youve-got-the-code-now-what)
 - [How you know you passed: workshop.check()](#how-you-know-you-passed-workshopcheck)
 - [Getting help from Genie Code](#getting-help-from-genie-code)
 - [Optional Tier-3 stretch modules](#optional-tier-3-stretch-modules)
@@ -71,55 +72,52 @@ stretch/add_your_own        Extend metric views and Genie questions
 ### Repository layout
 
 ```
-notebooks/
-├── 00_setup.py              Setup: configure domain and provision schema/volume
-├── 01_bronze_docs.py        Bronze layer for documents
-├── 01_bronze_txn.py         Bronze layer for transactions
-├── 02_silver_docs.py        Parse, classify, extract with AI Functions
-├── 03_gold.py               Join and build gold tables
-├── 04_metadata.py           Auto-generate governance metadata
-├── 05_metric_views.py       Author UC Metric Views
-├── 06_genie.py              Build a Genie agent
-├── 07_app.py                Wire the FastAPI data app
-├── 99_teardown.py           Cleanup
-└── stretch/
-    ├── package_as_dab.py    (Optional) Package as DABs
-    └── add_your_own.py      (Optional) Extend metrics and Genie
-
-workshop/
-└── Contains the workshop.check() validation framework
-
-data/
-└── Synthetic PDFs and transactional seeds per domain (Finance/Security/ITSM)
-
-app/
-└── The provided FastAPI data app you wire to your Genie agent
-
-solutions/
-└── Gated reference solutions, one per checkpoint, per domain
-    (the last rung of the hint ladder)
-
-resources/
-└── Databricks Asset Bundle (DAB) resource definitions
-
-docs/
-├── genie/
-│   └── .assistant_instructions.md   Hint ladder (injected into Genie Code)
-└── stretch/
-    └── README.md            Tier-3 stretch module guide
-
-assets/
-└── diagrams/
-    └── workshop-architecture.svg   The workshop data flow diagram
+stryker-cr-workshop-09232026/
+├── notebooks/
+│   ├── 00_setup.py              Setup: configure domain and provision schema/volume
+│   ├── 01_bronze_docs.py        Bronze layer for documents
+│   ├── 01_bronze_txn.py         Bronze layer for transactions
+│   ├── 02_silver_docs.py        Parse, classify, extract with AI Functions
+│   ├── 03_gold.py               Join and build gold tables
+│   ├── 04_metadata.py           Auto-generate governance metadata
+│   ├── 05_metric_views.py       Author UC Metric Views
+│   ├── 06_genie.py              Build a Genie agent
+│   ├── 07_app.py                Wire the FastAPI data app
+│   ├── 99_teardown.py           Cleanup
+│   └── stretch/
+│       ├── package_as_dab.py    (Optional) Package as DABs
+│       └── add_your_own.py      (Optional) Extend metrics and Genie
+├── workshop/                    The workshop.check() validation framework
+├── data/                        Synthetic PDFs and transactional seeds per domain (Finance/Security/ITSM)
+├── app/                         The provided FastAPI data app you wire to your Genie agent
+├── solutions/                   Gated reference solutions, one per checkpoint, per domain (the last rung of the hint ladder)
+├── resources/                   Databricks Asset Bundle (DAB) resource definitions
+├── docs/
+│   ├── genie/
+│   │   └── .assistant_instructions.md   Hint ladder (injected into Genie Code)
+│   └── stretch/
+│       └── README.md            Tier-3 stretch module guide
+└── assets/
+    └── diagrams/
+        └── workshop-architecture.svg   The workshop data flow diagram
 ```
 
 ## Getting started
 
 ### Prerequisites
 
-- **Databricks workspace access** or a free [Databricks Free Edition](https://www.databricks.com/learn/free-edition) account (self-sign-up; use this as your fallback venue).
+- **Databricks workspace access**, or a free [Databricks Free Edition](https://www.databricks.com/learn/free-edition) account for self-sign-up (see the note below).
 - **GitHub account** (only if you choose **Option A** below; optional for Option B).
 - Your facilitator will confirm any workspace toggles needed on the day.
+
+> [!NOTE]
+> **Databricks Free Edition is a valid fallback, but it has limits that affect this workshop.** It is for personal, non-commercial use, runs on serverless compute only under a fair-use quota (if you exceed it, your compute is shut off for the rest of the day, and in extreme cases the month), and is not covered by Databricks support or an SLA. Specific ceilings that matter here:
+> - **Databricks Apps:** up to 3 per account, and an app auto-stops 24 hours after it is started or redeployed (affects `07_app`).
+> - **Lakebase:** one project per account with scale-to-zero compute (affects the `07_app` synced table).
+> - **AI Functions / Foundation Models:** no provisioned throughput and some models are unavailable, so the AI-powered steps (silver parsing, metadata generation) may hit model or rate limits.
+> - **Genie Code** may be unavailable; if so, the hint ladder degrades to reading the solution directly (see [Free-Edition fallback](#free-edition-fallback) below).
+>
+> See the [Databricks Free Edition limitations](https://docs.databricks.com/aws/en/getting-started/free-edition-limitations) for the full list.
 
 ### Get the workshop into your workspace
 
@@ -132,6 +130,7 @@ Pick **one** of the two paths below. Both land the same files in your Databricks
 3. Paste the **HTTPS URL of your fork** (e.g., `https://github.com/<you>/stryker-cr-workshop-09232026`), pick the default branch, and click **Create Git folder**.
 4. Open the newly cloned folder in the Workspace.
 
+> [!TIP]
 > Forking (rather than cloning this repo directly) means you can commit your own progress and pull updates without needing write access here.
 
 #### Option B: Download a ZIP and upload it to the workspace
@@ -143,9 +142,9 @@ Use this when you can't or don't want to connect a Git provider to the workspace
 3. Choose **File / Folder** and upload the unzipped workshop folder (drag-and-drop the folder, or import files preserving the directory structure).
 4. Open the imported folder in the Workspace.
 
----
+### You've got the code, now what?
 
-**You're ready.** Open `notebooks/00_setup.py` and run the bootstrap cell (the first cell, which puts the repo on the path), then walk through the setup steps. When you finish, come back here and run the [`smoke` checkpoint](#how-you-know-you-passed-workshopcheck) to confirm everything is wired up, then follow [the workshop path](#the-workshop-path) from `01_bronze_docs` through `07_app`.
+Open `notebooks/00_setup.py` and run the bootstrap cell (the first cell, which puts the repo on the path), then walk through the setup steps. When you finish, come back here and run the [`smoke` checkpoint](#how-you-know-you-passed-workshopcheck) to confirm everything is wired up, then follow [the workshop path](#the-workshop-path) from `01_bronze_docs` through `07_app`.
 
 ## How you know you passed: workshop.check()
 
@@ -193,7 +192,8 @@ Genie Code is available in notebooks, the SQL editor, and other Databricks envir
 
 See the [Databricks Genie Code documentation](https://docs.databricks.com/genie-code/navigate-genie-code) for more details.
 
-> _Facilitator: confirm the exact way to open Genie Code in your workspace, in case your environment has custom configuration._
+> [!NOTE]
+> Facilitator: confirm the exact way to open Genie Code in your workspace, in case your environment has custom configuration.
 
 ### How the hint ladder works
 
