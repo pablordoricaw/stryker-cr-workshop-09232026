@@ -35,6 +35,8 @@ dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)"
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("genie_space_id", "", "Genie space id (from 06_genie)")
 
+# COMMAND ----------
+
 # Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
 # created, and your namespace — the one source of truth for every unique name in
 # the shared workspace (app, Lakebase project, synced table).

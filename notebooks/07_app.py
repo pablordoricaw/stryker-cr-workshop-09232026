@@ -75,6 +75,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 # Your identity resolves the SAME per-participant schema 00_setup created, and
 # your namespace — the one source of truth for every unique name in the shared
 # workspace (schema, Genie agent, app, Lakebase project, synced table).

@@ -66,6 +66,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 # Your Databricks identity. It makes your schema (and, later, your Genie agent,
 # app, and Lakebase objects) unique in the shared team catalog/workspace.
 me = spark.sql("SELECT current_user()").collect()[0][0]

@@ -30,6 +30,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(

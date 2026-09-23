@@ -24,6 +24,9 @@ from pyspark.sql import functions as F
 dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
 dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
+
+# COMMAND ----------
+
 me = spark.sql("SELECT current_user()").collect()[0][0]
 config = workshop.resolve_config(catalog=dbutils.widgets.get("catalog") or None, domain="itsm", schema=dbutils.widgets.get("schema") or None, identity=me)
 bronze = workshop.fully_qualified(config.catalog, config.schema, "bronze_service_tickets")

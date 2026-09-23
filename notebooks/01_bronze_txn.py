@@ -75,6 +75,8 @@ dbutils.widgets.text(
     "Lakebase CDF history table (blank = your domain's default)",
 )
 
+# COMMAND ----------
+
 # Your identity gives you a unique schema in the shared team catalog
 # (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
