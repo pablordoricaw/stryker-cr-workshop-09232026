@@ -1,5 +1,5 @@
 # Databricks notebook source
-# ruff: noqa: F821, I001
+# ruff: noqa: F821, I001, BLE001
 # MAGIC %md
 # MAGIC # 04 · Governed metadata with dbxmetagen — SOLUTION (ITSM)
 # MAGIC
@@ -23,14 +23,36 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 0. Install dbxmetagen (pinned)
+# MAGIC ## 0. Install dbxmetagen (pinned, vendored wheel)
 # MAGIC
-# MAGIC Pinned to `v0.10.68` (not `@main`/latest) for reproducibility.
-# MAGIC `restartPython()` makes the freshly-installed library importable below.
+# MAGIC Pinned to `v0.10.68` for reproducibility. Instead of `%pip install git+…`
+# MAGIC (which clones *and builds* from GitHub at runtime and hangs without
+# MAGIC github.com egress), we install a **prebuilt wheel vendored in the repo**
+# MAGIC under [`libs/`](../../libs/README.md). The install still resolves
+# MAGIC dbxmetagen's dependency tree from **PyPI**, so it needs PyPI egress; with
+# MAGIC none, skip the install and the dbxmetagen cells and use the **🛟 No-PyPI
+# MAGIC fallback** section. `restartPython()` makes the library importable below.
 
 # COMMAND ----------
 
-# MAGIC %pip install -qqq git+https://github.com/databricks-industry-solutions/dbxmetagen.git@v0.10.68
+# Egress precheck: dbxmetagen's install resolves its dependency tree from PyPI.
+# Fail fast (seconds) with instructions instead of hanging if PyPI is unreachable.
+import urllib.request
+
+try:
+    urllib.request.urlopen("https://pypi.org/simple/", timeout=5)
+    print("✅ PyPI reachable — run the %pip cell below, then continue.")
+except Exception as exc:  # any failure ⇒ treat PyPI as unreachable
+    raise RuntimeError(
+        f"No PyPI egress from this workspace ({type(exc).__name__}). dbxmetagen's "
+        "dependencies cannot be installed here. Skip the %pip cell and every "
+        "dbxmetagen cell below, and run the '🛟 No-PyPI fallback' section to "
+        "document the tables by hand."
+    ) from exc
+
+# COMMAND ----------
+
+# MAGIC %pip install -qqq ../../libs/dbxmetagen-0.10.68-py3-none-any.whl
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -140,6 +162,9 @@ def run_dbxmetagen(mode: str, *, apply_ddl: bool) -> None:
             # apply_tags follows apply_ddl by default; set it explicitly so PI and
             # domain tags are written as UC-native tags when we apply.
             "apply_tags": apply_ddl,
+            # LLM-based PI only: keep spaCy/Presidio (dbxmetagen's deterministic-PI
+            # extras) out of the serverless environment.
+            "include_deterministic_pi": False,
             "domain_tag_name": domain_tag_name,
             "pi_classification_tag_name": pi_classification_tag_name,
         }
@@ -206,6 +231,81 @@ display(
         """
     )
 )
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 🛟 No-PyPI fallback — document the tables without dbxmetagen
+# MAGIC
+# MAGIC **Run this section only if the §0 egress precheck stopped you.** Run the §0
+# MAGIC *workshop bootstrap* cell (`import workshop`) and the §1 *config* cell first
+# MAGIC — neither needs dbxmetagen — then run the cell below. It reaches the *same*
+# MAGIC Unity Catalog state the checkpoint verifies (a comment on every table and
+# MAGIC column, a PI tag on the sensitive columns, a domain tag per table) with
+# MAGIC hand-written DDL. Column comments are derived from the column names.
+# MAGIC
+# MAGIC Comments always apply; `SET TAGS` is **best-effort** — under a governed tag
+# MAGIC policy, set the §1 tag-key widgets to a permitted key (as in §4) and re-run.
+
+# COMMAND ----------
+
+# Sensitive columns to classify as PI, per gold table (only those present are tagged).
+FALLBACK_PII_COLUMNS = {
+    "gold_incidents": ["assignment_group", "configuration_item"],
+    "gold_service_performance": ["assignment_group", "configuration_item"],
+}
+FALLBACK_TABLE_DESCRIPTION = {
+    "gold_incidents": "Ticket-grain ITSM fact: one row per service ticket with priority, service, assignment, resolution, and SLA attributes.",
+    "gold_service_performance": "Incident-grain ITSM mart: aggregated MTTR and SLA-breach metrics per service incident.",
+}
+
+
+def _bq(*parts):
+    """Backtick-quote each identifier part and join with dots."""
+    return ".".join("`" + p.replace("`", "``") + "`" for p in parts)
+
+
+def apply_manual_metadata():
+    """Comment every table/column and best-effort-tag PI + domain, from plain DDL."""
+    for table in target_tables:
+        fq = _bq(config.catalog, config.schema, table)
+        desc = FALLBACK_TABLE_DESCRIPTION.get(
+            table, f"{config.domain} gold table {table}."
+        ).replace("'", "''")
+        spark.sql(f"COMMENT ON TABLE {fq} IS '{desc}'")
+
+        cols = [
+            row[0]
+            for row in spark.sql(
+                f"SELECT column_name FROM {_bq(config.catalog)}.information_schema.columns "
+                f"WHERE table_schema = '{config.schema}' AND table_name = '{table}'"
+            ).collect()
+        ]
+        for col in cols:
+            col_desc = col.replace("_", " ").strip().capitalize().replace("'", "''")
+            spark.sql(f"COMMENT ON COLUMN {fq}.{_bq(col)} IS '{col_desc}'")
+
+        try:
+            spark.sql(
+                f"ALTER TABLE {fq} SET TAGS ('{domain_tag_name}' = '{config.domain}')"
+            )
+        except Exception as exc:  # governed tag policy may reject the value
+            print(f"⚠️  domain tag not set on {table} ({type(exc).__name__}): {exc}")
+
+        for col in FALLBACK_PII_COLUMNS.get(table, []):
+            if col in cols:
+                try:
+                    spark.sql(
+                        f"ALTER TABLE {fq} ALTER COLUMN {_bq(col)} "
+                        f"SET TAGS ('{pi_classification_tag_name}' = 'pii')"
+                    )
+                except Exception as exc:
+                    print(f"⚠️  PI tag not set on {table}.{col} ({type(exc).__name__}): {exc}")
+
+    print("Manual metadata applied. Re-run §5 checkpoint to verify.")
+
+
+apply_manual_metadata()
 
 # COMMAND ----------
 

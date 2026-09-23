@@ -1,5 +1,5 @@
 # Databricks notebook source
-# ruff: noqa: F401, F821, I001
+# ruff: noqa: F401, F821, I001, BLE001
 # MAGIC %md
 # MAGIC # 04 · Governed metadata with dbxmetagen
 # MAGIC
@@ -30,16 +30,42 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 0. Install dbxmetagen (pinned)
+# MAGIC ## 0. Install dbxmetagen (pinned, vendored wheel)
 # MAGIC
-# MAGIC dbxmetagen is installed notebook-only and **pinned to a known version**
-# MAGIC (`v0.10.68`) — not `@main`/latest — so the workshop is reproducible. This
-# MAGIC must be the first cell you run; `restartPython()` restarts the interpreter
-# MAGIC so the freshly-installed library is importable in the cells below.
+# MAGIC dbxmetagen is installed notebook-only and **pinned to `v0.10.68`** for
+# MAGIC reproducibility. Instead of `%pip install git+…` — which clones *and builds*
+# MAGIC dbxmetagen from GitHub at runtime and **hangs on workspaces without
+# MAGIC github.com egress** — we install a **prebuilt wheel vendored in the repo**
+# MAGIC under [`libs/`](../libs/README.md). The install still resolves dbxmetagen's
+# MAGIC dependency tree (`mlflow`, `openai`, …) from **PyPI**, so it needs PyPI egress.
+# MAGIC
+# MAGIC **No PyPI access?** The precheck below stops in seconds with instructions:
+# MAGIC skip the install and every dbxmetagen cell, and run the **🛟 No-PyPI
+# MAGIC fallback** section to document the tables by hand.
+# MAGIC
+# MAGIC Run these first; `restartPython()` restarts the interpreter so the freshly
+# MAGIC installed library is importable in the cells below.
 
 # COMMAND ----------
 
-# MAGIC %pip install -qqq git+https://github.com/databricks-industry-solutions/dbxmetagen.git@v0.10.68
+# Egress precheck: dbxmetagen's install resolves its dependency tree from PyPI.
+# Fail fast (seconds) with instructions instead of hanging if PyPI is unreachable.
+import urllib.request
+
+try:
+    urllib.request.urlopen("https://pypi.org/simple/", timeout=5)
+    print("✅ PyPI reachable — run the %pip cell below, then continue.")
+except Exception as exc:  # any failure ⇒ treat PyPI as unreachable
+    raise RuntimeError(
+        f"No PyPI egress from this workspace ({type(exc).__name__}). dbxmetagen's "
+        "dependencies cannot be installed here. Skip the %pip cell and every "
+        "dbxmetagen cell below, and run the '🛟 No-PyPI fallback' section to "
+        "document the tables by hand."
+    ) from exc
+
+# COMMAND ----------
+
+# MAGIC %pip install -qqq ../libs/dbxmetagen-0.10.68-py3-none-any.whl
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -160,6 +186,7 @@ from dbxmetagen.main import main
 #   - model                       = model_endpoint
 #   - mode                        = the mode
 #   - apply_ddl                   = False            (stage only — do not apply yet)
+#   - include_deterministic_pi    = False            (LLM-based PI only — no spaCy/Presidio)
 #   - domain_tag_name             = domain_tag_name          (keep keys in sync)
 #   - pi_classification_tag_name  = pi_classification_tag_name
 
@@ -179,6 +206,7 @@ from dbxmetagen.main import main
 # MAGIC         "model": model_endpoint,
 # MAGIC         "mode": mode,
 # MAGIC         "apply_ddl": False,
+# MAGIC         "include_deterministic_pi": False,  # LLM-based PI only (no spaCy/Presidio)
 # MAGIC         "domain_tag_name": domain_tag_name,
 # MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
@@ -223,8 +251,9 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # TODO: Apply all three modes with apply_ddl=true and apply_tags=true.
-# Same main() calls as the staging step (still passing schema_name=config.schema
-# and the two *_tag_name options), but with apply_ddl=True and apply_tags=True.
+# Same main() calls as the staging step (still passing schema_name=config.schema,
+# include_deterministic_pi=False, and the two *_tag_name options), but with
+# apply_ddl=True and apply_tags=True.
 
 # COMMAND ----------
 
@@ -243,11 +272,84 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # MAGIC         "mode": mode,
 # MAGIC         "apply_ddl": True,
 # MAGIC         "apply_tags": True,
+# MAGIC         "include_deterministic_pi": False,  # LLM-based PI only (no spaCy/Presidio)
 # MAGIC         "domain_tag_name": domain_tag_name,
 # MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
 # MAGIC ```
 # MAGIC </details>
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 🛟 No-PyPI fallback — document the tables without dbxmetagen
+# MAGIC
+# MAGIC **Run this section only if the §0 egress precheck stopped you.** First run
+# MAGIC the §0 *workshop bootstrap* cell (`import workshop`) and the §1 *config* cell
+# MAGIC — neither needs dbxmetagen — then run the cell below. It reaches the *same*
+# MAGIC Unity Catalog state the checkpoint verifies: a comment on every table and
+# MAGIC column, a PI tag on the sensitive columns, and a business-domain tag on each
+# MAGIC table, using hand-written DDL instead of dbxmetagen. Column comments are
+# MAGIC derived from the column names (not AI-authored) — enough to document the
+# MAGIC tables and pass the checkpoint.
+# MAGIC
+# MAGIC Comments always apply. The `SET TAGS` calls are **best-effort**: if your
+# MAGIC metastore governs the `domain` / `data_classification` tag keys, they are
+# MAGIC skipped with a warning — set the tag-key widgets in §1 to a permitted key
+# MAGIC (as in §4) and re-run this cell.
+
+# COMMAND ----------
+
+# The sensitive columns to PI-classify come from the domain spec (resolved in §1),
+# so this shared cell names no domain-specific table or column literal — a
+# Security/ITSM participant tags their own columns, never Finance's.
+def _bq(*parts):
+    """Backtick-quote each identifier part and join with dots."""
+    return ".".join("`" + p.replace("`", "``") + "`" for p in parts)
+
+
+def apply_manual_metadata():
+    """Comment every table/column and best-effort-tag PI + domain, from plain DDL."""
+    for table in target_tables:
+        fq = _bq(config.catalog, config.schema, table)
+        desc = (
+            f"{config.domain.capitalize()} gold table {table}, documented via the "
+            "workshop no-PyPI fallback."
+        ).replace("'", "''")
+        spark.sql(f"COMMENT ON TABLE {fq} IS '{desc}'")
+
+        cols = [
+            row[0]
+            for row in spark.sql(
+                f"SELECT column_name FROM {_bq(config.catalog)}.information_schema.columns "
+                f"WHERE table_schema = '{config.schema}' AND table_name = '{table}'"
+            ).collect()
+        ]
+        for col in cols:
+            col_desc = col.replace("_", " ").strip().capitalize().replace("'", "''")
+            spark.sql(f"COMMENT ON COLUMN {fq}.{_bq(col)} IS '{col_desc}'")
+
+        try:
+            spark.sql(
+                f"ALTER TABLE {fq} SET TAGS ('{domain_tag_name}' = '{config.domain}')"
+            )
+        except Exception as exc:  # governed tag policy may reject the value
+            print(f"⚠️  domain tag not set on {table} ({type(exc).__name__}): {exc}")
+
+        for col in spec.pii_columns.get(table, ()):
+            if col in cols:
+                try:
+                    spark.sql(
+                        f"ALTER TABLE {fq} ALTER COLUMN {_bq(col)} "
+                        f"SET TAGS ('{pi_classification_tag_name}' = 'pii')"
+                    )
+                except Exception as exc:
+                    print(f"⚠️  PI tag not set on {table}.{col} ({type(exc).__name__}): {exc}")
+
+    print("Manual metadata applied. Re-run §5 checkpoint to verify.")
+
+
+apply_manual_metadata()
 
 # COMMAND ----------
 

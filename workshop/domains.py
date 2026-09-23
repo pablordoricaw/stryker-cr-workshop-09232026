@@ -101,6 +101,14 @@ class DomainSpec:
     #: ``False`` to skip measure reconciliation (grain/identity checks stay on).
     reconcile_measures: Any
 
+    # --- 04_metadata ---------------------------------------------------------
+    #: Sensitive (PII/PHI-ish) columns per gold table, tagged with the PI
+    #: classification key by the ``04_metadata`` no-PyPI manual fallback. Keyed by
+    #: gold table name; a table with no direct PII maps to an empty tuple (the
+    #: domain's ``min_pi_columns=1`` requirement is met by its other gold table).
+    #: Mirrors the columns dbxmetagen's ``pi`` mode classifies.
+    pii_columns: dict[str, tuple[str, ...]]
+
     # --- 05_metric_views -----------------------------------------------------
     #: The Metric Views this domain builds, keyed by view name (insertion-ordered:
     #: detail-grain view first, mart-grain view second).
@@ -177,6 +185,10 @@ DOMAIN_SPECS: dict[str, DomainSpec] = {
         detail_document_match="contract_document_path",
         # Finance uses the gold checkpoint's built-in additive-measure defaults.
         reconcile_measures=True,
+        pii_columns={
+            "gold_sales": ("customer_id", "customer_name", "contract_customer_name"),
+            "gold_contract_performance": ("contract_customer_name",),
+        },
         metric_views={
             "finance_sales_metrics": MetricViewSpec(
                 source_table="gold_sales",
@@ -238,6 +250,12 @@ DOMAIN_SPECS: dict[str, DomainSpec] = {
             "asset_value_at_risk",
             "weighted_risk",
         ),
+        pii_columns={
+            "gold_findings": ("asset_id", "asset_name", "business_unit", "owner_team"),
+            # Aggregated CVE mart with no direct PII; the domain's PI requirement
+            # is met by gold_findings above.
+            "gold_cve_exposure": (),
+        },
         metric_views={
             "security_findings_metrics": MetricViewSpec(
                 source_table="gold_findings",
@@ -299,6 +317,10 @@ DOMAIN_SPECS: dict[str, DomainSpec] = {
         # ITSM's mart measures are not same-named additive source columns, so the
         # grain/identity checks run but measure reconciliation is disabled.
         reconcile_measures=False,
+        pii_columns={
+            "gold_incidents": ("assignment_group", "configuration_item"),
+            "gold_service_performance": ("assignment_group", "configuration_item"),
+        },
         metric_views={
             "itsm_incident_metrics": MetricViewSpec(
                 source_table="gold_incidents",
