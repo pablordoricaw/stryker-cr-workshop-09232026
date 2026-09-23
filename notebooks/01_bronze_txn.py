@@ -1,19 +1,4 @@
 # Databricks notebook source
-# --- Workshop bootstrap: run this first in every notebook ---
-import os, sys
-_root = os.path.abspath(os.getcwd())
-while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
-    _parent = os.path.dirname(_root)
-    if _parent == _root:
-        raise RuntimeError("workshop repo root not found; open this notebook inside the cloned workshop Git folder.")
-    _root = _parent
-if _root not in sys.path:
-    sys.path.insert(0, _root)
-
-import workshop
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC # 01 · Transactional ingestion to bronze
 # MAGIC
@@ -46,6 +31,21 @@ import workshop
 # MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
+
+# COMMAND ----------
+
+# --- Workshop bootstrap: run this first in every notebook ---
+import os, sys
+_root = os.path.abspath(os.getcwd())
+while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
+    _parent = os.path.dirname(_root)
+    if _parent == _root:
+        raise RuntimeError("workshop repo root not found; open this notebook inside the cloned workshop Git folder.")
+    _root = _parent
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
+import workshop
 
 # COMMAND ----------
 
