@@ -13,18 +13,18 @@
      =================================================================== */
 
   :root {
-    --bg:        #0f1c1f;   /* deep slate */
-    --bg-2:      #16282c;   /* panel */
-    --bg-3:      #1d353a;   /* raised panel */
-    --ink:       #f4f7f7;   /* primary text (high contrast on dark) */
-    --ink-soft:  #c2d0d1;   /* secondary text */
-    --ink-mute:  #8fa3a4;   /* muted / captions */
-    --accent:    #ff5f46;   /* Databricks-ish orange, bright for projector */
-    --accent-2:  #ff8a73;
-    --line:      #2c474d;   /* borders */
-    --ok:        #43d19e;   /* green (passed) */
-    --chip:      #233a40;
-    --shadow:    0 10px 40px rgba(0,0,0,.45);
+    --bg:        #f5f8f8;   /* near-white page */
+    --bg-2:      #ffffff;   /* panel / card */
+    --bg-3:      #eaf0f0;   /* raised panel / code */
+    --ink:       #10232a;   /* primary text (high contrast on light) */
+    --ink-soft:  #33474d;   /* secondary text */
+    --ink-mute:  #64777c;   /* muted / captions */
+    --accent:    #cf3610;   /* deepened Databricks orange, legible on white */
+    --accent-2:  #b93a1c;
+    --line:      #d5dfdf;   /* borders */
+    --ok:        #147a55;   /* green (passed), darkened for light bg */
+    --chip:      #edf3f3;
+    --shadow:    0 10px 30px rgba(16,35,42,.12);
     --maxw:      1080px;
   }
 
@@ -43,8 +43,8 @@
 
   body {
     background:
-      radial-gradient(1100px 700px at 82% -8%, rgba(255,95,70,.14), transparent 60%),
-      radial-gradient(900px 600px at 5% 108%, rgba(67,209,158,.10), transparent 55%),
+      radial-gradient(1100px 700px at 82% -8%, rgba(207,54,16,.08), transparent 60%),
+      radial-gradient(900px 600px at 5% 108%, rgba(20,122,85,.07), transparent 55%),
       var(--bg);
     overflow: hidden;
   }
@@ -143,7 +143,7 @@
   .card h3 { display: flex; align-items: baseline; gap: .5em; }
   .card p { font-size: .98rem; margin: 0; }
   .card .tag { font-size: .72rem; color: var(--ink-mute); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-  .card.hl { border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(255,95,70,.25); }
+  .card.hl { border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(207,54,16,.28); }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: .5em; }
   .chip {
@@ -176,9 +176,25 @@
   .step .txt { font-size: .98rem; line-height: 1.4; color: var(--ink-soft); }
   .step .txt b { color: var(--ink); }
 
-  /* ---- Pipeline SVG framing ---- */
-  .diagram { width: 100%; height: auto; display: block; margin: .5em 0; }
-  .figcap { font-size: .85rem; color: var(--ink-mute); text-align: center; margin-top: .4em; }
+  /* ---- Architecture diagram (real repo SVG, referenced by relative path) ---- */
+  .diagram-frame {
+    background: #ffffff;              /* light backing so the diagram reads correctly */
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    margin: .3em 0 0;
+    overflow: auto;                    /* graceful scroll on very narrow screens */
+    box-shadow: var(--shadow);
+  }
+  .diagram-img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;                   /* fit the slide width */
+    max-height: 54vh;                  /* contain on laptop + projector, never cut off */
+    height: auto;
+    width: auto;
+  }
+  .figcap { font-size: .85rem; color: var(--ink-mute); text-align: center; margin-top: .5em; }
 
   /* ---- Rungs (hint ladder) ---- */
   .ladder { display: grid; gap: 12px; }
@@ -224,7 +240,7 @@
   /* ---- Title slide ---- */
   .title-slide { text-align: left; }
   .title-slide .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 1.4em; }
-  .title-slide .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px rgba(255,95,70,.18); }
+  .title-slide .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px rgba(207,54,16,.16); }
   .title-slide .brand span { font-weight: 700; letter-spacing: .04em; color: var(--ink-soft); }
   .meta-row { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 1.6em; color: var(--ink-mute); font-size: .95rem; }
   .meta-row b { color: var(--ink-soft); }
@@ -321,81 +337,13 @@
   <section class="slide" data-label="What you build">
     <span class="eyebrow">The end-to-end product</span>
     <h2>One pipeline, source to app</h2>
-    <p>You start from synthetic <strong>documents (PDFs)</strong> and <strong>transactional data</strong> and finish with an app people can ask questions in plain language. Every stage is a checkpoint you validate before moving on.</p>
+    <p>You start from synthetic <strong>documents (PDFs)</strong> and <strong>transactional data</strong> and finish with an app people can ask questions in plain language. Every stage is a checkpoint you validate before moving on — and <strong>you build all of it yourself</strong>.</p>
 
-    <svg class="diagram" viewBox="0 0 1000 300" role="img" aria-labelledby="diagTitle diagDesc">
-      <title id="diagTitle">Workshop data flow</title>
-      <desc id="diagDesc">Documents and transactions flow through bronze, silver, and gold medallion layers, then governance metadata and UC Metric Views, then a Genie agent and a data app.</desc>
-      <defs>
-        <marker id="arw" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto">
-          <path d="M0,0 L9,4.5 L0,9 Z" fill="#ff5f46"></path>
-        </marker>
-        <style>
-          .box  { fill:#16282c; stroke:#2c474d; stroke-width:1.5; rx:12; }
-          .boxg { fill:#1d353a; stroke:#43d19e; stroke-width:1.5; }
-          .boxa { fill:#1d353a; stroke:#ff5f46; stroke-width:1.5; }
-          .lbl  { fill:#f4f7f7; font: 700 15px -apple-system, "Segoe UI", sans-serif; }
-          .sub  { fill:#8fa3a4; font: 400 11px -apple-system, "Segoe UI", sans-serif; }
-          .flow { stroke:#ff5f46; stroke-width:2; fill:none; }
-          .stage{ fill:#8fa3a4; font: 700 10px -apple-system, sans-serif; letter-spacing:1px; }
-        </style>
-      </defs>
-
-      <!-- Sources -->
-      <text x="20" y="40" class="stage">SOURCES</text>
-      <rect class="box" x="20" y="52" width="150" height="46" rx="12"></rect>
-      <text x="34" y="74" class="lbl">Documents</text>
-      <text x="34" y="90" class="sub">PDFs → UC Volume</text>
-      <rect class="box" x="20" y="112" width="150" height="46" rx="12"></rect>
-      <text x="34" y="134" class="lbl">Transactions</text>
-      <text x="34" y="150" class="sub">Lakebase CDF / Delta</text>
-
-      <!-- Bronze -->
-      <text x="220" y="40" class="stage">BRONZE</text>
-      <rect class="box" x="220" y="72" width="120" height="66" rx="12"></rect>
-      <text x="234" y="102" class="lbl">Raw landed</text>
-      <text x="234" y="120" class="sub">docs + txn</text>
-
-      <!-- Silver -->
-      <text x="390" y="40" class="stage">SILVER</text>
-      <rect class="box" x="390" y="72" width="120" height="66" rx="12"></rect>
-      <text x="404" y="98" class="lbl">Parsed</text>
-      <text x="404" y="116" class="sub">AI Functions:</text>
-      <text x="404" y="130" class="sub">parse·classify·extract</text>
-
-      <!-- Gold -->
-      <text x="560" y="40" class="stage">GOLD</text>
-      <rect class="box" x="560" y="72" width="120" height="66" rx="12"></rect>
-      <text x="574" y="102" class="lbl">Modeled</text>
-      <text x="574" y="120" class="sub">facts + mart</text>
-
-      <!-- Governance + semantic -->
-      <text x="730" y="40" class="stage">GOVERN + SEMANTIC</text>
-      <rect class="box" x="730" y="52" width="250" height="46" rx="12"></rect>
-      <text x="744" y="74" class="lbl">Metadata (dbxmetagen)</text>
-      <text x="744" y="90" class="sub">comments · PI · domain tags</text>
-      <rect class="box" x="730" y="112" width="250" height="46" rx="12"></rect>
-      <text x="744" y="134" class="lbl">UC Metric Views</text>
-      <text x="744" y="150" class="sub">governed KPIs</text>
-
-      <!-- Consumption -->
-      <text x="300" y="205" class="stage">CONSUME</text>
-      <rect class="boxa" x="300" y="218" width="180" height="56" rx="12"></rect>
-      <text x="316" y="244" class="lbl accent" fill="#ff8a73">Genie agent</text>
-      <text x="316" y="262" class="sub">ask in plain language</text>
-      <rect class="boxa" x="520" y="218" width="180" height="56" rx="12"></rect>
-      <text x="536" y="244" class="lbl" fill="#ff8a73">Data app</text>
-      <text x="536" y="262" class="sub">FastAPI + Lakebase</text>
-
-      <!-- flows -->
-      <path class="flow" d="M170,75 H214" marker-end="url(#arw)"></path>
-      <path class="flow" d="M170,135 H214" marker-end="url(#arw)"></path>
-      <path class="flow" d="M340,105 H384" marker-end="url(#arw)"></path>
-      <path class="flow" d="M510,105 H554" marker-end="url(#arw)"></path>
-      <path class="flow" d="M680,105 H724" marker-end="url(#arw)"></path>
-      <path class="flow" d="M855,158 V188 H390 V214" marker-end="url(#arw)"></path>
-      <path class="flow" d="M480,246 H514" marker-end="url(#arw)"></path>
-    </svg>
+    <div class="diagram-frame">
+      <img class="diagram-img"
+           src="../../assets/diagrams/workshop-architecture.svg"
+           alt="Workshop architecture: Finance, Security, and ITSM source domains flow through bronze, silver, and gold medallion layers into governance metadata and UC Metric Views, then a Genie agent and a Databricks data app.">
+    </div>
     <p class="figcap">The same architecture for every team — only the dataset changes.</p>
   </section>
 
@@ -445,8 +393,8 @@
   <!-- 4 — NAMESPACING -->
   <section class="slide" data-label="Your namespace">
     <span class="eyebrow">Shared workspace, your objects</span>
-    <h2>Everyone works side-by-side</h2>
-    <p>Your whole team shares <strong>one workspace</strong> and <strong>one existing catalog</strong>. To avoid collisions, each person builds inside their <strong>own schema</strong> and creates uniquely-named, workspace-scoped objects.</p>
+    <h2>Everyone builds the whole thing</h2>
+    <p><strong>The work is not split across the team.</strong> Every participant builds the entire end-to-end project themselves — the full spine from <code>00_setup</code> to <code>07_app</code>. Your team shares <strong>one workspace</strong> and <strong>one existing catalog</strong>, so to avoid collisions each person builds inside their <strong>own schema</strong> with uniquely-named, workspace-scoped objects.</p>
     <div class="grid cols-2">
       <div class="card">
         <h3>Your private space</h3>

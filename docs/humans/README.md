@@ -10,8 +10,11 @@ end), how to fork/set up in your workspace, and the Genie Code hint ladder.
 
 ### Open it locally
 
-The deck is a single, self-contained HTML file — no build step, no internet, no
-dependencies. Just open it in a browser:
+The deck works fully offline — no build step and no internet. It is a single
+HTML file with all CSS and JS inlined; its one local dependency is the workshop
+architecture diagram at `assets/diagrams/workshop-architecture.svg`, referenced
+by relative path. Keep the deck inside the repo (both `docs/humans/` and
+`assets/` ship together) so that reference resolves. Just open it in a browser:
 
 - **Double-click** `kickoff-deck.html` in your file browser, or
 - Drag the file onto an open browser window, or
