@@ -2,8 +2,9 @@
 
 Static [Shields.io](https://shields.io/) badges for the top of the repository
 `README.md`. One **Platform: Databricks** badge plus one badge per main tool the
-workshop uses or builds. These are decorative/informational — no live/CI data.
+workshop uses or builds. These are decorative/informational; no live/CI data.
 
+> [!NOTE]
 > Tracked by issue #23 (Revise & enhance participant instructions). This directory
 > holds the reusable source assets and encodings so the badge row can be pasted
 > into the top-level `README.md` when that work is picked up.
@@ -27,7 +28,7 @@ workshop uses or builds. These are decorative/informational — no live/CI data.
 Colors: **`#FF3621`** (Databricks red) for the platform badge, **`#1B3139`**
 (Databricks navy) for the tool badges so the full-color logos read consistently.
 Order follows the workshop build arc and can be adjusted; badges are currently
-plain images (no link targets) — add links in the `README.md` pass if desired.
+plain images (no link targets); add links in the `README.md` pass if desired.
 
 ## Ready-to-paste Markdown
 
@@ -45,8 +46,8 @@ Paste this block at the top of the repository `README.md` (below the H1):
 
 ## Assets in this directory
 
-- `*.png` — full-color source logos (66x66), the source of truth.
-- `*.datauri` — the URL-safe `data:image/png;base64,...` string for each logo,
+- `*.png`: full-color source logos (66x66), the source of truth.
+- `*.datauri`: the URL-safe `data:image/png;base64,...` string for each logo,
   ready to drop into a Shields `?logo=` parameter.
 
 ## How the encodings were generated
@@ -55,7 +56,7 @@ The custom logos are **PNG** (Simple Icons has no entry for these products), so
 each is base64-encoded and embedded as a data URI in the Shields `logo` param.
 The base64 alphabet includes `+`, `/`, and `=`, which are URL-significant (`+`
 becomes a space in a query string), so they are percent-encoded (`%2B`, `%2F`,
-`%3D`) — otherwise the logo silently fails to render.
+`%3D`); otherwise the logo silently fails to render.
 
 Regenerate from the PNGs with:
 

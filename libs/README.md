@@ -1,4 +1,4 @@
-# `libs/` — vendored wheels
+# `libs/`: vendored wheels
 
 ## `dbxmetagen-0.10.68-py3-none-any.whl`
 
@@ -9,12 +9,12 @@ at tag **`v0.10.68`**, vendored into the repo so `04_metadata` can install it
 - **sha256:** `765be35f7e0606adcec40d61343118b4f1c4253a7505d54b93e8df27d12154de`
   (of *this* committed artifact; Hatchling builds are not guaranteed byte-reproducible,
   so a fresh build may differ in bytes while being functionally identical).
-- **Pure-Python** (`py3-none-any`) — no native code, no CPU-architecture concerns.
+- **Pure-Python** (`py3-none-any`): no native code, no CPU-architecture concerns.
 - dbxmetagen's own dependencies are **not** in this wheel (a wheel never bundles its
   dependencies). Installing it still resolves the transitive tree (`mlflow`,
   `ydata-profiling`, `openai`, …) from **PyPI at runtime**, so `04_metadata` needs
   **PyPI egress**. Where egress is blocked, `04_metadata` detects it and falls back to
-  a manual-metadata path — see that notebook.
+  a manual-metadata path; see that notebook.
 
 ### Why vendored instead of `%pip install git+…`
 

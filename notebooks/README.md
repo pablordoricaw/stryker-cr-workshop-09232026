@@ -1,12 +1,12 @@
 # notebooks/
 
-Participant-facing starter notebooks — one per workshop module — with `# TODO`
+Participant-facing starter notebooks; one per workshop module; with `# TODO`
 cells, collapsible hints, and "build from scratch" stretch toggles. Each module
 ends with a `workshop.check("<checkpoint_id>")` validation cell.
 
 Every graded **build** stage (`01_bronze_docs` … `07_app`) carries an identical
 **"🚀 From-scratch mode (optional stretch)"** markdown cell right after its config
-cell — the uniform, default-off convention for flipping a stage from guided to
+cell; the uniform, default-off convention for flipping a stage from guided to
 build-it-yourself. It is markdown only (no widget, no code), so it cannot change
 what the checkpoint asserts. `00_setup` is excluded (it provisions rather than
 teaches a build). The convention is documented once in
@@ -29,8 +29,8 @@ schema and UC Volume inside your team's **existing catalog**, runs seed hooks,
 and ends on the `00_setup` checkpoint. Start there. After the domain is chosen it
 also **installs the Genie Code hint ladder** (#27): it reads
 [`../docs/genie/.assistant_instructions.md`](../docs/genie/.assistant_instructions.md),
-fills in your repo root and domain, and injects the result — wrapped in
-`STRYKER-WORKSHOP` sentinels — into your personal `~/.assistant_instructions.md`,
+fills in your repo root and domain, and injects the result; wrapped in
+`STRYKER-WORKSHOP` sentinels; into your personal `~/.assistant_instructions.md`,
 which Genie Code auto-loads each session. The splice preserves any personal
 instructions of your own and is idempotent on re-run. The injection/merge/strip
 logic is the pure-Python `workshop.genie_instructions` module (unit-tested in
@@ -51,7 +51,7 @@ classifies it into one of your domain's classes (`ai_classify`) in a consolidate
 `silver_docs` table, and extracts class-specific fields (`ai_extract`) into one
 `silver_<class>` table per class. It ends on the `02_silver_docs` checkpoint.
 `ai_parse_document` needs DBR 17.3+ / serverless env v3+ and a region that
-supports AI Functions (not SQL Warehouse Classic) — see the notebook callout.
+supports AI Functions (not SQL Warehouse Classic); see the notebook callout.
 
 `03_gold.py` (added by #8) is the Finance gold medallion step. It joins the
 transaction fact to extracted commercial-agreement documents on the conformed
@@ -68,7 +68,7 @@ with `apply_ddl=true` to apply table/column comments, a PI classification tag on
 sensitive columns, and a business-domain tag on each table. dbxmetagen's model
 endpoint defaults to `databricks-claude-sonnet-4-6`; the notebook has you confirm
 that endpoint exists in **Serving → Foundation Models** or pick another (the only
-endpoint you select — the `02_silver_docs` AI Functions use the built-in system
+endpoint you select; the `02_silver_docs` AI Functions use the built-in system
 model). It ends on the `04_metadata` checkpoint, which reads only
 `information_schema` comments and tags and derives the expected columns from the
 live tables rather than hardcoding column names.
@@ -80,8 +80,8 @@ metrics over `gold_sales`, and contract-performance metrics over
 stretch and ends at `05_metrics`, which validates the deployed metric-model
 definitions and their non-null aggregate query results.
 
-`06_genie.py` (added by #11) builds a curated **Genie agent** — a natural-language
-interface — over the gold tables and Metric Views. It attaches all four Finance
+`06_genie.py` (added by #11) builds a curated **Genie agent**: a natural-language
+interface; over the gold tables and Metric Views. It attaches all four Finance
 data assets (`gold_sales`, `gold_contract_performance`, `finance_sales_metrics`,
 `finance_contract_metrics`), gives the agent a **per-participant, identity-derived
 name** so teammates sharing the workspace do not collide, and adds pre-authored
@@ -89,7 +89,7 @@ sample questions. It opens with a Partner-powered AI (Databricks Assistant)
 pre-check and ends on `06_genie`, which finds the caller's own agent by name,
 confirms the expected sources are attached (binding to the caller's own
 workspace namespace so a teammate's same-titled agent is never adopted), and
-asks benchmark questions — requiring each to return SQL that genuinely queries
+asks benchmark questions; requiring each to return SQL that genuinely queries
 the curated data (a source name in a string, comment, alias, or CTE name does
 not count). The agent must actually answer, so if the Conversation API is gated
 the checkpoint stays RED (enable Partner-powered AI) rather than passing.
@@ -110,5 +110,5 @@ participant.
 `99_teardown.py` (added by #27) is the optional end-of-workshop cleanup: it
 strips the `STRYKER-WORKSHOP` block `00_setup` injected from your personal
 `~/.assistant_instructions.md`, leaving any instructions of your own untouched.
-It's a safe no-op if there's no block. It does not touch your catalog data — drop
+It's a safe no-op if there's no block. It does not touch your catalog data; drop
 the workshop schema separately if you want to reclaim that.

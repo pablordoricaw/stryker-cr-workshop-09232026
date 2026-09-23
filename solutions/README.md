@@ -1,6 +1,6 @@
 # solutions/
 
-Gated reference solutions for all three domains — the top rung of the hint
+Gated reference solutions for all three domains: the top rung of the hint
 ladder and the ground truth maintainer CI runs end-to-end.
 
 **Participants:** reach for these only through Genie Code's graded hints. Peeking
@@ -12,15 +12,15 @@ Layout (one subtree per domain; filled in as build-spine tickets land):
 ```
 solutions/
 ├── finance/
-│   ├── 01_bronze_docs.py   # #5 — land PDFs + register the bronze docs table
-│   ├── 01_bronze_txn.py    # #7 — Lakebase CDF + Delta fallback to bronze txn
-│   ├── 02_silver_docs.py   # #6 — ai_parse_document/classify/extract to silver
-│   ├── 03_gold.py          # #8 — document-enriched sales + contract mart
-│   ├── 04_metadata.py      # #9 — dbxmetagen comment/pi/domain on the gold tables
-│   ├── 05_metric_views.py  # #10 — governed UC Metric Views over the gold tables
-│   ├── 06_genie.py         # #11 — per-participant Genie agent over gold + metrics
-│   ├── 07_app.py           # #12 — provided FastAPI app + Lakebase synced table
-│   └── stretch/            # #16 — optional Tier-3 gated solutions
+│   ├── 01_bronze_docs.py   # #5: land PDFs + register the bronze docs table
+│   ├── 01_bronze_txn.py    # #7: Lakebase CDF + Delta fallback to bronze txn
+│   ├── 02_silver_docs.py   # #6: ai_parse_document/classify/extract to silver
+│   ├── 03_gold.py          # #8: document-enriched sales + contract mart
+│   ├── 04_metadata.py      # #9: dbxmetagen comment/pi/domain on the gold tables
+│   ├── 05_metric_views.py  # #10: governed UC Metric Views over the gold tables
+│   ├── 06_genie.py         # #11: per-participant Genie agent over gold + metrics
+│   ├── 07_app.py           # #12: provided FastAPI app + Lakebase synced table
+│   └── stretch/            # #16: optional Tier-3 gated solutions
 │       ├── package_as_dab.py            # walkthrough of the bundle set below
 │       ├── package_as_dab_bundle/       # 2 independently-deployable DABs + the "why"
 │       └── add_your_own.py              # a 3rd Metric View + extra Genie questions
@@ -72,7 +72,7 @@ running).
 
 `stretch/` holds the gated solutions for the optional Tier-3 modules (#16).
 `package_as_dab_bundle/` is a **set of two independently-deployable DABs**
-(`pipeline`, `app`) — deliberately not one monolith — that package the built work
+(`pipeline`, `app`); deliberately not one monolith; packages the built work
 and **target** the schema/volume `00_setup` provisioned (neither declares a
 schema/volume resource, so a first deploy never collides with pre-existing UC
 objects). Its README documents the division rationale, coupling/decoupling
@@ -95,7 +95,7 @@ sample/benchmark questions (open findings by severity, weighted risk by CVE); an
 `07_app` syncs `gold_cve_exposure` on `cve_id`. Every domain-specific
 expectation (table/column names, reconcile measures, metric-view contracts,
 Genie sources, serving base) is passed to the shared, domain-generic checkpoints
-through `workshop.check(...)` extras — no shared checkpoint or notebook is
+through `workshop.check(...)` extras; no shared checkpoint or notebook is
 modified. The domain-generic `01_bronze_txn` checkpoint takes the Security bronze
 table name and expected row count as inputs, so it validates Security data
 without any Finance-specific name baked in.

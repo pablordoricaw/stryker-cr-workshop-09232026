@@ -1,4 +1,4 @@
-# workshop/ — the `workshop.check()` validation seam
+# workshop/: the `workshop.check()` validation seam
 
 The single test seam every workshop checkpoint runs through. Participant
 notebooks and maintainer CI both call `workshop.check(<id>)`; there is no second
@@ -7,7 +7,7 @@ test framework.
 ## Making `import workshop` work in notebooks (canonical first cell)
 
 In a Databricks Git folder the repo root is **not** guaranteed to be on
-`sys.path` — a notebook's working directory is its own folder. Every starter
+`sys.path`; a notebook's working directory is its own folder. Every starter
 notebook's **first cell** is this one canonical, self-contained bootstrap (it
 must run before `workshop` is importable, so it can't import from the repo).
 Ticket authors: reuse this exact snippet; do not invent variants.
@@ -49,16 +49,16 @@ back as `passed=False` with an explanatory message.
 
 | Module              | Responsibility                                              |
 | ------------------- | ----------------------------------------------------------- |
-| `results.py`        | `CheckResult` — the structured pass/fail contract           |
-| `context.py`        | `CheckContext` — spark / catalog / schema / extras handed to a check (backtick-safe `fully_qualified`) |
+| `results.py`        | `CheckResult`: the structured pass/fail contract           |
+| `context.py`        | `CheckContext`: spark / catalog / schema / extras handed to a check (backtick-safe `fully_qualified`) |
 | `registry.py`       | `CheckpointRegistry` + `@checkpoint` / `register` API       |
-| `runner.py`         | `check()` — looks up, runs, and normalizes a checkpoint      |
-| `bootstrap.py`      | `find_repo_root` / `bootstrap` — the notebook import path fix |
+| `runner.py`         | `check()`: looks up, runs, and normalizes a checkpoint      |
+| `bootstrap.py`      | `find_repo_root` / `bootstrap`: the notebook import path fix |
 | `checkpoints/`      | One module per checkpoint; auto-discovered, failure-isolated |
 
 ## Adding a checkpoint (for later tickets)
 
-Drop a module into `workshop/checkpoints/` — it's auto-discovered on `import
+Drop a module into `workshop/checkpoints/`; it's auto-discovered on `import
 workshop`, so there is **no central list to edit**. Register with the decorator:
 
 ```python
@@ -93,7 +93,7 @@ runner normalizes those into a `CheckResult`.
 - **Assert only externally-observable state**: catalog objects, row counts,
   tag/comment presence, metric-view resolvability, Genie answer sanity,
   synced-table row parity. **Never** inspect notebook cell structure or
-  intermediate variables — participants may reach the same observable state many
+  intermediate variables; participants may reach the same observable state many
   different ways.
 - **Write a targeted failure message**: say what's wrong and where to look, not
   just "failed".
@@ -121,7 +121,7 @@ config = workshop.resolve_config(catalog="my_existing_catalog", domain="finance"
 ```
 
 **Bring-your-own-catalog:** `catalog` is required (participants have no
-catalog-create privilege — each team already has a catalog). `schema` defaults to
+catalog-create privilege; each team already has a catalog). `schema` defaults to
 the domain; `volume` defaults to `landing`. `resolve_config(..., suffix="tok")`
 appends the token to the *schema* for throwaway/validation isolation.
 
@@ -154,7 +154,7 @@ def load(ctx):
   `ctx.domain`, `ctx.extras`) and returns a `SeedResult`, a `bool`, a
   `(bool, message)` tuple, or `None`.
 - Failures are isolated (a raising hook becomes a failed `SeedResult`; a seed
-  module that fails to import is surfaced, not fatal) — one broken later-ticket
+  module that fails to import is surfaced, not fatal); one broken later-ticket
   seed can't block a participant's setup.
 
 This ticket ships the mechanism plus a no-op `placeholder` seed, so the setup

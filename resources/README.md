@@ -1,6 +1,6 @@
 # resources/
 
-Databricks Asset Bundle (DAB) resource definitions — the maintainer packaging
+Databricks Asset Bundle (DAB) resource definitions; the maintainer packaging
 and reproducibility mechanism (versioned infra + app definition), and the basis
 of the optional Finance "package your work as a DAB" stretch.
 
@@ -11,7 +11,7 @@ are versioned and re-runnable.
 
 ## Bring-your-own-catalog
 
-Participants (and this bundle) do **not** create catalogs — each team already
+Participants (and this bundle) do **not** create catalogs; each team already
 has its own. The `catalog` variable in `../databricks.yml` names an **existing**
 catalog to target; the bundle defines only the **schema** and **UC Volume**
 inside it, plus the **app**.

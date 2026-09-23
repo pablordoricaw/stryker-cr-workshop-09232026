@@ -1,7 +1,7 @@
 # data/
 
 Committed synthetic data, one subtree per domain. Everything here is generated
-and fake — there is no real Stryker data anywhere in this repo.
+and fake; there is no real Stryker data anywhere in this repo.
 
 ```
 data/
@@ -12,9 +12,9 @@ data/
 
 Each domain holds:
 
-- `documents/` — ~20–25 synthetic PDFs (4–5 per class) that feed the document
+- `documents/`: ~20–25 synthetic PDFs (4–5 per class) that feed the document
   pipeline (`ai_classify` → `ai_parse_document` → `ai_extract`).
-- `transactional/` — a pre-seeded transactional dataset (~2–5k rows) that lands
+- `transactional/`: a pre-seeded transactional dataset (~2–5k rows) that lands
   in bronze. This is the **Delta fallback** for the Lakebase CDF path, so no
   participant is ever blocked by the one preview dependency.
 

@@ -16,7 +16,7 @@ Keep each contribution focused, use [Conventional Commits](https://www.conventio
 
 A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material. There is **no** hint-ladder swap: Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`), and promotion only strips the maintainer-only paths.
 
-Merge without committing, then strip the maintainer-only files (the `git rm` uses `-f` because the no-commit merge stages these files as additions — they are absent from `main`'s tree between releases — which a plain `git rm` refuses to remove):
+Merge without committing, then strip the maintainer-only files (the `git rm` uses `-f` because the no-commit merge stages these files as additions; they are absent from `main`'s tree between releases; which a plain `git rm` refuses to remove):
 
 ```bash
 git status --short --branch
@@ -50,11 +50,11 @@ git push origin v<major>.<minor>.<patch>
 
 Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 
-- `v1.0.0` — first stable workshop release.
-- `v1.1.0` — new exercises, modules, or materially expanded content.
-- `v1.1.1` — corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
-- `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
-- `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.
+- `v1.0.0`: first stable workshop release.
+- `v1.1.0`: new exercises, modules, or materially expanded content.
+- `v1.1.1`: corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
+- `v2.0.0`: changes that substantially alter the workshop flow or invalidate prior setup/materials.
+- `v1.2.0-rc.1`: optional rehearsal/review release before a major workshop event.
 
 Tag only the release commit on `main`.
 

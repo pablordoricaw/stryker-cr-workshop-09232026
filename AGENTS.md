@@ -5,7 +5,7 @@ This repository is developed with multiple coding agents using Git worktrees. Fo
 ## Branch Roles
 
 - `dev` is the development integration branch. All feature work starts from and returns to `dev`.
-- `main` is the participant-ready release branch and the remote default branch. It must not contain the **maintainer** `AGENTS.md` (the worktree/Git workflow documented in this file), `CLAUDE.md`, the `docs/agents/` skill configuration, `generators/`, or other maintainer-only material. It ships **no** root `AGENTS.md`: Genie Code does not auto-discover a repo `AGENTS.md` by walking the directory tree, so the **participant hint ladder** is delivered another way — it lives at `docs/genie/.assistant_instructions.md` (on both `dev` and `main`) and the `00_setup` notebook injects it into each participant's personal `~/.assistant_instructions.md`, which Genie Code auto-loads at session start.
+- `main` is the participant-ready release branch and the remote default branch. It must not contain the **maintainer** `AGENTS.md` (the worktree/Git workflow documented in this file), `CLAUDE.md`, the `docs/agents/` skill configuration, `generators/`, or other maintainer-only material. It ships **no** root `AGENTS.md`: Genie Code does not auto-discover a repo `AGENTS.md` by walking the directory tree, so the **participant hint ladder** is delivered another way; it lives at `docs/genie/.assistant_instructions.md` (on both `dev` and `main`) and the `00_setup` notebook injects it into each participant's personal `~/.assistant_instructions.md`, which Genie Code auto-loads at session start.
 - Feature branches use one dedicated worktree per agent task.
 - `worktrees/dev/` and `worktrees/main/` are reserved for coordination, review, and integration. Do not make feature changes directly in either worktree.
 
@@ -79,7 +79,7 @@ Do not use a regular merge or create a merge commit when integrating a feature i
 
 ## Promote a Workshop Release
 
-The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge. There is **no** hint-ladder swap — Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`) and only the maintainer-only paths are stripped.
+The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge. There is **no** hint-ladder swap; Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`) and only the maintainer-only paths are stripped.
 
 From the main worktree, merge without committing, then strip the maintainer-only files:
 
@@ -89,7 +89,7 @@ git merge --no-ff --no-commit dev
 git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
 ```
 
-The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md` and leaves **no** root `AGENTS.md` on `main`. Verify before committing — no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
+The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md` and leaves **no** root `AGENTS.md` on `main`. Verify before committing; no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
 
 ```bash
 test ! -e AGENTS.md
@@ -110,11 +110,11 @@ git push origin v<major>.<minor>.<patch>
 
 Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 
-- `v1.0.0` — first stable workshop release.
-- `v1.1.0` — new exercises, modules, or materially expanded content.
-- `v1.1.1` — corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
-- `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
-- `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.
+- `v1.0.0`: first stable workshop release.
+- `v1.1.0`: new exercises, modules, or materially expanded content.
+- `v1.1.1`: corrections, clarified instructions, broken-link fixes, or other compatible workshop fixes.
+- `v2.0.0`: changes that substantially alter the workshop flow or invalidate prior setup/materials.
+- `v1.2.0-rc.1`: optional rehearsal/review release before a major workshop event.
 
 If the merge conflicts, preserve the participant-ready state on `main`; in particular, there must be **no** root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
