@@ -40,14 +40,15 @@
 # MAGIC %md
 # MAGIC ## Install dependencies for Lakebase provisioning
 # MAGIC
-# MAGIC This cell installs `psycopg[binary]` (Postgres client) — required only if
-# MAGIC Lakebase provisioning is attempted. Installing does not restart the kernel on
-# MAGIC its own, so the next cell calls `dbutils.library.restartPython()` to make the
-# MAGIC package importable; the bootstrap cell then runs fresh and rebuilds state.
+# MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
+# MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
+# MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
+# MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
 
 # COMMAND ----------
 
-# MAGIC %pip install psycopg[binary] --quiet
+# MAGIC %pip install --quiet --upgrade "psycopg[binary]" "databricks-sdk>=0.135"
 
 # COMMAND ----------
 
