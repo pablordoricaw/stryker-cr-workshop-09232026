@@ -141,8 +141,71 @@ assert result.passed, result.message
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## 5. Give Genie Code your workshop hints
+# MAGIC
+# MAGIC **Genie Code** — the in-workspace coding assistant — helps you through the
+# MAGIC workshop *one rung at a time*. It doesn't read this repo's files on its own;
+# MAGIC what it *does* read is your personal instructions file,
+# MAGIC `~/.assistant_instructions.md`, at the start of every session. This cell
+# MAGIC injects the workshop's hint ladder (with **your** repo root and domain
+# MAGIC filled in) into that file so Genie Code knows how to help.
+# MAGIC
+# MAGIC It is **surgical and safe**: the workshop's content is wrapped in
+# MAGIC `STRYKER-WORKSHOP` sentinels, so any personal instructions you already have
+# MAGIC are preserved untouched. Re-running it just refreshes the workshop block
+# MAGIC (e.g. if you change your domain above). Remove it any time with the teardown
+# MAGIC notebook, `notebooks/99_teardown.py`.
+
+# COMMAND ----------
+
+import io
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.workspace import ExportFormat, ImportFormat
+
+# The workshop clone's root (anchored on workshop/__init__.py) and the shipped
+# hint-ladder source. `config.domain` is the domain you chose above.
+repo_root = workshop.find_repo_root() or _root
+with open(
+    os.path.join(repo_root, "docs", "genie", ".assistant_instructions.md"),
+    encoding="utf-8",
+) as _handle:
+    hint_source = _handle.read()
+
+block = workshop.build_injection_block(hint_source, repo_root, config.domain)
+
+# Your personal instructions file. Genie Code auto-loads it each session.
+personal_path = f"/Workspace/Users/{me}/.assistant_instructions.md"
+
+w = WorkspaceClient()
+try:
+    with w.workspace.download(personal_path, format=ExportFormat.RAW) as _stream:
+        existing = _stream.read().decode("utf-8")
+except NotFound:
+    # No personal file yet (most common) — start from empty and only add ours.
+    existing = ""
+
+merged = workshop.merge_block(existing, block)
+w.workspace.upload(
+    personal_path,
+    io.BytesIO(merged.encode("utf-8")),
+    format=ImportFormat.RAW,
+    overwrite=True,
+)
+
+print(f"Injected the workshop hint block into {personal_path}")
+print(f"  repo root: {repo_root}")
+print(f"  domain   : {config.domain}")
+print("  (your existing personal instructions, if any, were preserved)")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## ✅ Setup complete
 # MAGIC
-# MAGIC Your schema and UC Volume exist inside your catalog and `00_setup` is
-# MAGIC green. Move on to the next module — it reuses the domain and names you
-# MAGIC chose above.
+# MAGIC Your schema and UC Volume exist inside your catalog, `00_setup` is green,
+# MAGIC and Genie Code has your workshop hints. Move on to the next module — it
+# MAGIC reuses the domain and names you chose above. When you're done with the
+# MAGIC workshop, run `notebooks/99_teardown.py` to remove the hint block from your
+# MAGIC personal instructions.

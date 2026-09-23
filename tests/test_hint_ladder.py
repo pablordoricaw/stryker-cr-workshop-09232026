@@ -12,11 +12,15 @@ to FAIL on the specific defect it guards:
 2. **``smoke`` / ``00_setup`` marked solution-less in the ladder.** Their table
    rows must say "none" and carry no ``solutions/`` pointer; an invented pointer
    fails.
-3. **The release swap uses the documented recipe.** The promotion commands are
+3. **The release strip uses the documented recipe.** The promotion commands are
    parsed out of the fenced ``bash`` block in ``AGENTS.md`` and executed in a
-   throwaway git repo; the end state is verified. The two docs' recipes must be
-   the identical ordered command sequence. A reordered / broken / missing
-   ``git rm`` or ``git mv`` in either doc fails the test.
+   throwaway git repo; the end state is verified. Genie Code does *not*
+   auto-discover a repo ``AGENTS.md``, so there is **no** hint-ladder swap:
+   promotion strips the maintainer-only paths and leaves the participant hint
+   ladder untouched at ``docs/genie/.assistant_instructions.md``. The two docs'
+   recipes must be the identical ordered command sequence. A reintroduced
+   ``git mv`` swap, a broken/missing ``git rm``, or a docs mismatch fails the
+   test.
 4. **Discipline + fallback live in their enforceable sections.** The
    one-rung-at-a-time / no-whole-project-dump rules must sit inside the Rules
    section, and the open-the-solution-file-directly fallback inside the Fallback
@@ -36,9 +40,11 @@ import workshop
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(workshop.__file__)))
 
-# The participant hint ladder's source path on `dev`. The release recipe moves
-# this to the repo root as `AGENTS.md` on `main`.
-PARTICIPANT_SRC = os.path.join("docs", "participant", "AGENTS.md")
+# The participant hint ladder's source path. It ships as-is at this path on both
+# `dev` and `main`; it is NOT swapped to the repo root — Genie Code does not
+# auto-discover a repo `AGENTS.md`, so `00_setup` injects this file's content
+# into each participant's `~/.assistant_instructions.md` instead.
+PARTICIPANT_SRC = os.path.join("docs", "genie", ".assistant_instructions.md")
 MAINTAINER_AGENTS = "AGENTS.md"
 CONTRIBUTING = "CONTRIBUTING.md"
 
@@ -224,17 +230,21 @@ def test_release_recipe_is_consistent_across_docs() -> None:
     agents = _promotion_recipe_commands(_read(MAINTAINER_AGENTS))
     contributing = _promotion_recipe_commands(_read(CONTRIBUTING))
 
-    # Both recipes must contain the swap's critical ops...
+    # Both recipes must contain the strip's critical ops...
     for cmds in (agents, contributing):
         assert "git merge --no-ff --no-commit dev" in cmds
         assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators" in cmds
-        assert "git mv docs/participant/AGENTS.md AGENTS.md" in cmds
         assert 'git commit -m "chore(release): promote dev to main"' in cmds
-        # ...ordered so the maintainer file is removed before the participant
-        # file is moved into its place.
+        # ...ordered so the maintainer files are stripped before the commit.
         assert cmds.index(
             "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators"
-        ) < cmds.index("git mv docs/participant/AGENTS.md AGENTS.md")
+        ) < cmds.index('git commit -m "chore(release): promote dev to main"')
+        # ...and there is NO hint-ladder swap: Genie Code does not auto-discover a
+        # repo AGENTS.md, so promotion must not move any file to root AGENTS.md.
+        assert not any(
+            line.startswith("git mv ") and line.rstrip().endswith(" AGENTS.md")
+            for line in cmds
+        ), "release recipe must not swap any file into a root AGENTS.md"
 
     # ...and the two docs must be the identical ordered command sequence.
     assert agents == contributing, (
@@ -243,17 +253,24 @@ def test_release_recipe_is_consistent_across_docs() -> None:
     )
 
 
-def test_release_recipe_executes_and_swaps(tmp_path) -> None:
+def test_release_recipe_executes_and_strips(tmp_path) -> None:
     """Run the *documented* promotion commands in a throwaway git repo.
 
     Seeds a `main` base + a `dev` branch carrying the maintainer files and the
-    real participant hint ladder, then executes the exact command lines parsed
-    from AGENTS.md and verifies the resulting tree.
+    real participant hint ladder (at its `docs/genie/` home), then executes the
+    exact command lines parsed from AGENTS.md and verifies the resulting tree.
+    The end state must have NO root `AGENTS.md` (no swap), the participant hint
+    ladder still present and unchanged under `docs/genie/`, and every
+    maintainer-only path stripped.
     """
     commands = _promotion_recipe_commands(_read(MAINTAINER_AGENTS))
-    # Guard: extraction must have actually found the recipe (not silently empty).
-    assert "git mv docs/participant/AGENTS.md AGENTS.md" in commands
+    # Guard: extraction must have actually found the recipe (not silently empty),
+    # and it must NOT reintroduce a swap of the participant file to root.
     assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators" in commands
+    assert not any(
+        line.startswith("git mv ") and line.rstrip().endswith(" AGENTS.md")
+        for line in commands
+    )
 
     participant_text = _read(PARTICIPANT_SRC)
     repo = tmp_path / "repo"
@@ -265,7 +282,7 @@ def test_release_recipe_executes_and_swaps(tmp_path) -> None:
     _git(["config", "user.name", "Test"], repo_str)
     _git(["checkout", "-q", "-b", "main"], repo_str)
 
-    # --- main base: participant-ready-ish, no maintainer files ---
+    # --- main base: participant-ready-ish, no maintainer files, no root AGENTS.md ---
     (repo / "README.md").write_text("base\n", encoding="utf-8")
     (repo / "solutions").mkdir()
     (repo / "solutions" / "keep.txt").write_text("x\n", encoding="utf-8")
@@ -282,8 +299,8 @@ def test_release_recipe_executes_and_swaps(tmp_path) -> None:
     (repo / "docs" / "agents" / "domain.md").write_text("x\n", encoding="utf-8")
     (repo / "generators").mkdir()
     (repo / "generators" / "gen.py").write_text("x\n", encoding="utf-8")
-    (repo / "docs" / "participant").mkdir(parents=True)
-    (repo / "docs" / "participant" / "AGENTS.md").write_text(
+    (repo / "docs" / "genie").mkdir(parents=True)
+    (repo / "docs" / "genie" / ".assistant_instructions.md").write_text(
         participant_text, encoding="utf-8"
     )
     _git(["add", "-A"], repo_str)
@@ -299,16 +316,18 @@ def test_release_recipe_executes_and_swaps(tmp_path) -> None:
         f"documented recipe failed (exit {result.returncode}):\n{result.stderr}"
     )
 
-    # --- verify the swapped end state ---
-    swapped = (repo / "AGENTS.md")
-    assert swapped.is_file(), "root AGENTS.md must exist after the swap"
-    swapped_text = swapped.read_text(encoding="utf-8")
-    assert swapped_text == participant_text, (
-        "root AGENTS.md must be byte-identical to the participant hint ladder"
+    # --- verify the stripped end state: no swap, ladder intact, maintainer gone ---
+    assert not (repo / "AGENTS.md").exists(), "main must ship no root AGENTS.md"
+
+    ladder = repo / "docs" / "genie" / ".assistant_instructions.md"
+    assert ladder.is_file(), "participant hint ladder must survive under docs/genie/"
+    ladder_text = ladder.read_text(encoding="utf-8")
+    assert ladder_text == participant_text, (
+        "participant hint ladder must ship unchanged (no swap, no edit)"
     )
-    assert PARTICIPANT_SENTINEL in swapped_text
-    assert MAINTAINER_MARKER not in swapped_text
-    assert not (repo / "docs" / "participant" / "AGENTS.md").exists()
+    assert PARTICIPANT_SENTINEL in ladder_text
+    assert MAINTAINER_MARKER not in ladder_text
+
     assert not (repo / "CLAUDE.md").exists()
     assert not (repo / "docs" / "agents").exists()
     assert not (repo / "generators").exists()

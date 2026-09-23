@@ -26,7 +26,15 @@ notebook's config.
 
 `00_setup.py` (added by #3) is the participant setup notebook: it creates a
 schema and UC Volume inside your team's **existing catalog**, runs seed hooks,
-and ends on the `00_setup` checkpoint. Start there.
+and ends on the `00_setup` checkpoint. Start there. After the domain is chosen it
+also **installs the Genie Code hint ladder** (#27): it reads
+[`../docs/genie/.assistant_instructions.md`](../docs/genie/.assistant_instructions.md),
+fills in your repo root and domain, and injects the result — wrapped in
+`STRYKER-WORKSHOP` sentinels — into your personal `~/.assistant_instructions.md`,
+which Genie Code auto-loads each session. The splice preserves any personal
+instructions of your own and is idempotent on re-run. The injection/merge/strip
+logic is the pure-Python `workshop.genie_instructions` module (unit-tested in
+[`../tests/test_genie_instructions.py`](../tests/test_genie_instructions.py)).
 
 `01_bronze_docs.py` (added by #5) is the first medallion step: copy the committed
 source PDFs into your UC Volume and register a bronze documents table over the
@@ -98,3 +106,9 @@ the expected key, is online and serving rows, and the caller's own app is
 deployed and running. On Free Edition, one denormalized serving table is synced.
 The app name, Lakebase project, and synced table are all namespaced per
 participant.
+
+`99_teardown.py` (added by #27) is the optional end-of-workshop cleanup: it
+strips the `STRYKER-WORKSHOP` block `00_setup` injected from your personal
+`~/.assistant_instructions.md`, leaving any instructions of your own untouched.
+It's a safe no-op if there's no block. It does not touch your catalog data — drop
+the workshop schema separately if you want to reclaim that.

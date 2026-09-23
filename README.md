@@ -109,11 +109,17 @@ returns green from a fresh clone and confirms the validation seam is working.
 ## Getting unstuck
 
 Every build notebook has collapsible **💡 Hint** cells on each `# TODO`. Beyond
-those, ask **Genie Code** in the workspace: it reads this repo and gives graded
-help **one rung at a time** — a nudge and a doc link first, then an API shape or
-skeleton, and only then the checkpoint solution — for the **one checkpoint you're
-on**, so you get unblocked without skipping the learning. The gated
-`solutions/<domain>/` directory holds the full reference as the last rung.
+those, ask **Genie Code** in the workspace: it gives graded help **one rung at a
+time** — a nudge and a doc link first, then an API shape or skeleton, and only
+then the checkpoint solution — for the **one checkpoint you're on**, so you get
+unblocked without skipping the learning. The gated `solutions/<domain>/`
+directory holds the full reference as the last rung.
+
+Genie Code knows how to help because `00_setup` installs the workshop's hint
+ladder into your personal instructions file (`~/.assistant_instructions.md`),
+which Genie Code auto-loads each session — with your repo root and chosen domain
+filled in. It's added surgically, so any personal instructions of your own are
+preserved. When you finish, run `notebooks/99_teardown.py` to remove it.
 
 **Free-Edition fallback.** Genie Code is guaranteed on the Stryker workspaces but
 may be unavailable on Databricks Free Edition. If you can't reach it, the hint
@@ -148,6 +154,7 @@ Start at [`docs/stretch/README.md`](docs/stretch/README.md); the starters live i
 | `app/`        | The provided data app you wire to your Genie agent                 |
 | `solutions/`  | Gated reference solutions (top rung of the hint ladder)            |
 | `resources/`  | Databricks Asset Bundle (DAB) resource definitions                 |
+| `docs/genie/` | The hint ladder `00_setup` installs into Genie Code's instructions |
 | `docs/stretch/` | Optional Tier-3 stretch modules (package-as-DAB, add-your-own)   |
 
 ## Prerequisites

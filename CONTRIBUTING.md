@@ -14,27 +14,25 @@ Keep each contribution focused, use [Conventional Commits](https://www.conventio
 
 ## Promote a Workshop Release
 
-A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material and **swap in the participant hint ladder** as its root `AGENTS.md`.
+A coordinator agent or human maintainer promotes a reviewed release from `dev` to `main`. Run the promotion from the `main` worktree. The release is a merge commit rather than a fast-forward because `main` must omit maintainer-only material. There is **no** hint-ladder swap: Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`), and promotion only strips the maintainer-only paths.
 
-Merge without committing, strip the maintainer-only files, then move the participant hint ladder into the root as `AGENTS.md` (the `git rm` uses `-f` because the no-commit merge stages these files as additions — they are absent from `main`'s tree between releases — which a plain `git rm` refuses to remove; the `git mv` then puts the participant ladder in its place, where Genie Code auto-discovers it):
+Merge without committing, then strip the maintainer-only files (the `git rm` uses `-f` because the no-commit merge stages these files as additions — they are absent from `main`'s tree between releases — which a plain `git rm` refuses to remove):
 
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
 git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
-git mv docs/participant/AGENTS.md AGENTS.md
 ```
 
-Verify the swap: the root `AGENTS.md` must now exist and be the participant hint ladder (its sentinel present, the maintainer workflow's title absent), the participant source must no longer sit under `docs/`, and the other maintainer-only paths must be gone:
+Verify the result: no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
 
 ```bash
-test -e AGENTS.md
-grep -q 'stryker-workshop:participant-hint-ladder' AGENTS.md
-! grep -q 'Repository Agent Workflow' AGENTS.md
-test ! -e docs/participant/AGENTS.md
+test ! -e AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
 test ! -e generators
+test -e docs/genie/.assistant_instructions.md
+grep -q 'stryker-workshop:participant-hint-ladder' docs/genie/.assistant_instructions.md
 ```
 
 Review the complete staged diff and run the workshop validation relevant to the promoted changes. When both are satisfactory, create the release commit:
@@ -60,7 +58,7 @@ Use a major version when a change breaks the participant experience, a minor ver
 
 Tag only the release commit on `main`.
 
-If the merge conflicts, preserve the participant-ready state on `main`: the root `AGENTS.md` must end up as the participant hint ladder (not the maintainer workflow), while `CLAUDE.md`, `docs/agents/`, `generators/`, and the `docs/participant/AGENTS.md` source must be absent. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
+If the merge conflicts, preserve the participant-ready state on `main`: there must be no root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
 
 ## Agent-Assisted Development
 

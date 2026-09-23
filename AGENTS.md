@@ -5,11 +5,11 @@ This repository is developed with multiple coding agents using Git worktrees. Fo
 ## Branch Roles
 
 - `dev` is the development integration branch. All feature work starts from and returns to `dev`.
-- `main` is the participant-ready release branch and the remote default branch. It must not contain the **maintainer** `AGENTS.md` (the worktree/Git workflow documented in this file), `CLAUDE.md`, the `docs/agents/` skill configuration, or other maintainer-only material. Its root `AGENTS.md` is instead the **participant hint ladder** — authored on `dev` at `docs/participant/AGENTS.md` and swapped to the root at release so Genie Code auto-discovers it via its directory-tree walk.
+- `main` is the participant-ready release branch and the remote default branch. It must not contain the **maintainer** `AGENTS.md` (the worktree/Git workflow documented in this file), `CLAUDE.md`, the `docs/agents/` skill configuration, `generators/`, or other maintainer-only material. It ships **no** root `AGENTS.md`: Genie Code does not auto-discover a repo `AGENTS.md` by walking the directory tree, so the **participant hint ladder** is delivered another way — it lives at `docs/genie/.assistant_instructions.md` (on both `dev` and `main`) and the `00_setup` notebook injects it into each participant's personal `~/.assistant_instructions.md`, which Genie Code auto-loads at session start.
 - Feature branches use one dedicated worktree per agent task.
 - `worktrees/dev/` and `worktrees/main/` are reserved for coordination, review, and integration. Do not make feature changes directly in either worktree.
 
-The maintainer agent instructions live on `dev`, so workshop participants who clone the default `main` branch receive only workshop material — with the participant hint ladder as the root `AGENTS.md`.
+The maintainer agent instructions live on `dev`, so workshop participants who clone the default `main` branch receive only workshop material. The participant hint ladder rides along as `docs/genie/.assistant_instructions.md` and reaches Genie Code through the `00_setup` injection, not through a root `AGENTS.md`.
 
 ## Before Making Changes
 
@@ -79,27 +79,25 @@ Do not use a regular merge or create a merge commit when integrating a feature i
 
 ## Promote a Workshop Release
 
-The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files **and swaps in the participant hint ladder** as its root `AGENTS.md`, so promotion uses a merge commit rather than a fast-forward merge.
+The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge. There is **no** hint-ladder swap — Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`) and only the maintainer-only paths are stripped.
 
-From the main worktree, merge without committing, strip the maintainer-only files, then move the participant hint ladder into the root as `AGENTS.md`:
+From the main worktree, merge without committing, then strip the maintainer-only files:
 
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
 git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
-git mv docs/participant/AGENTS.md AGENTS.md
 ```
 
-The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md`; the `git mv` then puts the participant hint ladder in its place. Verify the swap before committing — the root `AGENTS.md` must now exist and be the participant hint ladder (its sentinel present, the maintainer workflow's title absent), the participant source must no longer sit under `docs/`, and the other maintainer-only paths must be gone:
+The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md` and leaves **no** root `AGENTS.md` on `main`. Verify before committing — no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
 
 ```bash
-test -e AGENTS.md
-grep -q 'stryker-workshop:participant-hint-ladder' AGENTS.md
-! grep -q 'Repository Agent Workflow' AGENTS.md
-test ! -e docs/participant/AGENTS.md
+test ! -e AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
 test ! -e generators
+test -e docs/genie/.assistant_instructions.md
+grep -q 'stryker-workshop:participant-hint-ladder' docs/genie/.assistant_instructions.md
 git commit -m "chore(release): promote dev to main"
 ```
 
@@ -118,7 +116,7 @@ Use a major version for participant-breaking changes, a minor version for new wo
 - `v2.0.0` — changes that substantially alter the workshop flow or invalidate prior setup/materials.
 - `v1.2.0-rc.1` — optional rehearsal/review release before a major workshop event.
 
-If the merge conflicts, preserve the participant-ready state on `main`; in particular, the root `AGENTS.md` must end up as the **participant hint ladder** (not the maintainer workflow), while `CLAUDE.md`, `docs/agents/`, `generators/`, and the `docs/participant/AGENTS.md` source must be absent. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+If the merge conflicts, preserve the participant-ready state on `main`; in particular, there must be **no** root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 

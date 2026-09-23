@@ -23,6 +23,7 @@ from .bootstrap import bootstrap, find_repo_root
 from .config import DOMAINS, WorkshopConfig, resolve_config
 from .context import CheckContext
 from .domains import DOMAIN_SPECS, DomainSpec, MetricViewSpec, domain_spec
+from .genie_instructions import build_injection_block, merge_block, strip_block
 from .identifiers import fully_qualified, quote_identifier
 from .namespace import (
     WORKSHOP_SCHEMA_PREFIX,
@@ -100,6 +101,10 @@ __all__ = [
     "ProvisionReport",
     "quote_identifier",
     "fully_qualified",
+    # Genie Code hint-ladder injection into ~/.assistant_instructions.md (#27)
+    "build_injection_block",
+    "merge_block",
+    "strip_block",
     # Per-participant namespacing (ticket #22)
     "namespace",
     "Namespace",
