@@ -2,17 +2,18 @@
 # MAGIC %md
 # MAGIC # Solution · 01 Transactional ingestion to bronze — Finance
 # MAGIC
-# MAGIC Both source paths are implemented below and overwrite the same
-# MAGIC `bronze_sales_transactions` table.
+# MAGIC This solution automatically ensures the `lb_sales_transactions_history`
+# MAGIC CDF history table is available, then reconstructs the current state and
+# MAGIC writes the bronze table.
 # MAGIC
-# MAGIC ## ⚠️ Lakebase CDF admin/preview dependency
+# MAGIC ## Automatic CDF source detection and provisioning
 # MAGIC
-# MAGIC `lakebase_cdf` requires a workspace admin to enable the **Lakebase
-# MAGIC Lakehouse Sync / CDF Beta/Preview** under workspace **Previews**, a
-# MAGIC Lakebase Autoscaling Postgres 17 project seeded from the committed
-# MAGIC `finance_seed` SQL/CSV, and an ONLINE CDF config targeting the selected
-# MAGIC Unity Catalog schema. Without all three, use `delta_fallback`; it has no
-# MAGIC admin or preview dependency.
+# MAGIC The notebook uses a three-tier fallback to guarantee the history table:
+# MAGIC
+# MAGIC 1. **Detect** — if already present, use it.
+# MAGIC 2. **Provision** — create a Lakebase Postgres project (if needed), seed it,
+# MAGIC    and configure CDF→UC (requires workspace admin to enable CDF preview).
+# MAGIC 3. **Synthesize** — on any failure, build the history table in UC from seed.
 
 # COMMAND ----------
 
@@ -37,14 +38,24 @@ dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)"
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.dropdown(
     "source_mode",
-    "delta_fallback",
-    ["delta_fallback", "lakebase_cdf"],
+    "auto",
+    ["auto", "delta_fallback", "lakebase_cdf"],
     "Transactional source",
 )
 dbutils.widgets.text(
+    "lakebase_project",
+    "",
+    "Lakebase project (blank = auto-derive/create)",
+)
+dbutils.widgets.text(
+    "lakebase_database",
+    "",
+    "Lakebase database resource path (blank = default)",
+)
+dbutils.widgets.text(
     "lakebase_cdf_table",
-    "lb_sales_transactions_history",
-    "Lakebase CDF history table",
+    "",
+    "Lakebase CDF history table (blank = your domain's default)",
 )
 
 # COMMAND ----------
@@ -60,8 +71,47 @@ config = workshop.resolve_config(
     volume=dbutils.widgets.get("volume") or None,
     identity=me,
 )
+spec = workshop.domain_spec(config.domain)
 source_mode = dbutils.widgets.get("source_mode")
 bronze_table = f"{config.quoted_schema()}.`bronze_sales_transactions`"
+lakebase_project = dbutils.widgets.get("lakebase_project") or None
+lakebase_database = dbutils.widgets.get("lakebase_database") or None
+
+# COMMAND ----------
+
+# Ensure CDF source (done for you)
+if source_mode == "delta_fallback":
+    # Explicit delta_fallback: use the Delta seed directly.
+    lakebase_cdf_table = None
+    print(f"[Solution] Using delta_fallback (CDF skipped per source_mode)")
+else:
+    # source_mode is "auto" or "lakebase_cdf": provision/synthesize CDF.
+    from databricks.sdk import WorkspaceClient
+
+    try:
+        w = WorkspaceClient()
+    except Exception as e:
+        w = None
+        print(f"[Solution] Could not initialize WorkspaceClient: {e}")
+
+    try:
+        cdf_report = workshop.ensure_txn_cdf_source(
+            config=config,
+            spec=spec,
+            spark=spark,
+            lakebase_project=lakebase_project,
+            lakebase_database=lakebase_database,
+            w=w,
+            timeout_s=120.0,
+            logger=print,
+        )
+        lakebase_cdf_table = cdf_report.cdf_history_table
+        print(f"[Solution] CDF source: {cdf_report.mode} ({cdf_report.cdf_history_table})")
+    except Exception as e:
+        if source_mode == "lakebase_cdf":
+            raise RuntimeError(f"source_mode is lakebase_cdf but CDF failed: {e}") from e
+        lakebase_cdf_table = None
+        print(f"[Solution] CDF provisioning failed; using delta_fallback: {e}")
 
 # COMMAND ----------
 
@@ -101,11 +151,11 @@ TRANSACTION_COLUMNS = [
     "source_updated_at",
 ]
 
-if source_mode == "lakebase_cdf":
+if lakebase_cdf_table is not None:
     cdf_table = ".".join(
         [
             config.quoted_schema(),
-            f"`{dbutils.widgets.get('lakebase_cdf_table').replace('`', '``')}`",
+            f"`{lakebase_cdf_table.split('.')[-1].replace('`', '``')}`",
         ]
     )
     cdf = spark.sql(f"SELECT * FROM {cdf_table}")
@@ -113,7 +163,7 @@ if source_mode == "lakebase_cdf":
     missing_metadata = required_metadata.difference(cdf.columns)
     if missing_metadata:
         raise RuntimeError(
-            "The selected table is not a Lakebase CDF history table; missing "
+            "The CDF history table is missing required columns; missing "
             f"columns: {sorted(missing_metadata)}"
         )
 
