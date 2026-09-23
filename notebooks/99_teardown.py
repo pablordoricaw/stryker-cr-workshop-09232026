@@ -112,8 +112,8 @@ if catalog:
             with open(metadata_path, "r") as f:
                 metadata = json.load(f)
 
-            # Check if this was a provisioned (not BYO) resource.
-            if metadata.get("mode") == "provisioned":
+            # Check if this was a provisioned (not BYO) resource that was created by the workshop.
+            if metadata.get("mode") == "provisioned" and metadata.get("lakebase_project_created"):
                 lakebase_project = metadata.get("lakebase_project")
                 if lakebase_project:
                     try:
@@ -122,12 +122,18 @@ if catalog:
                         try:
                             w.postgres.delete_project(name=lakebase_project)
                             print(f"[99_teardown] Deleted Lakebase project {lakebase_project}")
-                        except (AttributeError, NotFound, Exception) as del_err:
+                        except (AttributeError, NotFound) as del_err:
                             print(f"[99_teardown] Could not delete project via SDK: {del_err}; manual cleanup may be needed.")
                     except Exception as e:
                         print(f"[99_teardown] Error during Lakebase cleanup: {e}")
             else:
-                print(f"[99_teardown] CDF source mode is {metadata.get('mode', 'unknown')}; skipping Lakebase cleanup.")
+                mode = metadata.get('mode', 'unknown')
+                was_created = metadata.get('lakebase_project_created', False)
+                if mode == "provisioned" and not was_created:
+                    lakebase_project = metadata.get("lakebase_project")
+                    print(f"[99_teardown] CDF source was provisioned with a bring-your-own project ({lakebase_project}); preserving for reuse by 07_app.")
+                else:
+                    print(f"[99_teardown] CDF source mode is {mode}; skipping Lakebase cleanup.")
         except FileNotFoundError:
             print(f"[99_teardown] No provisioning metadata found; nothing to clean up.")
         except Exception as e:
