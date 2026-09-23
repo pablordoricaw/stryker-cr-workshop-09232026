@@ -13,11 +13,12 @@
 # MAGIC `cve_id`, ITSM `gold_service_performance` on `incident_id`) and are derived
 # MAGIC for you below.
 # MAGIC
-# MAGIC Everything lands in **your existing catalog / schema** and a **per-participant
-# MAGIC Lakebase project** — no catalog is created, and no second schema.
+# MAGIC Everything lands in **your existing catalog / schema** and the **Lakebase
+# MAGIC project you created in `01_bronze_txn`** (reused here) — no catalog is created,
+# MAGIC and no second schema.
 # MAGIC
 # MAGIC You will:
-# MAGIC 1. create a per-participant **Lakebase project**;
+# MAGIC 1. **reuse the Lakebase project** you created in `01_bronze_txn`;
 # MAGIC 2. create a **synced table** from your gold serving table into your existing catalog/schema;
 # MAGIC 3. **deploy and start** the app (Apps UI or CLI) with its Genie + Lakebase resources;
 # MAGIC 4. fill the **two gaps** in `app/backend.py`; and
@@ -62,11 +63,12 @@ import workshop
 # MAGIC %md
 # MAGIC ## 1. Config and your per-participant names
 # MAGIC
-# MAGIC The app, the Lakebase project, and the synced table are all
-# MAGIC **workspace-scoped**, and your team shares one workspace — so each carries a
-# MAGIC **per-participant identity suffix**, exactly like your `06_genie` agent name.
-# MAGIC This cell derives your domain's gold serving table, primary key, and
-# MAGIC serving-table base from the domain spec.
+# MAGIC The app and the synced table are **workspace-scoped**, and your team shares
+# MAGIC one workspace — so each carries a **per-participant identity suffix**, exactly
+# MAGIC like your `06_genie` agent name. The **Lakebase project is the one you created
+# MAGIC in `01_bronze_txn`** (supplied via the widget) — 07_app reuses it. This cell
+# MAGIC derives your domain's gold serving table, primary key, and serving-table base
+# MAGIC from the domain spec.
 
 # COMMAND ----------
 
@@ -74,6 +76,7 @@ dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+dbutils.widgets.text("lakebase_project", "", "Lakebase project — reuse the one from 01_bronze_txn (required)")
 
 # COMMAND ----------
 
@@ -102,12 +105,23 @@ gold_serving = workshop.fully_qualified(
     config.catalog, config.schema, spec.app_source_table
 )
 
-# Per-participant identifiers, all derived from your namespace so the checkpoint
+# The app and synced-table names derive from your namespace so the checkpoint
 # resolves the SAME names (pass namespace=ns). App names allow [a-z0-9-] (<=30);
-# Lakebase project ids are RFC 1123 (<=63); the digest is always kept, so
-# uniqueness survives the length limits.
+# the digest is always kept, so uniqueness survives the length limit.
 app_name = ns.app_name()
-project_id = ns.lakebase_project()
+
+# Bring-your-own Lakebase project: reuse the SAME project you created for
+# 01_bronze_txn (supplied via the widget). 07_app does NOT create a project — its
+# synced serving table lands there as a DISTINCT table, alongside (not colliding
+# with) 01_bronze_txn's CDF history table (different table, different Postgres schema).
+project_id = dbutils.widgets.get("lakebase_project") or None
+if not project_id:
+    raise RuntimeError(
+        "Set the 'lakebase_project' widget to the Lakebase project you created in "
+        "01_bronze_txn (Compute -> Lakebase). 07_app reuses that project; it does not "
+        "create one. If you used 01_bronze_txn's synthesized path and have no project, "
+        "create one first (Compute -> Lakebase, or 'databricks postgres create-project')."
+    )
 branch = f"projects/{project_id}/branches/production"
 
 # The synced table lands in YOUR existing catalog + schema — no catalog is
@@ -122,7 +136,7 @@ serving_table = f"{config.schema}.{target_table}"  # the app's SERVING_TABLE (Po
 print(f"Domain          : {config.domain}")
 print(f"Signed in as    : {me}")
 print(f"App name        : {app_name}")
-print(f"Lakebase project: {project_id}")
+print(f"Lakebase project: {project_id}   (reused from 01_bronze_txn)")
 print(f"Synced table    : {synced_table}")
 print(f"App SERVING_TABLE: {serving_table}")
 print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)})")
@@ -155,14 +169,16 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create your Lakebase synced table from the gold serving table
+# MAGIC ## 2. Add your Lakebase synced table to your 01_bronze_txn project
 # MAGIC
 # MAGIC Sync your gold serving table (one denormalized row per business key) into
-# MAGIC Lakebase so the app reads it at low latency. Two steps: create a Lakebase
-# MAGIC **project**, then create the **synced table** straight into your existing
-# MAGIC catalog/schema. There is **no catalog to create or register** — the
-# MAGIC synced-table id is a Unity Catalog name in *your own* catalog, and Lakebase
-# MAGIC creates the matching Postgres table for you.
+# MAGIC Lakebase so the app reads it at low latency. **Reuse the Lakebase project you
+# MAGIC created for `01_bronze_txn`** — 07_app does not create one — then create the
+# MAGIC **synced table** straight into your existing catalog/schema. There is **no
+# MAGIC catalog to create or register** — the synced-table id is a Unity Catalog name
+# MAGIC in *your own* catalog, and Lakebase creates the matching Postgres table for
+# MAGIC you. It lands as a **distinct table** in that project, alongside 01_bronze_txn's
+# MAGIC CDF history table (no collision).
 
 # COMMAND ----------
 
@@ -193,16 +209,19 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — create the project (CLI, run in a terminal)
+# MAGIC ### 💡 Hint — reuse your 01_bronze_txn project (create one only if needed)
 
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC Put the name of the project you created in `01_bronze_txn` in the
+# MAGIC `lakebase_project` widget — 07_app reuses it and does **not** create a project.
+# MAGIC Only if you have none (you used 01_bronze_txn's synthesized path), create one:
 # MAGIC ```bash
 # MAGIC databricks postgres create-project <project_id> \
 # MAGIC   --json '{"spec": {"display_name": "<project_id>"}}' --profile <p>
 # MAGIC ```
-# MAGIC The project auto-creates a `production` branch + `primary` endpoint
+# MAGIC A project auto-creates a `production` branch + `primary` endpoint
 # MAGIC (scale-to-zero). You do **not** run `databricks postgres create-catalog`.
 
 # COMMAND ----------
