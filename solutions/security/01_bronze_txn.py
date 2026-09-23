@@ -206,13 +206,7 @@ FINDING_COLUMNS = [
 ]
 
 if lakebase_cdf_table is not None:
-    cdf_table = ".".join(
-        [
-            config.quoted_schema(),
-            f"`{lakebase_cdf_table.split('.')[-1].replace('`', '``')}`",
-        ]
-    )
-    cdf = spark.sql(f"SELECT * FROM {cdf_table}")
+    cdf = spark.sql(f"SELECT * FROM {lakebase_cdf_table}")
     required_metadata = {"_pg_change_type", "_sort_by"}
     missing_metadata = required_metadata.difference(cdf.columns)
     if missing_metadata:
@@ -227,7 +221,7 @@ if lakebase_cdf_table is not None:
         .where(F.col("_bronze_rank") == 1)
         .where(F.col("_pg_change_type") != "delete")
     )
-    print(f"Read current state from Lakebase CDF table {cdf_table}")
+    print(f"Read current state from Lakebase CDF table {lakebase_cdf_table}")
 else:
     source_seed = os.path.join(
         _root,
