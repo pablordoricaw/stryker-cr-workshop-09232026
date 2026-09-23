@@ -20,24 +20,6 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## ⚠️ Pre-check: Partner-powered AI must be enabled
-# MAGIC
-# MAGIC Genie is an AI feature. Before it will answer anything, your workspace must
-# MAGIC have **Partner-powered AI features** (which enable the Databricks Assistant
-# MAGIC that Genie is built on) turned **on**:
-# MAGIC
-# MAGIC - **Settings → Advanced → Partner-powered AI features** must be enabled at
-# MAGIC   the account/workspace level (an admin toggle).
-# MAGIC - You need **CAN USE** on a **Pro or Serverless SQL warehouse** (the same
-# MAGIC   warehouse the agent runs its generated SQL on).
-# MAGIC
-# MAGIC If Genie is disabled, agent creation and the checkpoint below will fail with
-# MAGIC a permissions/feature error — ask your workspace admin to enable it. Genie
-# MAGIC agent APIs may be **Preview/entitlement-gated** on some workspaces.
-
-# COMMAND ----------
-
 # --- Workshop bootstrap: run this first in every notebook ---
 import os
 import sys

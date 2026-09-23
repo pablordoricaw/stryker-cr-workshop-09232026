@@ -108,6 +108,7 @@ stryker-cr-workshop-09232026/
 
 - **Databricks workspace access**, or a free [Databricks Free Edition](https://www.databricks.com/learn/free-edition) account for self-sign-up (see the note below).
 - **GitHub account** (only if you choose **Option A** below; optional for Option B).
+- **Genie prerequisites** (module `06_genie`): Genie is an AI feature powered by the Databricks Assistant. For the Genie module, your workspace admin must enable **Partner-powered AI features** (**Settings → Advanced → Partner-powered AI features**), and you need **CAN USE** permissions on a **Pro or Serverless SQL warehouse** for Genie to run its generated SQL. Genie agent APIs may be Preview/entitlement-gated on some workspaces.
 - Your facilitator will confirm any workspace toggles needed on the day.
 
 > [!NOTE]
