@@ -8,26 +8,29 @@
 # MAGIC `bronze_scan_findings` / `finding_id`, ITSM's `bronze_service_tickets` /
 # MAGIC `ticket_id` — and are derived for you below from the domain you pick.
 # MAGIC
-# MAGIC ## 📦 Automatic CDF source detection and provisioning
+# MAGIC ## 📦 CDF source detection and provisioning (optional)
 # MAGIC
 # MAGIC This notebook automatically ensures your domain's CDF history table is
 # MAGIC available via a **three-tier fallback**:
 # MAGIC
 # MAGIC 1. **Detect** — if the history table already exists in your catalog/schema,
 # MAGIC    it is used as-is.
-# MAGIC 2. **Provision** — if you supply a Lakebase project/database (via widgets,
-# MAGIC    optional) or a derived one can be created, the notebook seeds Postgres
-# MAGIC    and configures CDF→UC automatically. Requires workspace admin to enable
-# MAGIC    the **Lakebase Lakehouse Sync / CDF Beta/Preview** under workspace
-# MAGIC    **Previews**.
-# MAGIC 3. **Synthesize** — if provisioning is unavailable or fails (e.g.,
-# MAGIC    default-storage catalogs are unsupported), the history table is built
-# MAGIC    in UC from the committed seed, and the participant's `# TODO` cells run
-# MAGIC    as if synced.
+# MAGIC 2. **Provision real Lakebase CDF** — if you manually created a Lakebase
+# MAGIC    project (database instance) beforehand and entered it in the `lakebase_project`
+# MAGIC    widget, the notebook configures CDF→UC automatically to sync your Postgres
+# MAGIC    history table to Unity Catalog. Requires workspace admin to enable the
+# MAGIC    **Lakebase Lakehouse Sync / CDF** preview under workspace **Previews**. This is
+# MAGIC    the real CDF path and is optional — skip it to use the fallback below.
+# MAGIC 3. **Synthesize** — if you leave `lakebase_project` blank, or if real CDF
+# MAGIC    provisioning is unavailable or fails (e.g., default-storage catalogs are
+# MAGIC    unsupported), the history table is built in UC from the committed seed. The
+# MAGIC    participant's `# TODO` cells run identically in either mode, and the checkpoint
+# MAGIC    passes the same. This is the recommended path if you did not deploy a project.
 # MAGIC
-# MAGIC Both paths produce the same current-state bronze table and finish at the
-# MAGIC same checkpoint. Leave the Lakebase widgets blank for automatic detection;
-# MAGIC fill them only to reuse an existing project.
+# MAGIC Both paths produce the same current-state bronze table and finish at the same
+# MAGIC checkpoint. **Leave `lakebase_project` blank to synthesize** (recommended for most
+# MAGIC participants); fill it only if you created and want to exercise the real Lakebase
+# MAGIC CDF sync.
 # MAGIC
 # MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
 # MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
@@ -75,6 +78,30 @@ import workshop
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## 🛢️ Optional: deploy your Lakebase project first (for the real CDF path)
+# MAGIC
+# MAGIC If you want to exercise the real Lakebase CDF sync (recommended for learning), follow these steps to create a Lakebase project in your workspace. **This is optional** — if you skip it, the notebook will synthesize the history table from a committed seed and you'll complete the checkpoint identically.
+# MAGIC
+# MAGIC ### Steps to create a Lakebase project:
+# MAGIC
+# MAGIC 1. **In the Databricks workspace sidebar**, click **Compute** (or **Compute & SQL** depending on your Databricks version).
+# MAGIC 2. Click the **Lakebase** tab (or look for a **Lakebase** option in the compute menu).
+# MAGIC 3. Click **Create Lakebase project** (or **Create project**).
+# MAGIC 4. **Enter a project name** (e.g., `my-workshop-postgres`) and choose your cloud region (default is fine).
+# MAGIC 5. Click **Create**. The project auto-provisions:
+# MAGIC    - A `production` branch with a read-write endpoint
+# MAGIC    - A default database named `databricks_postgres` (this is the database you'll use unless you have a specific reason to create another one)
+# MAGIC 6. Once the project shows **Ready**, note its **project name** (the one you entered in step 4).
+# MAGIC 7. Come back to this notebook and fill the `lakebase_project` widget (below) with the project name you just created.
+# MAGIC
+# MAGIC **That's it.** The notebook will auto-detect your project and configure CDF→UC. If you don't see a **Lakebase** tab or option, ask your workspace admin to enable the **Lakebase Lakehouse Sync / CDF** preview under workspace **Previews** (or use the synthesized path by leaving `lakebase_project` blank).
+# MAGIC
+# MAGIC ### Not deploying a project?
+# MAGIC **Just skip this step and leave `lakebase_project` blank.** The notebook will build the history table from the committed seed and the checkpoint passes identically.
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 1. Reuse your setup configuration and pick your domain
 # MAGIC
 # MAGIC Configure your notebook using the widgets below. Most settings come from your earlier work in `00_setup`; the three Lakebase widgets are optional (leave blank for automatic setup).
@@ -87,9 +114,9 @@ import workshop
 # MAGIC | **domain** | Same domain you selected in `00_setup` (Finance / Security / ITSM) | Never — selects your transactional schema |
 # MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
 # MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
-# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
-# MAGIC | **lakebase_project** | (Advanced / optional) Leave blank to auto-derive/create; fill only if reusing an existing Lakebase project | Yes — blank is the recommended default |
-# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
+# MAGIC | **source_mode** | Choose your CDF approach: `auto` (recommended) = detect existing history, provision **real Lakebase CDF if you supplied a `lakebase_project`**, else synthesize from seed; `lakebase_cdf` = require real CDF (fails if you didn't create/supply a project or the preview is off); `delta_fallback` = skip Lakebase entirely, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project (database instance) you created** (see the deploy step above) to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
+# MAGIC | **lakebase_database** | Leave blank to use the instance's default `databricks_postgres` database; set only if you created a differently-named database in your Lakebase project | Yes — blank is the recommended default |
 # MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use your domain's default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
 # MAGIC
 # MAGIC **Most participants:** use the defaults shown above — enter your **catalog** and pick your **domain**, leave everything else blank or as-is.
@@ -109,12 +136,12 @@ dbutils.widgets.dropdown(
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "(Advanced) Lakebase project — leave blank for auto",
+    "(Optional) Lakebase project you created — blank = synthesize",
 )
 dbutils.widgets.text(
     "lakebase_database",
     "",
-    "(Advanced) Lakebase database — leave blank for default",
+    "(Optional) Lakebase database — blank = default databricks_postgres",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",

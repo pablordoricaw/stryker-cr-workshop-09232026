@@ -68,7 +68,7 @@ import workshop
 # MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
 # MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
 # MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
-# MAGIC | **lakebase_project** | (Advanced / optional) Leave blank to auto-derive/create; fill only if reusing an existing Lakebase project | Yes — blank is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
 # MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
 # MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the Finance default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
 # MAGIC
@@ -89,7 +89,7 @@ dbutils.widgets.dropdown(
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "(Advanced) Lakebase project — leave blank for auto",
+    "(Optional) Lakebase project you created — blank = synthesize",
 )
 dbutils.widgets.text(
     "lakebase_database",
