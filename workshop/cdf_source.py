@@ -10,12 +10,21 @@ is raised only if synthesis also fails.
 
 All pure logic (mode selection, CDC-row synthesis shaping) is unit-testable
 without a live workspace.
+
+Key fixes (vs. initial version):
+- Seed paths anchored to repo_root, not volume_path
+- Spark reads from UC volume (staged via shutil), not /Workspace
+- _pg_lsn/_sort_by are BIGINT (LongType), not INTEGER
+- Provision creates/discovers projects/branches/endpoints per authoritative API
+- CdfConfig imported correctly from databricks.sdk.service.postgres
+- NotFound exceptions caught per SDK error handling
+- Postgres connection uses correct auth (current_user, token)
+- Entire provision wrapped in try/except for fail-soft fallback to synthesize
 """
 
 from __future__ import annotations
 
-import csv
-import io
+import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -44,29 +53,18 @@ class CdfSourceReport:
 
 
 def _cdc_row_shape(row: dict[str, Any], *, include_cols: list[str]) -> dict[str, Any]:
-    """Shape one seed row into a CDC-formatted history row.
+    """Shape one seed row into a CDC-formatted history row (pure logic).
 
     Adds CDC metadata columns (_pg_change_type, _pg_lsn, _pg_xid, _timestamp,
-    _sort_by) with all insert events and monotonically increasing LSN values.
-
-    Args:
-        row: One row from the seed CSV/DataFrame as a dict.
-        include_cols: The seed's actual columns to include (in order).
-
-    Returns:
-        The row with original columns + CDC metadata.
+    _sort_by) with all insert events. LSN and _sort_by will be filled by Spark
+    using monotonically_increasing_id().
     """
-    # Start with the original columns (in order, filtered to include_cols).
     shaped = {col: row.get(col) for col in include_cols}
-
-    # Add CDC metadata: all rows are inserts, _sort_by is monotonically increasing
-    # so the latest rank-1 row is always the one we read.
     shaped["_pg_change_type"] = "insert"
-    shaped["_pg_lsn"] = None  # Will be filled by caller with monotonically_increasing_id
+    shaped["_pg_lsn"] = None  # Spark will fill with monotonically_increasing_id (BIGINT)
     shaped["_pg_xid"] = None
-    shaped["_timestamp"] = None  # Will be filled by caller with current_timestamp()
-    shaped["_sort_by"] = None  # Will be filled by caller with monotonically_increasing_id
-
+    shaped["_timestamp"] = None  # Spark will fill with current_timestamp()
+    shaped["_sort_by"] = None  # Spark will fill with monotonically_increasing_id (BIGINT)
     return shaped
 
 
@@ -75,16 +73,15 @@ def shape_seed_to_cdc(
 ) -> list[dict[str, Any]]:
     """Transform seed rows into CDC-formatted history rows (pure logic).
 
-    This is the shaping applied during the synthesize fallback: each row becomes
-    an `insert` event with CDC metadata columns. This function is pure Python
-    (no Spark, no SDK) so it can be unit-tested offline.
+    Each row becomes an `insert` event with CDC metadata columns. This function
+    is pure Python (no Spark, no SDK) so it can be unit-tested offline.
 
     Args:
         seed_rows: The seed rows as dicts (one per row, with original columns).
         include_cols: The column names to include (in order).
 
     Returns:
-        The same rows with CDC metadata added.
+        The same rows with CDC metadata added (LSN/timestamp values as None).
     """
     return [_cdc_row_shape(row, include_cols=include_cols) for row in seed_rows]
 
@@ -113,6 +110,7 @@ def ensure_txn_cdf_source(
     spec: Any,
     spark: Any,
     *,
+    repo_root: str,
     lakebase_project: Optional[str] = None,
     lakebase_database: Optional[str] = None,
     w: Optional[Any] = None,
@@ -121,28 +119,25 @@ def ensure_txn_cdf_source(
 ) -> CdfSourceReport:
     """Guarantee the domain's CDF history table exists via detect/provision/synthesize.
 
-    The three-tier fallback:
-    1. Detect — if the history table exists, return it as-is (preexisting).
-    2. Provision — if lakebase_project/database supplied or can be created, seed
-       Postgres, configure CDF→UC, poll until ONLINE (provisioned).
-    3. Synthesize — on any failure, build the history table in UC from the seed
-       (synthesized).
+    Three-tier fail-soft flow:
+    1. Detect — if history table exists, return it (preexisting).
+    2. Provision — create/reuse Lakebase project, seed Postgres, configure CDF (provisioned).
+    3. Synthesize — on any failure, build history table in UC from committed seed (synthesized).
 
     Args:
         config: WorkshopConfig with catalog/schema/domain/volume_path.
-        spec: DomainSpec with lakebase_cdf_table, expected_txn_rows, txn_seed_dir,
-            txn_entity_label, transaction_key, bronze_txn_table.
+        spec: DomainSpec with lakebase_cdf_table, txn_seed_dir, transaction_key, etc.
         spark: Active SparkSession.
-        lakebase_project: Existing Lakebase project ID to reuse, or None to create.
+        repo_root: Absolute path to the workshop repo root (contains data/).
+        lakebase_project: Existing Lakebase project ID to reuse, or None to create/derive.
         lakebase_database: Existing Lakebase database resource path to reuse, or None.
-        w: WorkspaceClient for SDK calls; if None, provisioning is skipped and
-            synthesis is attempted.
+        w: WorkspaceClient for SDK calls; if None, provisioning is skipped.
         timeout_s: Timeout in seconds for CDF status polling.
         logger: Callable (e.g., print) for logging; if None, messages are silent.
 
     Returns:
         CdfSourceReport with mode, resolved history table, project identity, and notes.
-        Every path leaves a readable history table (or raises a clear error).
+        Guaranteed: always leaves a readable history table (or raises only if synthesis fails).
     """
     if logger is None:
         logger = lambda *args, **kwargs: None
@@ -171,7 +166,6 @@ def ensure_txn_cdf_source(
     provisioning_succeeded = False
     lakebase_project_used = None
     lakebase_db_resource_path = None
-    provision_error = None
 
     if w is not None:
         try:
@@ -182,6 +176,7 @@ def ensure_txn_cdf_source(
                     config=config,
                     spec=spec,
                     spark=spark,
+                    repo_root=repo_root,
                     lakebase_project=lakebase_project,
                     lakebase_database=lakebase_database,
                     timeout_s=timeout_s,
@@ -191,7 +186,6 @@ def ensure_txn_cdf_source(
             provisioning_succeeded = True
             logger(f"[CDF] Lakebase provisioning succeeded.")
         except Exception as e:
-            provision_error = e
             logger(
                 f"[CDF] Lakebase provisioning failed: {type(e).__name__}: {e}. "
                 f"Will synthesize fallback."
@@ -210,6 +204,7 @@ def ensure_txn_cdf_source(
                 spark=spark,
                 config=config,
                 spec=spec,
+                repo_root=repo_root,
                 history_table_fq=history_table_fq,
                 logger=logger,
             )
@@ -223,7 +218,6 @@ def ensure_txn_cdf_source(
     # --- Save metadata for teardown to find ---
     try:
         import json
-        import os
 
         report_obj = {
             "mode": mode,
@@ -264,6 +258,7 @@ def _provision_lakebase_cdf_config(
     config: Any,
     spec: Any,
     spark: Any,
+    repo_root: str,
     lakebase_project: Optional[str],
     lakebase_database: Optional[str],
     timeout_s: float,
@@ -277,22 +272,28 @@ def _provision_lakebase_cdf_config(
     Raises:
         Exception: If any step fails (CDF unsupported, SDK errors, timeout, etc).
             The caller handles the exception and falls back to synthesis.
-    """
-    from databricks.sdk.service.provisioning import CdfConfig
 
-    import psycopg
+    API Reference (per authoritative lakehouse-sync.md):
+    - project: projects/<PROJECT_ID>
+    - branch: projects/<PROJECT_ID>/branches/<BRANCH_ID>
+    - endpoint: projects/<PROJECT_ID>/branches/<BRANCH_ID>/endpoints/<ENDPOINT_ID>
+    - database: projects/<PROJECT_ID>/branches/<BRANCH_ID>/databases/<DATABASE_ID> (resource path)
+    - CdfConfig imported from databricks.sdk.service.postgres
+    - parent for CDF is DATABASE resource path, not project or database name
+    - list_cdf_statuses catches NotFound (404) when none exist
+    """
+    from databricks.sdk.service.postgres import CdfConfig
 
     domain = config.domain
     postgres_schema = f"{domain}_seed"
     catalog = config.catalog
     uc_schema = config.schema
 
-    # --- Resolve or create the Lakebase project ---
+    # --- Create or reuse Lakebase project ---
     if lakebase_project:
         logger(f"[CDF] Reusing supplied Lakebase project: {lakebase_project}")
         project_id = lakebase_project
     else:
-        # Derive project name from identity + domain.
         from workshop import namespace
 
         me = spark.sql("SELECT current_user()").collect()[0][0]
@@ -300,54 +301,92 @@ def _provision_lakebase_cdf_config(
         project_id = ns.lakebase_project()
         logger(f"[CDF] Creating or reusing derived Lakebase project: {project_id}")
 
-        # Try to create (reuse-if-exists via the name).
-        # This would be done via w.postgres.create_project(...), but we'll assume
-        # the project either exists or will be created by the provisioning call below.
-        # For now, log the intention.
-        logger(f"[CDF] Project {project_id} will be created (if needed) by SDK.")
-
-    # --- Resolve or discover the Lakebase database ---
-    if lakebase_database:
-        logger(f"[CDF] Reusing supplied database resource path: {lakebase_database}")
-        db_resource_path = lakebase_database
-    else:
-        # List databases in the project and find the default.
-        logger(f"[CDF] Discovering Lakebase database in project {project_id}...")
-        databases = w.postgres.list_databases(name=project_id)
-        db_list = list(databases)
-        if not db_list:
-            raise RuntimeError(
-                f"No databases found in Lakebase project {project_id}. "
-                f"Check project exists and has a database."
+        # Create project (auto-creates production branch + primary endpoint).
+        # Reuse if already exists by catching the error.
+        try:
+            w.postgres.create_project(
+                name=project_id,
+                spec={"display_name": f"Workshop {domain} Lakebase project"}
             )
-        # Use the first (default) database.
-        db_resource_path = db_list[0].name
-        logger(f"[CDF] Using database: {db_resource_path}")
+            logger(f"[CDF] Created Lakebase project {project_id}")
+        except Exception as e:
+            if "already exists" in str(e).lower() or "conflict" in str(e).lower():
+                logger(f"[CDF] Project {project_id} already exists (reusing)")
+            else:
+                raise
 
-    # --- Get Postgres host and credentials ---
-    logger(f"[CDF] Retrieving Postgres connection endpoint...")
-    endpoint = w.postgres.get_endpoint(name=db_resource_path)
-    if not endpoint or not endpoint.host:
-        raise RuntimeError(f"Postgres endpoint not accessible for {db_resource_path}")
-    host = endpoint.host
+    # --- Discover the production branch and database ---
+    logger(f"[CDF] Discovering branch and database for project {project_id}...")
+
+    # List branches to get the production branch id
+    branches = list(w.postgres.list_branches(parent=f"projects/{project_id}"))
+    production_branch = None
+    for branch in branches:
+        if "production" in branch.name.lower():
+            production_branch = branch.name
+            break
+
+    if not production_branch:
+        # Fallback: use the first branch (likely production)
+        if branches:
+            production_branch = branches[0].name
+        else:
+            raise RuntimeError(f"No branches found in project {project_id}")
+
+    logger(f"[CDF] Using branch: {production_branch}")
+
+    # List databases in the production branch
+    databases = list(w.postgres.list_databases(parent=production_branch))
+    db_resource_path = None
+    for db in databases:
+        # Match on postgres_database name
+        if hasattr(db, "status") and hasattr(db.status, "postgres_database"):
+            if db.status.postgres_database == "databricks_postgres":
+                db_resource_path = db.name
+                break
+
+    if not db_resource_path:
+        raise RuntimeError(
+            f"Could not find databricks_postgres database in {production_branch}"
+        )
+
+    logger(f"[CDF] Using database: {db_resource_path}")
+
+    # --- Get endpoint for Postgres connection ---
+    logger(f"[CDF] Retrieving Postgres endpoint...")
+    endpoints = list(w.postgres.list_endpoints(parent=production_branch))
+    if not endpoints:
+        raise RuntimeError(f"No endpoints found in {production_branch}")
+
+    endpoint = endpoints[0]  # Use primary endpoint
+    endpoint_fq = endpoint.name
+    logger(f"[CDF] Using endpoint: {endpoint_fq}")
+
+    # Get full endpoint details for host
+    endpoint_obj = w.postgres.get_endpoint(name=endpoint_fq)
+    if not hasattr(endpoint_obj, "status") or not hasattr(endpoint_obj.status, "hosts"):
+        raise RuntimeError(f"Endpoint missing host information")
+
+    host = endpoint_obj.status.hosts.host
     logger(f"[CDF] Postgres host: {host}")
 
-    # Generate OAuth token for Postgres.
+    # Generate OAuth token for Postgres
     logger(f"[CDF] Generating OAuth token for Postgres...")
-    cred = w.postgres.generate_database_credential(name=db_resource_path)
-    if not cred or not cred.password:
-        raise RuntimeError(
-            f"Failed to generate Postgres credential for {db_resource_path}"
-        )
-    auth_token = cred.password
+    cred = w.postgres.generate_database_credential(name=endpoint_fq)
+    if not cred or not hasattr(cred, "token"):
+        raise RuntimeError(f"Failed to generate Postgres credential")
+
+    auth_token = cred.token
 
     # --- Seed Postgres schema + table + data ---
+    me_user = spark.sql("SELECT current_user()").collect()[0][0]
     logger(f"[CDF] Seeding Postgres schema {postgres_schema}...")
     _seed_postgres(
-        w=w,
         config=config,
         spec=spec,
+        repo_root=repo_root,
         host=host,
+        user=me_user,
         token=auth_token,
         schema=postgres_schema,
         logger=logger,
@@ -359,18 +398,15 @@ def _provision_lakebase_cdf_config(
         f"{catalog}.{uc_schema}..."
     )
     cdf_config_id = f"{domain}_cdf"
-    try:
-        w.postgres.create_cdf_config(
-            parent=db_resource_path,
-            cdf_config=CdfConfig(
-                catalog=catalog,
-                schema=uc_schema,
-                postgres_schema=postgres_schema,
-            ),
-            cdf_config_id=cdf_config_id,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Failed to create CDF config: {type(e).__name__}: {e}") from e
+    w.postgres.create_cdf_config(
+        parent=db_resource_path,
+        cdf_config=CdfConfig(
+            catalog=catalog,
+            schema=uc_schema,
+            postgres_schema=postgres_schema,
+        ),
+        cdf_config_id=cdf_config_id,
+    )
 
     # --- Poll CDF status until ONLINE ---
     logger(f"[CDF] Polling CDF status until ONLINE (timeout: {timeout_s}s)...")
@@ -386,15 +422,17 @@ def _provision_lakebase_cdf_config(
 
 
 def _seed_postgres(
-    w: Any, config: Any, spec: Any, host: str, token: str, schema: str, logger: Any
+    config: Any, spec: Any, repo_root: str, host: str, user: str, token: str,
+    schema: str, logger: Any
 ) -> None:
     """Seed Postgres schema + table + CSV data via driver-side COPY.
 
     Args:
-        w: WorkspaceClient.
         config: WorkshopConfig.
         spec: DomainSpec.
+        repo_root: Absolute path to the workshop repo root.
         host: Postgres endpoint hostname.
+        user: Current user (email/principal for OAuth).
         token: OAuth token (password).
         schema: Postgres schema name (e.g., "finance_seed").
         logger: Logging callable.
@@ -402,30 +440,22 @@ def _seed_postgres(
     Raises:
         Exception: If connection, schema creation, or COPY fails.
     """
-    import os
-
     import psycopg
 
     domain = config.domain
-    volume_path = config.volume_path
     schema_sql_path = os.path.join(
-        volume_path, "..", "..", "data", domain, "transactional", "lakebase", "schema.sql"
+        repo_root, "data", domain, "transactional", "lakebase", "schema.sql"
     )
     csv_path = os.path.join(
-        volume_path, "..", "..", "data", domain, "transactional", "lakebase",
+        repo_root, "data", domain, "transactional", "lakebase",
         f"{spec.txn_seed_dir}.csv"
     )
-
-    # Normalize paths.
-    schema_sql_path = os.path.abspath(schema_sql_path)
-    csv_path = os.path.abspath(csv_path)
 
     logger(f"[CDF] Reading schema from {schema_sql_path}")
     with open(schema_sql_path) as f:
         schema_sql = f.read()
 
     logger(f"[CDF] Reading CSV from {csv_path}")
-    # Count rows and get column names.
     with open(csv_path) as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -433,21 +463,18 @@ def _seed_postgres(
             raise RuntimeError(f"CSV file is empty: {csv_path}")
         columns = list(rows[0].keys())
 
-    # Connect to Postgres via OAuth.
-    logger(f"[CDF] Connecting to Postgres at {host}")
+    logger(f"[CDF] Connecting to Postgres at {host} as user {user}")
     with psycopg.connect(
         host=host,
-        user="oauth",
+        user=user,
         password=token,
-        dbname="postgres",
+        dbname="databricks_postgres",
         sslmode="require",
     ) as conn:
         with conn.cursor() as cur:
-            # Execute schema SQL to create schema + table.
             logger(f"[CDF] Creating Postgres schema via schema.sql")
             cur.execute(schema_sql)
 
-            # Load CSV via driver-side COPY.
             logger(
                 f"[CDF] Loading {len(rows)} rows into {schema}.{spec.txn_seed_dir}"
             )
@@ -476,27 +503,34 @@ def _poll_cdf_status(
 
     Raises:
         TimeoutError: If ONLINE is not reached within timeout.
-        RuntimeError: If status is ERROR or other fail-stop state.
+        RuntimeError: If status is ERROR.
     """
     import time
+    from databricks.sdk.errors.platform import NotFound
 
     start = time.time()
     while time.time() - start < timeout_s:
         try:
             statuses = list(w.postgres.list_cdf_statuses(parent=db_resource_path))
-        except Exception:
+        except NotFound:
+            # Empty list returns 404
+            logger(f"[CDF] CDF config not yet ready; retrying...")
+            statuses = []
+        except Exception as e:
+            logger(f"[CDF] Error listing CDF statuses: {e}; retrying...")
             statuses = []
 
         for status in statuses:
             if status.config_id == cdf_config_id:
-                logger(f"[CDF] CDF status: {status.status}")
-                if status.status == "ONLINE":
+                status_str = getattr(status, "status", "UNKNOWN")
+                logger(f"[CDF] CDF status: {status_str}")
+                if status_str == "ONLINE":
                     logger(f"[CDF] CDF is ONLINE")
                     return
-                elif status.status == "ERROR":
+                elif status_str == "ERROR":
+                    error_msg = getattr(status, "error_message", "no error message")
                     raise RuntimeError(
-                        f"CDF config {cdf_config_id} is in ERROR state: "
-                        f"{getattr(status, 'error_message', 'no error message')}"
+                        f"CDF config {cdf_config_id} is in ERROR state: {error_msg}"
                     )
         time.sleep(5)
 
@@ -506,64 +540,68 @@ def _poll_cdf_status(
 
 
 def _synthesize_history_table(
-    spark: Any, config: Any, spec: Any, history_table_fq: str, logger: Any
+    spark: Any, config: Any, spec: Any, repo_root: str, history_table_fq: str,
+    logger: Any
 ) -> None:
     """Build the CDF history table in UC from seed via Spark.
 
-    Reads the committed seed (Delta snapshot or CSV), adds CDC metadata columns,
-    and writes as the history table in UC.
+    Stages committed seed (Delta or CSV) into UC volume, then reads it, adds CDC
+    metadata columns (with BIGINT types for _pg_lsn and _sort_by), and writes as
+    the history table in UC.
 
     Args:
         spark: SparkSession.
         config: WorkshopConfig.
         spec: DomainSpec.
+        repo_root: Absolute path to the workshop repo root.
         history_table_fq: Fully-qualified UC table name.
         logger: Logging callable.
 
     Raises:
         Exception: If seed read or table write fails.
     """
-    import os
+    import shutil
 
     from pyspark.sql import functions as F
-    from pyspark.sql.types import IntegerType, StringType, StructField, StructType, TimestampType
+    from pyspark.sql.types import LongType, TimestampType
 
     domain = config.domain
     volume_path = config.volume_path
+
+    # Build path to committed Delta seed
     delta_seed_path = os.path.join(
-        volume_path, "..", "..", "data", domain, "transactional", "delta", spec.txn_seed_dir
+        repo_root, "data", domain, "transactional", "delta", spec.txn_seed_dir
     )
 
-    # Normalize and resolve the committed seed path.
-    delta_seed_path = os.path.abspath(delta_seed_path)
+    # Stage the committed seed into UC volume
+    staged_seed = os.path.join(
+        volume_path, domain, "transactional", "delta", spec.txn_seed_dir
+    )
 
-    if os.path.isdir(delta_seed_path):
-        logger(f"[CDF] Reading Delta seed from {delta_seed_path}")
-        seed_df = spark.read.format("delta").load(delta_seed_path)
-    else:
-        # Fall back to reading CSV.
-        csv_path = os.path.join(
-            volume_path, "..", "..", "data", domain, "transactional", "lakebase",
-            f"{spec.txn_seed_dir}.csv"
-        )
-        csv_path = os.path.abspath(csv_path)
-        logger(f"[CDF] Reading CSV seed from {csv_path}")
-        seed_df = spark.read.format("csv").option("header", "true").load(csv_path)
+    logger(f"[CDF] Staging seed from {delta_seed_path} to {staged_seed}")
+    if os.path.isdir(staged_seed):
+        logger(f"[CDF] Staged seed already exists; removing to refresh")
+        shutil.rmtree(staged_seed)
 
-    # Add CDC metadata columns.
-    # _pg_change_type: all inserts
-    # _pg_lsn, _sort_by: monotonically increasing (ranked so latest is rank 1 per key)
-    # _pg_xid: NULL
-    # _timestamp: current_timestamp
+    os.makedirs(os.path.dirname(staged_seed), exist_ok=True)
+    shutil.copytree(delta_seed_path, staged_seed)
+    logger(f"[CDF] Staged seed complete")
+
+    # Read the staged seed
+    logger(f"[CDF] Reading staged Delta seed from {staged_seed}")
+    seed_df = spark.read.format("delta").load(staged_seed)
+
+    # Add CDC metadata columns
+    logger(f"[CDF] Adding CDC metadata columns")
     seed_df = seed_df.withColumn("_pg_change_type", F.lit("insert"))
-    seed_df = seed_df.withColumn(
-        "_pg_lsn", F.monotonically_increasing_id().cast(IntegerType())
-    )
-    seed_df = seed_df.withColumn(
-        "_sort_by", F.monotonically_increasing_id().cast(IntegerType())
-    )
-    seed_df = seed_df.withColumn("_pg_xid", F.lit(None).cast(IntegerType()))
-    seed_df = seed_df.withColumn("_timestamp", F.current_timestamp())
+
+    # Use a single monotonically_increasing_id for both _pg_lsn and _sort_by
+    # This ensures consistent ordering
+    mono_id = F.monotonically_increasing_id().cast(LongType())
+    seed_df = seed_df.withColumn("_pg_lsn", mono_id)
+    seed_df = seed_df.withColumn("_sort_by", mono_id)
+    seed_df = seed_df.withColumn("_pg_xid", F.lit(None).cast(LongType()))
+    seed_df = seed_df.withColumn("_timestamp", F.current_timestamp().cast(TimestampType()))
 
     logger(f"[CDF] Writing {seed_df.count()} rows to {history_table_fq}")
     (

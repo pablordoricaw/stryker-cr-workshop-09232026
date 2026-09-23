@@ -97,6 +97,7 @@ else:
             config=config,
             spec=spec,
             spark=spark,
+            repo_root=_root,
             lakebase_project=lakebase_project,
             lakebase_database=lakebase_database,
             w=w,
