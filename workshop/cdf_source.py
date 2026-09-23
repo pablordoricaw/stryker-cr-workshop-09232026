@@ -188,14 +188,14 @@ def ensure_txn_cdf_source(
     provisioning_succeeded = False
     lakebase_project_used = None
     lakebase_db_resource_path = None
-    lakebase_project_created = False
     discovered_uc_table = None
 
-    if w is not None:
+    # Provisioning requires both SDK (w) and an explicitly supplied project
+    if w is not None and lakebase_project is not None:
         try:
-            logger(f"[CDF] Attempting Lakebase provisioning...")
+            logger(f"[CDF] Attempting Lakebase provisioning with project {lakebase_project}...")
             (lakebase_project_used, lakebase_db_resource_path,
-             discovered_uc_table, lakebase_project_created) = (
+             discovered_uc_table) = (
                 _provision_lakebase_cdf_config(
                     w=w,
                     config=config,
@@ -215,6 +215,10 @@ def ensure_txn_cdf_source(
                 f"[CDF] Lakebase provisioning failed: {type(e).__name__}: {e}. "
                 f"Will synthesize fallback."
             )
+    elif w is not None and lakebase_project is None:
+        logger(
+            f"[CDF] No Lakebase project supplied; skipping provisioning and falling back to synthesis."
+        )
 
     # --- Decide mode ---
     mode = _resolve_mode(
@@ -258,7 +262,6 @@ def ensure_txn_cdf_source(
             "mode": mode,
             "cdf_history_table": actual_history_table_fq,
             "lakebase_project": lakebase_project_used,
-            "lakebase_project_created": lakebase_project_created,
             "lakebase_database_resource_path": lakebase_db_resource_path,
             "domain": config.domain,
             "notes": (
@@ -282,7 +285,6 @@ def ensure_txn_cdf_source(
         cdf_history_table=actual_history_table_fq,
         lakebase_project=lakebase_project_used,
         lakebase_database_resource_path=lakebase_db_resource_path,
-        lakebase_project_created=lakebase_project_created,
         notes=(
             f"Mode: {mode}. History table: {actual_history_table}. "
             f"Lakebase project: {lakebase_project_used or 'none'}."
@@ -296,30 +298,32 @@ def _provision_lakebase_cdf_config(
     spec: Any,
     spark: Any,
     repo_root: str,
-    lakebase_project: Optional[str],
+    lakebase_project: str,
     lakebase_database: Optional[str],
     timeout_s: float,
     logger: Any,
-) -> tuple[str, str, str, bool]:
+) -> tuple[str, str, str]:
     """Provision Lakebase Postgres + seed + CDF config → UC, with readability verification.
 
+    Participants must create the Lakebase project beforehand; this function uses the
+    supplied project to discover branch/database, seed Postgres, and configure CDF.
+
     Performs the full three-step sequence:
-    1. Create/reuse Lakebase project and seed Postgres schema + table.
-    2. Configure CDF and poll until ONLINE.
-    3. Verify the UC history table is readable (post-provision verification).
+    1. Discover Lakebase project branch and database.
+    2. Seed Postgres schema + table and configure CDF.
+    3. Poll until CDF reaches STREAMING and verify the UC history table is readable.
 
     Only returns successfully if all steps complete AND the UC table is verified readable.
 
     Returns:
-        (project_id, database_resource_path, discovered_uc_table, created_new_project)
-        — the identities for later cleanup, the actual UC table created by CDF,
-        and a flag indicating whether THIS run created the project.
+        (project_id, database_resource_path, discovered_uc_table)
+        — the identities needed by the notebook and the actual UC table created by CDF.
 
     Raises:
-        Exception: If any step fails (CDF unsupported, SDK errors, timeout, table not
-            readable after ONLINE, etc). The caller handles the exception and falls
-            back to synthesis. If this run created a new project, it is cleaned up
-            before raising.
+        Exception: If any step fails (branch not found, database not found, CDF errors,
+            timeout, table not readable after STREAMING, etc). The caller handles the
+            exception and falls back to synthesis. The participant owns the project,
+            so this function never deletes it on failure.
 
     API Reference (per authoritative lakehouse-sync.md):
     - project: projects/<PROJECT_ID>
@@ -330,54 +334,17 @@ def _provision_lakebase_cdf_config(
     - parent for CDF is DATABASE resource path, not project or database name
     - list_cdf_statuses catches NotFound (404) when none exist
     """
-    from databricks.sdk.service.postgres import CdfConfig, Project, ProjectSpec, EndpointType
+    from databricks.sdk.service.postgres import CdfConfig, EndpointType
 
     domain = config.domain
     postgres_schema = f"{domain}_seed"
     catalog = config.catalog
     uc_schema = config.schema
-
-    # Track whether THIS run created the project (vs. BYO or reuse)
-    created_new_project = False
-    project_id = None
+    project_id = lakebase_project
 
     try:
-        # --- Create or reuse Lakebase project ---
-        if lakebase_project:
-            logger(f"[CDF] Reusing supplied Lakebase project: {lakebase_project}")
-            project_id = lakebase_project
-            created_new_project = False
-        else:
-            from workshop import namespace
-
-            me = spark.sql("SELECT current_user()").collect()[0][0]
-            ns = namespace(me, domain=domain)
-            project_id = ns.lakebase_project()
-            logger(f"[CDF] Creating or reusing derived Lakebase project: {project_id}")
-
-            # Create project (auto-creates production branch + primary endpoint).
-            # Reuse if already exists by catching the error.
-            try:
-                project_obj = Project(
-                    spec=ProjectSpec(
-                        display_name=f"Workshop {domain} Lakebase project",
-                        pg_version=17
-                    )
-                )
-                op = w.postgres.create_project(
-                    project=project_obj,
-                    project_id=project_id
-                )
-                # Wait for the LRO to complete
-                op.wait()
-                logger(f"[CDF] Created Lakebase project {project_id}")
-                created_new_project = True
-            except Exception as e:
-                if "already exists" in str(e).lower() or "conflict" in str(e).lower():
-                    logger(f"[CDF] Project {project_id} already exists (reusing)")
-                    created_new_project = False
-                else:
-                    raise
+        # --- Use the supplied Lakebase project ---
+        logger(f"[CDF] Using supplied Lakebase project: {project_id}")
 
         # --- Discover the production branch and database ---
         logger(f"[CDF] Discovering branch and database for project {project_id}...")
@@ -402,20 +369,32 @@ def _provision_lakebase_cdf_config(
 
         logger(f"[CDF] Using branch: {production_branch}")
 
-        # List databases in the production branch
-        databases = list(w.postgres.list_databases(parent=production_branch))
+        # --- Discover or use the supplied database ---
         db_resource_path = None
-        for db in databases:
-            # Match on postgres_database name
-            if hasattr(db, "status") and hasattr(db.status, "postgres_database"):
-                if db.status.postgres_database == "databricks_postgres":
-                    db_resource_path = db.name
-                    break
+        if lakebase_database:
+            # Participant supplied a database resource path; use it directly
+            logger(f"[CDF] Using supplied database: {lakebase_database}")
+            db_resource_path = lakebase_database
+        else:
+            # Discover the default databricks_postgres database
+            logger(f"[CDF] Discovering default database in {production_branch}...")
+            databases = list(w.postgres.list_databases(parent=production_branch))
+            for db in databases:
+                # Match on postgres_database name
+                if hasattr(db, "status") and hasattr(db.status, "postgres_database"):
+                    if db.status.postgres_database == "databricks_postgres":
+                        db_resource_path = db.name
+                        break
+                # Fallback: check spec
+                elif hasattr(db, "spec") and hasattr(db.spec, "postgres_database"):
+                    if db.spec.postgres_database == "databricks_postgres":
+                        db_resource_path = db.name
+                        break
 
-        if not db_resource_path:
-            raise RuntimeError(
-                f"Could not find databricks_postgres database in {production_branch}"
-            )
+            if not db_resource_path:
+                raise RuntimeError(
+                    f"Could not find databricks_postgres database in {production_branch}"
+                )
 
         logger(f"[CDF] Using database: {db_resource_path}")
 
@@ -512,21 +491,11 @@ def _provision_lakebase_cdf_config(
             logger=logger,
         )
 
-        return project_id, db_resource_path, discovered_uc_table, created_new_project
+        return project_id, db_resource_path, discovered_uc_table
 
     except Exception as e:
-        # If we created a new project and any step failed, attempt cleanup
-        if created_new_project and project_id:
-            logger(f"[CDF] Provisioning failed; attempting to clean up project {project_id}...")
-            try:
-                w.postgres.delete_project(name=f"projects/{project_id}")
-                logger(f"[CDF] Successfully deleted project {project_id}")
-            except Exception as del_err:
-                logger(
-                    f"[CDF] Warning: could not delete project {project_id}: {del_err}. "
-                    f"Manual cleanup may be needed."
-                )
-        # Re-raise the original exception
+        # Participant owns the project, so we never delete it on failure
+        # Re-raise the original exception for the caller to handle
         raise
 
 
