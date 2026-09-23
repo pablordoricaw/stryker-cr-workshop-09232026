@@ -1,113 +1,122 @@
 # notebooks/
 
-Participant-facing starter notebooks; one per workshop module; with `# TODO`
-cells, collapsible hints, and "build from scratch" stretch toggles. Each module
-ends with a `workshop.check("<checkpoint_id>")` validation cell.
+Participant-facing starter notebooks: one per workshop module, each with `# TODO` cells, collapsible hints, and "build from scratch" stretch toggles. Each module ends with a `workshop.check("<checkpoint_id>")` validation cell.
 
-Every graded **build** stage (`01_bronze_docs` … `07_app`) carries an identical
-**"🚀 From-scratch mode (optional stretch)"** markdown cell right after its config
-cell; the uniform, default-off convention for flipping a stage from guided to
-build-it-yourself. It is markdown only (no widget, no code), so it cannot change
-what the checkpoint asserts. `00_setup` is excluded (it provisions rather than
-teaches a build). The convention is documented once in
-[`../docs/stretch/README.md`](../docs/stretch/README.md).
+## Overview
 
-The optional **Tier-3 stretch** starters live in [`stretch/`](stretch/):
-`package_as_dab.py` (package your built infra/app as a set of independently-
-deployable DABs) and `add_your_own.py` (add your own Metric View + Genie
-benchmark questions, validated through the existing checkpoint knobs). Both are
-additive and ungraded; their gated solutions are under
-`solutions/finance/stretch/`.
+Every graded **build** stage (`01_bronze_docs` through `07_app`) includes an identical **"🚀 From-scratch mode (optional stretch)"** markdown cell right after its config cell. This uniform, default-off convention lets you flip any stage from guided (with `# TODO`s and hints) to build-it-yourself mode. The cell is markdown only (no widget, no code), so it does not change what the checkpoint asserts. `00_setup` is excluded because it provisions rather than teaches a build. The convention is documented in [`../docs/stretch/README.md`](../docs/stretch/README.md).
 
-The curriculum is **one shared spine** across all three domains (Finance,
-Security, ITSM); only the dataset and pre-authored semantic content differ, so
-notebooks are domain-agnostic and read your selected domain from the setup
-notebook's config.
+The curriculum is **one shared spine** across all three domains (Finance, Security, ITSM); only the dataset and pre-authored semantic content differ. Notebooks are domain-agnostic and read your selected domain from the setup notebook's config.
 
-`00_setup.py` (added by #3) is the participant setup notebook: it creates a
-schema and UC Volume inside your team's **existing catalog**, runs seed hooks,
-and ends on the `00_setup` checkpoint. Start there. After the domain is chosen it
-also **installs the Genie Code hint ladder** (#27): it reads
-[`../docs/genie/.assistant_instructions.md`](../docs/genie/.assistant_instructions.md),
-fills in your repo root and domain, and injects the result; wrapped in
-`STRYKER-WORKSHOP` sentinels; into your personal `~/.assistant_instructions.md`,
-which Genie Code auto-loads each session. The splice preserves any personal
-instructions of your own and is idempotent on re-run. The injection/merge/strip
-logic is the pure-Python `workshop.genie_instructions` module (unit-tested in
-[`../tests/test_genie_instructions.py`](../tests/test_genie_instructions.py)).
+## Setup
 
-`01_bronze_docs.py` (added by #5) is the first medallion step: copy the committed
-source PDFs into your UC Volume and register a bronze documents table over the
-raw files. It ends on the `01_bronze_docs` checkpoint.
+### `00_setup.py`
 
-`01_bronze_txn.py` (added by #7) is the Finance transactional-ingestion starter.
-It offers a primary Lakebase CDF path (clearly marked as an admin-enabled
-Beta/Preview) and a no-admin Delta fallback; both land
-`bronze_sales_transactions` and finish at checkpoint `01_bronze_txn`.
+The participant setup notebook that starts every workshop:
 
-`02_silver_docs.py` (added by #6) is the document-intelligence silver step. Using
-Databricks AI Functions, it parses each bronze document (`ai_parse_document`),
-classifies it into one of your domain's classes (`ai_classify`) in a consolidated
-`silver_docs` table, and extracts class-specific fields (`ai_extract`) into one
-`silver_<class>` table per class. It ends on the `02_silver_docs` checkpoint.
-`ai_parse_document` needs DBR 17.3+ / serverless env v3+ and a region that
-supports AI Functions (not SQL Warehouse Classic); see the notebook callout.
+- Creates a schema and UC Volume inside your team's **existing catalog** (no catalog-creation privilege needed).
+- Runs seed hooks.
+- Ends on the `00_setup` checkpoint.
 
-`03_gold.py` (added by #8) is the Finance gold medallion step. It joins the
-transaction fact to extracted commercial-agreement documents on the conformed
-`contract_id = agreement_id` key, producing transaction-grain `gold_sales` and
-contract-grain `gold_contract_performance`. It ends on `03_gold`, which derives
-the expected grains, identities, enrichment coverage, and aggregate measures
-from the upstream tables rather than hardcoding seed counts.
+After your domain is chosen, it also **installs the Genie Code hint ladder**:
 
-`04_metadata.py` (added by #9) governs the gold tables with
-[dbxmetagen](https://github.com/databricks-industry-solutions/dbxmetagen)
-(notebook-only install, pinned to `v0.10.68`). It runs the `comment`, `pi`, and
-`domain` modes with `apply_ddl=false` to stage metadata for review, then re-runs
-with `apply_ddl=true` to apply table/column comments, a PI classification tag on
-sensitive columns, and a business-domain tag on each table. dbxmetagen's model
-endpoint defaults to `databricks-claude-sonnet-4-6`; the notebook has you confirm
-that endpoint exists in **Serving → Foundation Models** or pick another (the only
-endpoint you select; the `02_silver_docs` AI Functions use the built-in system
-model). It ends on the `04_metadata` checkpoint, which reads only
-`information_schema` comments and tags and derives the expected columns from the
-live tables rather than hardcoding column names.
+- Reads [`../docs/genie/.assistant_instructions.md`](../docs/genie/.assistant_instructions.md), fills in your repo root and domain.
+- Injects the result (wrapped in `STRYKER-WORKSHOP` sentinels) into your personal `~/.assistant_instructions.md`, which Genie Code auto-loads each session.
+- Preserves any personal instructions of your own and is idempotent on re-run.
+- The injection/merge/strip logic is the pure-Python `workshop.genie_instructions` module (unit-tested in [`../tests/test_genie_instructions.py`](../tests/test_genie_instructions.py)).
 
-`05_metric_views.py` (added by #10) creates two governed Unity Catalog Metric
-Views in the same resolved participant schema: Finance sales revenue/margin
-metrics over `gold_sales`, and contract-performance metrics over
-`gold_contract_performance`. It includes a documented "add your own metric"
-stretch and ends at `05_metrics`, which validates the deployed metric-model
-definitions and their non-null aggregate query results.
+## Core Pipeline
 
-`06_genie.py` (added by #11) builds a curated **Genie agent**: a natural-language
-interface; over the gold tables and Metric Views. It attaches all four Finance
-data assets (`gold_sales`, `gold_contract_performance`, `finance_sales_metrics`,
-`finance_contract_metrics`), gives the agent a **per-participant, identity-derived
-name** so teammates sharing the workspace do not collide, and adds pre-authored
-sample questions. It ends on `06_genie`, which finds the caller's own agent by name,
-confirms the expected sources are attached (binding to the caller's own
-workspace namespace so a teammate's same-titled agent is never adopted), and
-asks benchmark questions; requiring each to return SQL that genuinely queries
-the curated data (a source name in a string, comment, alias, or CTE name does
-not count). The agent must actually answer, so if the Conversation API is gated
-the checkpoint stays RED (enable Partner-powered AI) rather than passing.
+### `01_bronze_docs.py`
 
-`07_app.py` (added by #12) ships the **provided Streamlit data app** (`app/`) wired
-to a **Lakebase synced table** created from the `gold_contract_performance` gold
-table (#8) and the participant's **Genie agent** (#11). It has the participant
-create a per-participant Lakebase project + synced table, deploy and explicitly
-**start** the app (deploying can leave it stopped), and fill the app's **two
-gaps** (the Genie Conversation API call and the Lakebase read) in
-`app/backend.py`. It ends on `07_app`, which asserts observable platform state
-only: the caller's own synced table exists, syncs from the expected gold table on
-the expected key, is online and serving rows, and the caller's own app is
-deployed and running. On Free Edition, one denormalized serving table is synced.
-The app name, Lakebase project, and synced table are all namespaced per
-participant.
+The first medallion step:
 
-`99_teardown.py` (added by #27) is the optional end-of-workshop cleanup: it
-strips the `STRYKER-WORKSHOP` block `00_setup` injected from your personal
-`~/.assistant_instructions.md`, leaving any instructions of your own untouched.
-It's a safe no-op if there's no block. It does not touch your catalog data; drop
-the workshop schema separately if you want to reclaim that.
+- Copy the committed source PDFs from `data/<domain>/` into your UC Volume.
+- Register a **bronze documents table** over the raw files.
+- Ends on the `01_bronze_docs` checkpoint.
+
+### `01_bronze_txn.py`
+
+The transactional-ingestion starter for your domain:
+
+- Offers a primary **Lakebase CDF path** (admin-enabled, marked Beta/Preview) and a no-admin **Delta fallback**.
+- Both paths land your domain's transactional table (e.g., `bronze_sales_transactions` for Finance).
+- Finishes at checkpoint `01_bronze_txn`.
+
+### `02_silver_docs.py`
+
+The document-intelligence silver step:
+
+- Uses **Databricks AI Functions** to parse each bronze document (`ai_parse_document`).
+- Classifies each document into one of your domain's classes (`ai_classify`) into a consolidated `silver_docs` table.
+- Extracts class-specific fields (`ai_extract`) into one `silver_<class>` table per class.
+- Ends on the `02_silver_docs` checkpoint.
+
+**Requirement:** `ai_parse_document` requires DBR 17.3+, serverless environment v3+, and a region that supports AI Functions (not SQL Warehouse Classic). See the notebook callout for details.
+
+### `03_gold.py`
+
+The gold medallion step for your domain:
+
+- Joins the transactional fact to extracted domain-specific documents on the domain-appropriate key.
+- Produces transaction-grain and reconciled mart tables (e.g., `gold_sales` and `gold_contract_performance` for Finance).
+- Ends on the `03_gold` checkpoint, which derives expected grains, identities, enrichment coverage, and aggregate measures from the upstream tables (no hardcoded seed counts).
+
+### `04_metadata.py`
+
+Governance metadata with [dbxmetagen](https://github.com/databricks-industry-solutions/dbxmetagen):
+
+- Pinned to `v0.10.68` (notebook-only install).
+- Runs `comment`, `pi`, and `domain` modes with `apply_ddl=false` to stage metadata for review.
+- Re-runs with `apply_ddl=true` to apply table/column comments, PI classification tags on sensitive columns, and business-domain tags on each table.
+- Uses a model endpoint (defaults to `databricks-claude-sonnet-4-6`; notebook prompts you to confirm it exists in **Serving → Foundation Models** or pick another).
+- The `02_silver_docs` AI Functions use the built-in system model (you select only the endpoint for this step).
+- Ends on the `04_metadata` checkpoint, which reads `information_schema` comments and tags and derives expected columns from live tables.
+
+### `05_metric_views.py`
+
+Creates two governed UC Metric Views in your resolved participant schema:
+
+- **Sales and contract metrics** over the gold tables (e.g., `gold_sales` revenue/margin and `gold_contract_performance` metrics for Finance).
+- Includes a documented "add your own metric" stretch.
+- Ends at the `05_metrics` checkpoint, which validates deployed metric-model definitions and non-null aggregate query results.
+
+### `06_genie.py`
+
+Builds a curated **Genie agent** as a natural-language interface:
+
+- Attaches your gold tables and Metric Views (all four Finance data assets, for example: `gold_sales`, `gold_contract_performance`, `finance_sales_metrics`, `finance_contract_metrics`).
+- Gives the agent a **per-participant, identity-derived name** so teammates in the same workspace do not collide.
+- Adds pre-authored sample questions.
+- Ends on `06_genie`. The checkpoint finds your own agent by name, confirms the expected sources are attached (binding to your own workspace namespace), and asks benchmark questions. Each must return SQL that genuinely queries the curated data (mentioning a source name in a string, comment, alias, or CTE name does not count).
+- If the Genie Conversation API is gated, the checkpoint stays RED (enable Partner-powered AI in workspace settings).
+
+### `07_app.py`
+
+Ships the **provided Streamlit data app** (`app/`) wired to your built pipeline:
+
+- Create a per-participant **Lakebase synced table** from your gold domain table (e.g., `gold_contract_performance`).
+- Deploy and explicitly **start** the app (deploying can leave it stopped).
+- Fill the app's **two gaps** in `app/backend.py`: the Genie Conversation API call and the Lakebase read.
+- Ends on `07_app`. The checkpoint asserts observable platform state only: your own synced table exists, syncs from the expected gold table on the expected key, is online and serving rows, and your app is deployed and running.
+- On Databricks Free Edition, one denormalized serving table is synced.
+- The app name, Lakebase project, and synced table are all namespaced per participant.
+
+## Optional Stretch Modules
+
+The **Tier-3 stretch** starters live in [`stretch/`](stretch/):
+
+- **`package_as_dab.py`**: Package your built infrastructure and app as a set of independently-deployable Databricks Asset Bundles.
+- **`add_your_own.py`**: Add your own Metric View and Genie benchmark questions, validated through the existing checkpoint knobs.
+
+Both are additive and ungraded. Their gated solutions are under `solutions/<domain>/stretch/`.
+
+## Cleanup
+
+### `99_teardown.py`
+
+Optional end-of-workshop cleanup:
+
+- Strips the `STRYKER-WORKSHOP` block that `00_setup` injected from your personal `~/.assistant_instructions.md`, leaving any instructions of your own untouched.
+- Safe no-op if there's no block.
+- Does **not** touch your catalog data; drop the workshop schema separately if you want to reclaim that.
