@@ -72,7 +72,76 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Clean up Lakebase resources (if created by provisioning)
+# MAGIC
+# MAGIC If `01_bronze_txn` created a Lakebase project or CDF config, this cell
+# MAGIC attempts to delete them. If you supplied your own project/database (bring-your-own),
+# MAGIC nothing is deleted. This is guarded: only resources that match the known
+# MAGIC naming scheme and domain are cleaned up.
+
+# COMMAND ----------
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+
+w = WorkspaceClient()
+
+# Resolve config to know what domain/catalog/schema we're working with.
+catalog = dbutils.widgets.get("catalog") if "catalog" in dir(dbutils.widgets) else ""
+domain = dbutils.widgets.get("domain") if "domain" in dir(dbutils.widgets) else "finance"
+schema = dbutils.widgets.get("schema") if "schema" in dir(dbutils.widgets) else ""
+volume = dbutils.widgets.get("volume") if "volume" in dir(dbutils.widgets) else "landing"
+
+if catalog:
+    try:
+        config = workshop.resolve_config(
+            catalog=catalog,
+            domain=domain,
+            schema=schema or None,
+            volume=volume,
+            identity=me,
+        )
+
+        metadata_path = os.path.join(
+            config.volume_path,
+            ".stryker_workshop_cdf_metadata.json"
+        )
+
+        import json
+        try:
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+
+            # Check if this was a provisioned (not BYO) resource.
+            if metadata.get("mode") == "provisioned":
+                lakebase_project = metadata.get("lakebase_project")
+                if lakebase_project:
+                    try:
+                        print(f"[99_teardown] Attempting to delete Lakebase project: {lakebase_project}")
+                        # Attempt to delete; SDK support varies.
+                        try:
+                            w.postgres.delete_project(name=lakebase_project)
+                            print(f"[99_teardown] Deleted Lakebase project {lakebase_project}")
+                        except (AttributeError, NotFound, Exception) as del_err:
+                            print(f"[99_teardown] Could not delete project via SDK: {del_err}; manual cleanup may be needed.")
+                    except Exception as e:
+                        print(f"[99_teardown] Error during Lakebase cleanup: {e}")
+            else:
+                print(f"[99_teardown] CDF source mode is {metadata.get('mode', 'unknown')}; skipping Lakebase cleanup.")
+        except FileNotFoundError:
+            print(f"[99_teardown] No provisioning metadata found; nothing to clean up.")
+        except Exception as e:
+            print(f"[99_teardown] Could not read/process provisioning metadata: {e}")
+    except Exception as e:
+        print(f"[99_teardown] Could not resolve config for cleanup: {e}")
+else:
+    print(f"[99_teardown] No catalog configured; skipping Lakebase cleanup.")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## ✅ Teardown complete
 # MAGIC
 # MAGIC Your personal instructions no longer carry the workshop hint block. Any
-# MAGIC instructions of your own are exactly as you left them.
+# MAGIC instructions of your own are exactly as you left them. Lakebase resources
+# MAGIC created by provisioning (if any) have been removed (or noted for manual cleanup).
