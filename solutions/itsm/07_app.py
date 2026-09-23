@@ -34,6 +34,7 @@ dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("genie_space_id", "", "Genie space id (from 06_genie)")
+dbutils.widgets.text("lakebase_project", "", "Lakebase project — reuse the one from 01_bronze_txn (required)")
 
 # COMMAND ----------
 
@@ -62,12 +63,24 @@ ns = workshop.namespace(me, domain=config.domain)
 
 # COMMAND ----------
 
-# Every per-participant name comes from your namespace, so the checkpoint (below,
-# via namespace=ns) resolves the SAME app, project, and synced-table names. App
-# names allow [a-z0-9-] (<=30); Lakebase project ids are RFC 1123 (<=63); the
-# digest is always kept, so uniqueness survives the length limits.
+# The app and synced-table names come from your namespace, so the checkpoint
+# (below, via namespace=ns) resolves the SAME names. App names allow [a-z0-9-]
+# (<=30); the digest is always kept, so uniqueness survives the length limit. The
+# Lakebase project is bring-your-own (below), not namespace-derived.
 app_name = ns.app_name()
-project_id = ns.lakebase_project()
+
+# Bring-your-own Lakebase project: reuse the SAME project you created for
+# 01_bronze_txn (supplied via the widget). 07_app does NOT create a project — its
+# synced serving table lands there as a DISTINCT table, alongside (not colliding
+# with) 01_bronze_txn's CDF history table (different table, different Postgres schema).
+project_id = dbutils.widgets.get("lakebase_project") or None
+if not project_id:
+    raise RuntimeError(
+        "Set the 'lakebase_project' widget to the Lakebase project you created in "
+        "01_bronze_txn (Compute -> Lakebase). 07_app reuses that project; it does not "
+        "create one. If you used 01_bronze_txn's synthesized path and have no project, "
+        "create one first (Compute -> Lakebase, or 'databricks postgres create-project')."
+    )
 branch = f"projects/{project_id}/branches/production"
 gold_serving = f"{config.catalog}.{config.schema}.gold_service_performance"
 
@@ -89,20 +102,23 @@ print(f"gold_serving   : {gold_serving}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create the Lakebase project and synced table (CLI)
+# MAGIC ## 2. Add your synced serving table to your 01_bronze_txn Lakebase project (CLI)
 # MAGIC
-# MAGIC Run these in a terminal with your `--profile`. The project auto-creates a
-# MAGIC `production` branch + `primary` endpoint (scale-to-zero). Then create the
-# MAGIC synced table straight into your **existing** catalog/schema — there is **no
-# MAGIC catalog to create or register** (`create-catalog` is not used). Snapshot
-# MAGIC mode is simplest on Free Edition; Triggered/Continuous need Change Data Feed
-# MAGIC on the gold table.
+# MAGIC Run this in a terminal with your `--profile`. **Reuse the Lakebase project you
+# MAGIC created for `01_bronze_txn`** — 07_app does not create one. Create the synced
+# MAGIC table straight into your **existing** catalog/schema — there is **no catalog to
+# MAGIC create or register** (`create-catalog` is not used). It lands as a **distinct
+# MAGIC table** in that same project, alongside 01_bronze_txn's CDF history table (they
+# MAGIC don't collide — different table, and a different Postgres schema). Snapshot mode
+# MAGIC is simplest on Free Edition; Triggered/Continuous need Change Data Feed on the
+# MAGIC gold table.
 
 # COMMAND ----------
 
-print(f"""# 2a. Create the per-participant Lakebase project (waits until ready)
-databricks postgres create-project {project_id} \\
-  --json '{{"spec": {{"display_name": "Stryker workshop — {me}"}}}}' --profile <p>
+print(f"""# 2a. Reuse your 01_bronze_txn Lakebase project '{project_id}' — no create step.
+#     Only if you have NO project yet (you used 01_bronze_txn's synthesized path):
+#       databricks postgres create-project {project_id} \\
+#         --json '{{"spec": {{"display_name": "Stryker workshop — {me}"}}}}' --profile <p>
 
 # 2b. Create the synced table from the gold serving table (Snapshot mode). The id
 #     is a UC name in YOUR existing catalog/schema — there is NO create-catalog.
