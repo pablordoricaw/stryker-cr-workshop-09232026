@@ -130,6 +130,13 @@ print(f"  PI tag key    : {pi_classification_tag_name}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC > ⏳ **Heads up — this is slow.**
+# MAGIC >
+# MAGIC > Each mode re-invokes the foundation-model endpoint once per target table. A single staging or apply pass takes several minutes (longer on cold/scale-to-zero endpoints). This is expected — let it run.
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 2. Stage metadata for review (`apply_ddl=false`)
 # MAGIC
 # MAGIC One dbxmetagen run per mode. With `apply_ddl=false` the generated metadata
