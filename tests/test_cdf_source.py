@@ -10,7 +10,7 @@ the grace timeout, provisioning fails (raises) and mode resolves to "synthesized
 
 from __future__ import annotations
 
-from workshop.cdf_source import _resolve_mode, shape_seed_to_cdc
+from workshop.cdf_source import _as_fq_table, _resolve_mode, shape_seed_to_cdc
 
 
 def test_resolve_mode_preexisting():
@@ -122,3 +122,24 @@ def test_shape_seed_to_cdc_empty():
     """Shaping an empty seed produces an empty result."""
     shaped = shape_seed_to_cdc([], include_cols=["transaction_id"])
     assert shaped == []
+
+
+def test_as_fq_table_bare_name():
+    """Bare table name gets qualified with catalog, schema, and backticks."""
+    result = _as_fq_table("my_table", "my_catalog", "my_schema")
+    assert result == "my_catalog.my_schema.`my_table`"
+
+
+def test_as_fq_table_already_qualified():
+    """Already-qualified table name is returned unchanged."""
+    result = _as_fq_table("cat.sch.table", "other_catalog", "other_schema")
+    # Should return the input as-is, ignoring the catalog/schema params
+    assert result == "cat.sch.table"
+
+
+def test_as_fq_table_cdf_discovered_format():
+    """CdfStatus.uc_table (already fully-qualified) is returned unchanged."""
+    # Simulate what CDF discovery returns
+    discovered = "stryker_workshop.default.lb_scan_findings_history"
+    result = _as_fq_table(discovered, "my_catalog", "my_schema")
+    assert result == "stryker_workshop.default.lb_scan_findings_history"

@@ -90,6 +90,30 @@ def shape_seed_to_cdc(
     return [_cdc_row_shape(row, include_cols=include_cols) for row in seed_rows]
 
 
+def _as_fq_table(name: str, catalog: str, schema: str) -> str:
+    """Convert a table name to fully-qualified form, handling already-qualified names.
+
+    If the name already contains a dot (e.g., 'catalog.schema.table'), return it unchanged.
+    Otherwise, qualify it as catalog.schema.`name`.
+
+    This helper ensures that CdfStatus.uc_table (which is already fully-qualified) is used
+    verbatim, while spec-provided table names (which are bare) are properly qualified.
+
+    Args:
+        name: Table name, either bare ('table_name') or already qualified ('cat.sch.table').
+        catalog: Catalog name (for qualification if needed).
+        schema: Schema name (for qualification if needed).
+
+    Returns:
+        Fully-qualified table name ready for Spark SQL (with backticks if needed).
+    """
+    if "." in name:
+        # Already qualified; return unchanged
+        return name
+    # Bare name; qualify it
+    return f"{catalog}.{schema}.`{name}`"
+
+
 def _history_table_readable(spark: Any, history_table_fq: str) -> bool:
     """Check if a history table is readable in UC.
 
@@ -252,7 +276,12 @@ def ensure_txn_cdf_source(
             ) from e
 
     # --- Build fully-qualified table name with actual table name ---
-    actual_history_table_fq = f"{catalog}.{schema}.`{actual_history_table}`"
+    # If mode is "provisioned", actual_history_table is already fully-qualified from CDF discovery
+    if mode == "provisioned":
+        actual_history_table_fq = _as_fq_table(actual_history_table, catalog, schema)
+    else:
+        # For preexisting and synthesized, use the spec name (bare)
+        actual_history_table_fq = f"{catalog}.{schema}.`{actual_history_table}`"
 
     # --- Save metadata for teardown to find ---
     try:
@@ -449,28 +478,59 @@ def _provision_lakebase_cdf_config(
             logger=logger,
         )
 
-        # --- Create CDF config ---
+        # --- Create or reuse CDF config (idempotent) ---
         logger(
-            f"[CDF] Creating CDF config: {postgres_schema} → "
+            f"[CDF] Creating or reusing CDF config: {postgres_schema} → "
             f"{catalog}.{uc_schema}..."
         )
         cdf_config_id = f"{domain}_cdf"
-        w.postgres.create_cdf_config(
-            parent=db_resource_path,
-            cdf_config=CdfConfig(
-                catalog=catalog,
-                schema=uc_schema,
-                postgres_schema=postgres_schema,
-            ),
-            cdf_config_id=cdf_config_id,
-        )
+
+        # Check if config already exists to make this idempotent
+        existing_configs = [
+            c for c in w.postgres.list_cdf_configs(parent=db_resource_path)
+            if getattr(c, "cdf_config_id", None) == cdf_config_id
+        ]
+
+        if existing_configs:
+            # Reuse existing config
+            cfg_name = existing_configs[0].name
+            logger(f"[CDF] CDF config already exists: {cfg_name}")
+        else:
+            # Create new config
+            logger(f"[CDF] Creating new CDF config with ID {cdf_config_id}...")
+            cfg_result = w.postgres.create_cdf_config(
+                parent=db_resource_path,
+                cdf_config=CdfConfig(
+                    catalog=catalog,
+                    schema=uc_schema,
+                    postgres_schema=postgres_schema,
+                ),
+                cdf_config_id=cdf_config_id,
+            )
+            # Try to get the resource name from the LRO result
+            try:
+                cfg_name = cfg_result.wait().name
+                logger(f"[CDF] CDF config created: {cfg_name}")
+            except Exception:
+                # Fallback: re-list to find the just-created config
+                logger(f"[CDF] Fallback: re-listing to find created config...")
+                configs = [
+                    c for c in w.postgres.list_cdf_configs(parent=db_resource_path)
+                    if getattr(c, "cdf_config_id", None) == cdf_config_id
+                ]
+                if configs:
+                    cfg_name = configs[0].name
+                    logger(f"[CDF] Found created config: {cfg_name}")
+                else:
+                    raise RuntimeError(
+                        f"Failed to create or find CDF config {cdf_config_id}"
+                    )
 
         # --- Poll CDF status until STREAMING and discover actual UC table ---
         logger(f"[CDF] Polling CDF status until STREAMING (timeout: {timeout_s}s)...")
         discovered_uc_table = _poll_cdf_status(
             w=w,
-            db_resource_path=db_resource_path,
-            cdf_config_id=cdf_config_id,
+            cfg_resource_name=cfg_name,
             postgres_table_seed=spec.txn_seed_dir,
             timeout_s=timeout_s,
             logger=logger,
@@ -482,7 +542,8 @@ def _provision_lakebase_cdf_config(
             # Fallback to spec-assumed name if discovery didn't return a table
             discovered_uc_table = spec.lakebase_cdf_table
 
-        history_table_fq = f"{catalog}.{uc_schema}.`{discovered_uc_table}`"
+        # discovered_uc_table may be already fully-qualified; use helper to avoid double-qualification
+        history_table_fq = _as_fq_table(discovered_uc_table, catalog, uc_schema)
         logger(f"[CDF] Verifying UC history table is readable: {history_table_fq}...")
         _verify_history_table_readable(
             spark=spark,
@@ -568,21 +629,21 @@ def _seed_postgres(
 
 
 def _poll_cdf_status(
-    w: Any, db_resource_path: str, cdf_config_id: str, postgres_table_seed: str,
+    w: Any, cfg_resource_name: str, postgres_table_seed: str,
     timeout_s: float, logger: Any
 ) -> Optional[str]:
     """Poll CDF status until STREAMING and return discovered UC table name.
 
     Args:
         w: WorkspaceClient.
-        db_resource_path: Database resource path.
-        cdf_config_id: CDF config ID.
+        cfg_resource_name: CDF config resource name (the parent for list_cdf_statuses).
         postgres_table_seed: The postgres table seed name to match (for discovery).
         timeout_s: Timeout in seconds.
         logger: Logging callable.
 
     Returns:
         The discovered UC table name (from status.uc_table) when CDF reaches STREAMING.
+        Note: uc_table is already fully-qualified (e.g., 'catalog.schema.table').
 
     Raises:
         TimeoutError: If STREAMING is not reached within timeout.
@@ -595,7 +656,7 @@ def _poll_cdf_status(
     start = time.time()
     while time.time() - start < timeout_s:
         try:
-            statuses = list(w.postgres.list_cdf_statuses(parent=db_resource_path))
+            statuses = list(w.postgres.list_cdf_statuses(parent=cfg_resource_name))
         except NotFound:
             # Empty list returns 404
             logger(f"[CDF] CDF config not yet ready; retrying...")
@@ -629,7 +690,7 @@ def _poll_cdf_status(
             )
 
             if state == CdfState.CDF_STATE_STREAMING:
-                logger(f"[CDF] CDF is STREAMING")
+                logger(f"[CDF] CDF is STREAMING; returning discovered uc_table: {uc_table}")
                 return uc_table
             elif state == CdfState.CDF_STATE_TERMINATED:
                 raise RuntimeError(
@@ -640,7 +701,7 @@ def _poll_cdf_status(
         time.sleep(5)
 
     raise TimeoutError(
-        f"CDF config {cdf_config_id} did not reach STREAMING within {timeout_s}s"
+        f"CDF config {cfg_resource_name} did not reach STREAMING within {timeout_s}s"
     )
 
 
