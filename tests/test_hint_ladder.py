@@ -233,11 +233,11 @@ def test_release_recipe_is_consistent_across_docs() -> None:
     # Both recipes must contain the strip's critical ops...
     for cmds in (agents, contributing):
         assert "git merge --no-ff --no-commit dev" in cmds
-        assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators" in cmds
+        assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents docs/facilitators generators" in cmds
         assert 'git commit -m "chore(release): promote dev to main"' in cmds
         # ...ordered so the maintainer files are stripped before the commit.
         assert cmds.index(
-            "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators"
+            "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents docs/facilitators generators"
         ) < cmds.index('git commit -m "chore(release): promote dev to main"')
         # ...and there is NO hint-ladder swap: Genie Code does not auto-discover a
         # repo AGENTS.md, so promotion must not move any file to root AGENTS.md.
@@ -266,7 +266,7 @@ def test_release_recipe_executes_and_strips(tmp_path) -> None:
     commands = _promotion_recipe_commands(_read(MAINTAINER_AGENTS))
     # Guard: extraction must have actually found the recipe (not silently empty),
     # and it must NOT reintroduce a swap of the participant file to root.
-    assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators" in commands
+    assert "git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents docs/facilitators generators" in commands
     assert not any(
         line.startswith("git mv ") and line.rstrip().endswith(" AGENTS.md")
         for line in commands

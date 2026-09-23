@@ -48,6 +48,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 # Your identity gives you a unique schema in the shared team catalog
 # (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
@@ -98,19 +100,19 @@ docs_path = f"{config.volume_path}/documents"                    # destination o
 # TODO: copy the source PDFs from `source_dir` into `docs_path`, recursively.
 # Then list `docs_path` to confirm the per-class folders arrived.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — copying files into a UC Volume
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — copying files into a UC Volume</summary>
-# MAGIC
 # MAGIC `dbutils.fs.cp(<from>, <to>, recurse=True)` copies a whole directory tree.
 # MAGIC The source is a local repo path, so it needs the `file:` scheme (already in
 # MAGIC `source_dir`); the destination is your `/Volumes/...` path (`docs_path`).
 # MAGIC List the result with `dbutils.fs.ls(docs_path)`. Re-running is safe — it
 # MAGIC overwrites the same files.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -141,13 +143,14 @@ bronze_table = workshop.fully_qualified(config.catalog, config.schema, "bronze_d
 # (recursively, PDFs only), select the columns in the table above, and write the
 # result to `bronze_table` as a Delta table with one row per file.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — reading files and deriving the columns
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — reading files and deriving the columns</summary>
-# MAGIC
 # MAGIC Read with
 # MAGIC `spark.read.format("binaryFile").option("recursiveFileLookup", "true").option("pathGlobFilter", "*.pdf").load(docs_path)`.
 # MAGIC That gives you `path`, `length`, `modificationTime`, and `content`.
@@ -161,7 +164,6 @@ bronze_table = workshop.fully_qualified(config.catalog, config.schema, "bronze_d
 # MAGIC Write it with
 # MAGIC `.write.mode("overwrite").saveAsTable(bronze_table)` so re-running replaces
 # MAGIC the table cleanly.
-# MAGIC </details>
 
 # COMMAND ----------
 

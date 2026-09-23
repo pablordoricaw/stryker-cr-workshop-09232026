@@ -95,6 +95,8 @@ dbutils.widgets.text("model_endpoint", "databricks-claude-sonnet-4-6", "FM endpo
 dbutils.widgets.text("domain_tag_name", "domain", "Domain tag key")
 dbutils.widgets.text("pi_classification_tag_name", "data_classification", "PI tag key")
 
+# COMMAND ----------
+
 # Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
 # created in the shared team catalog. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]

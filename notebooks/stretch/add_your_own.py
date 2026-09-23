@@ -44,6 +44,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -71,8 +73,8 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC %md
 # MAGIC ## 2. Add your own Metric View
 # MAGIC
-# MAGIC Author a third governed Metric View in your schema for a question Finance
-# MAGIC asks often — e.g. discounting by product family and sales channel. Keep the
+# MAGIC Author a third governed Metric View in your schema for a question your
+# MAGIC domain asks often — e.g. discounting by product family and sales channel. Keep the
 # MAGIC YAML `source:` pointed at a gold table, define atomic measures first, then
 # MAGIC compose a ratio with `MEASURE()`. Confirmed `gold_sales` columns you can use:
 # MAGIC `product_family`, `sales_region`, `customer_type`, `sales_channel`,
@@ -84,13 +86,14 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # TODO: source: "<gold_sales>"; pick dimensions with useful cardinality and
 # TODO: define atomic measures (SUM(...)) plus one composed MEASURE()-ratio.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — a discount Metric View skeleton
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — a discount Metric View skeleton</summary>
-# MAGIC
 # MAGIC ```sql
 # MAGIC CREATE OR REPLACE VIEW <my_metrics>
 # MAGIC WITH METRICS LANGUAGE YAML AS $$
@@ -112,7 +115,6 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC ```
 # MAGIC
 # MAGIC The complete solution is in `solutions/finance/stretch/add_your_own.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -159,17 +161,17 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # TODO:         "Which product family gives the deepest discounts?"])
 # TODO: print(result); assert result.passed, result.message
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — why the superset check is safe
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — why the superset check is safe</summary>
-# MAGIC
 # MAGIC The `06_genie` check asserts your agent is attached to **at least** the
 # MAGIC `expected_sources` (a superset test) and that each benchmark question
 # MAGIC returns SQL touching a curated source. Adding `my_metrics` and two questions
 # MAGIC extends coverage; it never removes the default assets, so your agent still
 # MAGIC passes the plain `06_genie` grade too. Full example:
 # MAGIC `solutions/finance/stretch/add_your_own.py`.
-# MAGIC </details>

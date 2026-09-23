@@ -117,6 +117,8 @@ dbutils.widgets.text("model_endpoint", "databricks-claude-sonnet-4-6", "FM endpo
 dbutils.widgets.text("domain_tag_name", "domain", "Domain tag key")
 dbutils.widgets.text("pi_classification_tag_name", "data_classification", "PI tag key")
 
+# COMMAND ----------
+
 # Your identity gives you a unique schema in the shared team catalog
 # (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
@@ -192,9 +194,11 @@ from dbxmetagen.main import main
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — stage the three modes</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — stage the three modes
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
@@ -214,7 +218,6 @@ from dbxmetagen.main import main
 # MAGIC dbxmetagen generates one mode at a time. `comment` first is a good habit —
 # MAGIC the other modes reuse its context. `schema_name` is your single resolved
 # MAGIC schema, so the review tables land beside the gold tables.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -257,9 +260,11 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — apply the reviewed metadata</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — apply the reviewed metadata
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
@@ -276,7 +281,6 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
 # MAGIC ```
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -300,8 +304,8 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # The sensitive columns to PI-classify come from the domain spec (resolved in §1),
-# so this shared cell names no domain-specific table or column literal — a
-# Security/ITSM participant tags their own columns, never Finance's.
+# so this shared cell names no domain-specific table or column literal — your
+# domain's participant tags their own columns, never another domain's.
 def _bq(*parts):
     """Backtick-quote each identifier part and join with dots."""
     return ".".join("`" + p.replace("`", "``") + "`" for p in parts)

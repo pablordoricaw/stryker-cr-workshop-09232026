@@ -20,24 +20,6 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## ⚠️ Pre-check: Partner-powered AI must be enabled
-# MAGIC
-# MAGIC Genie is an AI feature. Before it will answer anything, your workspace must
-# MAGIC have **Partner-powered AI features** (which enable the Databricks Assistant
-# MAGIC that Genie is built on) turned **on**:
-# MAGIC
-# MAGIC - **Settings → Advanced → Partner-powered AI features** must be enabled at
-# MAGIC   the account/workspace level (an admin toggle).
-# MAGIC - You need **CAN USE** on a **Pro or Serverless SQL warehouse** (the same
-# MAGIC   warehouse the agent runs its generated SQL on).
-# MAGIC
-# MAGIC If Genie is disabled, agent creation and the checkpoint below will fail with
-# MAGIC a permissions/feature error — ask your workspace admin to enable it. Genie
-# MAGIC agent APIs may be **Preview/entitlement-gated** on some workspaces.
-
-# COMMAND ----------
-
 # --- Workshop bootstrap: run this first in every notebook ---
 import os
 import sys
@@ -70,6 +52,8 @@ dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
+
+# COMMAND ----------
 
 # Your identity resolves the SAME per-participant schema 00_setup created, and
 # your namespace — the single source of truth for every unique name in the shared
@@ -113,9 +97,11 @@ print(f"Benchmarks  : {benchmark_questions}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — a unique, identity-derived agent name</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — a unique, identity-derived agent name
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC agent_name = ns.genie_agent_name()   # workshop_genie_<domain>_<you>
 # MAGIC ```
@@ -125,7 +111,6 @@ print(f"Benchmarks  : {benchmark_questions}")
 # MAGIC checkpoint resolves that **same** name (pass `namespace=ns`) — so generation
 # MAGIC and verification always agree. There is no shared default; two participants
 # MAGIC in the same workspace each pass with their own agent.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -166,9 +151,11 @@ print(f"Benchmarks  : {benchmark_questions}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — create the agent with the SDK</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — create the agent with the SDK
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC import json, uuid
 # MAGIC from databricks.sdk import WorkspaceClient
@@ -197,7 +184,6 @@ print(f"Benchmarks  : {benchmark_questions}")
 # MAGIC
 # MAGIC The full solution (your domain's sample questions, instructions, and an
 # MAGIC idempotent create-or-update) is in `solutions/<domain>/06_genie.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 

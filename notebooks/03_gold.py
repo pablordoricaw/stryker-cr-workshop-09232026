@@ -56,6 +56,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 # Your identity gives you a unique schema in the shared team catalog
 # (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
@@ -126,9 +128,11 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — grain-safe document enrichment</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — grain-safe document enrichment
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC Alias the source DataFrames, project the document columns explicitly (so
 # MAGIC their provenance stays obvious), and left-join on the conformed key:
 # MAGIC
@@ -155,7 +159,6 @@ from pyspark.sql import functions as F
 # MAGIC checkpoint proves the join enriches exactly the expected transactions. The
 # MAGIC exact projected fields are in `data/<domain>/README.md` and the gated
 # MAGIC `solutions/<domain>/03_gold.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -177,9 +180,11 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — mart aggregation shape</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — mart aggregation shape
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC mart = (
 # MAGIC     spark.table(gold_detail)
@@ -198,7 +203,6 @@ from pyspark.sql import functions as F
 # MAGIC The gated `solutions/<domain>/03_gold.py` lists the exact measures — and the
 # MAGIC `03_gold` checkpoint reconciles the additive ones back to the transaction
 # MAGIC source for your domain.
-# MAGIC </details>
 
 # COMMAND ----------
 

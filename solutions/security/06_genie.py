@@ -8,10 +8,6 @@
 # MAGIC pre-authored Security sample questions, short text instructions, and
 # MAGIC benchmark Q&A, then verifies observable state with the `06_genie`
 # MAGIC checkpoint. No catalog or additional schema is created.
-# MAGIC
-# MAGIC **Prerequisite:** Partner-powered AI features (Databricks Assistant) must be
-# MAGIC enabled and you need CAN USE on a Pro/Serverless SQL warehouse. Genie agent
-# MAGIC APIs may be Preview/entitlement-gated on some workspaces.
 
 # COMMAND ----------
 
@@ -35,6 +31,8 @@ dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("warehouse_id", "", "SQL warehouse id (blank = auto-detect)")
+
+# COMMAND ----------
 
 # Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
 # created, and your namespace — the one source of truth for every unique name in

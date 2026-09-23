@@ -75,6 +75,8 @@ dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 
+# COMMAND ----------
+
 # Your identity resolves the SAME per-participant schema 00_setup created, and
 # your namespace — the one source of truth for every unique name in the shared
 # workspace (schema, Genie agent, app, Lakebase project, synced table).
@@ -128,13 +130,14 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — why per-participant names</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — why per-participant names
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC The `07_app` checkpoint asserts **your own** app and synced table by these
 # MAGIC exact names — there is no shared/fixed name. Two participants in the same
 # MAGIC workspace each pass with their own app + synced table.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -160,17 +163,6 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # MAGIC catalog/schema. There is **no catalog to create or register** — the
 # MAGIC synced-table id is a Unity Catalog name in *your own* catalog, and Lakebase
 # MAGIC creates the matching Postgres table for you.
-# MAGIC
-# MAGIC <details>
-# MAGIC <summary>Hint: create the project (CLI, run in a terminal)</summary>
-# MAGIC
-# MAGIC ```bash
-# MAGIC databricks postgres create-project <project_id> \
-# MAGIC   --json '{"spec": {"display_name": "<project_id>"}}' --profile <p>
-# MAGIC ```
-# MAGIC The project auto-creates a `production` branch + `primary` endpoint
-# MAGIC (scale-to-zero). You do **not** run `databricks postgres create-catalog`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -201,8 +193,22 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>Hint: create the synced table (CLI)</summary>
+# MAGIC ### 💡 Hint — create the project (CLI, run in a terminal)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ```bash
+# MAGIC databricks postgres create-project <project_id> \
+# MAGIC   --json '{"spec": {"display_name": "<project_id>"}}' --profile <p>
+# MAGIC ```
+# MAGIC The project auto-creates a `production` branch + `primary` endpoint
+# MAGIC (scale-to-zero). You do **not** run `databricks postgres create-catalog`.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — create the synced table (CLI)
 # MAGIC
 # MAGIC ```bash
 # MAGIC databricks postgres create-synced-table <catalog>.<schema>.<serving_base>_<suffix> \
@@ -222,7 +228,6 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # MAGIC Use the concrete names printed in cell 1. Check status with
 # MAGIC `databricks postgres get-synced-table "synced_tables/<synced_table>"` and
 # MAGIC wait for it to be **online** before deploying.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -238,10 +243,15 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # MAGIC *Can connect and create*). Set `SERVING_TABLE` to your synced table's
 # MAGIC Postgres name — `<schema>.<table>`, the `serving_table` printed above
 # MAGIC (e.g. `<your_schema>.<serving_base>_<suffix>`).
-# MAGIC
-# MAGIC <details>
-# MAGIC <summary>Hint: deploy + start (CLI)</summary>
-# MAGIC
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — deploy + start (CLI)
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```bash
 # MAGIC databricks apps create <app_name> --profile <p>            # once
 # MAGIC databricks sync ./app "/Workspace/Users/<me>/<app_name>" --profile <p>
@@ -251,7 +261,6 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # MAGIC ```
 # MAGIC After the synced table is online, grant the app's service principal SELECT on
 # MAGIC it (see solutions/<domain>/07_app.py).
-# MAGIC </details>
 
 # COMMAND ----------
 

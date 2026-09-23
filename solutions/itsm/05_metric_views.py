@@ -28,6 +28,9 @@ if _root not in sys.path:
 import workshop
 dbutils.widgets.text("catalog","","Catalog (your existing catalog — required)")
 dbutils.widgets.text("schema","","Schema (blank = your workshop_<you> schema)")
+
+# COMMAND ----------
+
 me=spark.sql("SELECT current_user()").collect()[0][0]
 config=workshop.resolve_config(catalog=dbutils.widgets.get("catalog") or None,domain="itsm",schema=dbutils.widgets.get("schema") or None,identity=me)
 incidents=workshop.fully_qualified(config.catalog,config.schema,"gold_incidents")
