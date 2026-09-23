@@ -8,10 +8,6 @@
 # MAGIC pre-authored Security sample questions, short text instructions, and
 # MAGIC benchmark Q&A, then verifies observable state with the `06_genie`
 # MAGIC checkpoint. No catalog or additional schema is created.
-# MAGIC
-# MAGIC **Prerequisite:** Partner-powered AI features (Databricks Assistant) must be
-# MAGIC enabled and you need CAN USE on a Pro/Serverless SQL warehouse. Genie agent
-# MAGIC APIs may be Preview/entitlement-gated on some workspaces.
 
 # COMMAND ----------
 

@@ -85,8 +85,7 @@ interface; over the gold tables and Metric Views. It attaches all four Finance
 data assets (`gold_sales`, `gold_contract_performance`, `finance_sales_metrics`,
 `finance_contract_metrics`), gives the agent a **per-participant, identity-derived
 name** so teammates sharing the workspace do not collide, and adds pre-authored
-sample questions. It opens with a Partner-powered AI (Databricks Assistant)
-pre-check and ends on `06_genie`, which finds the caller's own agent by name,
+sample questions. It ends on `06_genie`, which finds the caller's own agent by name,
 confirms the expected sources are attached (binding to the caller's own
 workspace namespace so a teammate's same-titled agent is never adopted), and
 asks benchmark questions; requiring each to return SQL that genuinely queries
