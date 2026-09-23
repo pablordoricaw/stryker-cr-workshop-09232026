@@ -21,12 +21,20 @@
 # MAGIC ## Install dependencies for Lakebase provisioning
 # MAGIC
 # MAGIC This cell installs `psycopg[binary]` (Postgres client) — required only if
-# MAGIC Lakebase provisioning is attempted. The `%pip install` magic will restart
-# MAGIC the Python kernel; the bootstrap cell below runs fresh in the restarted kernel.
+# MAGIC Lakebase provisioning is attempted. Installing does not restart the kernel on
+# MAGIC its own, so the next cell calls `dbutils.library.restartPython()` to make the
+# MAGIC package importable; the bootstrap cell then runs fresh and rebuilds state.
 
 # COMMAND ----------
 
 # MAGIC %pip install psycopg[binary] --quiet
+
+# COMMAND ----------
+
+# On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
+# installed package is not importable until the kernel restarts. Restart explicitly
+# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
