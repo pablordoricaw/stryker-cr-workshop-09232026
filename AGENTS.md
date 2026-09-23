@@ -101,12 +101,18 @@ grep -q 'stryker-workshop:participant-hint-ladder' docs/genie/.assistant_instruc
 git commit -m "chore(release): promote dev to main"
 ```
 
-Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. After committing, create an annotated Semantic Version tag on that `main` commit and push the tag:
+Before committing the release merge, review the complete staged diff and run the workshop validation relevant to the promoted changes. After committing, create an annotated Semantic Version tag on that `main` commit, push the tag, and publish a GitHub release from it. Confirm the active `gh` account is `pablordoricaw` (`gh auth status`) before running the `gh` command:
 
 ```bash
 git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
 git push origin v<major>.<minor>.<patch>
+gh release create v<major>.<minor>.<patch> \
+  --title "v<major>.<minor>.<patch> — <short release summary>" \
+  --notes-file <release-notes.md> \
+  --latest --verify-tag
 ```
+
+The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release — for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead. Write the notes to summarize the promoted content (domains, notebooks, solutions, data, and any breaking changes) rather than relying on auto-generated commit logs.
 
 Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 

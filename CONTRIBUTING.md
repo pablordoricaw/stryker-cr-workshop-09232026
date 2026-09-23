@@ -41,12 +41,18 @@ Review the complete staged diff and run the workshop validation relevant to the 
 git commit -m "chore(release): promote dev to main"
 ```
 
-Then create an annotated Semantic Version tag on the release commit and push it:
+Then create an annotated Semantic Version tag on the release commit, push it, and publish a GitHub release from it. Confirm the active `gh` account is `pablordoricaw` (`gh auth status`) before running the `gh` command:
 
 ```bash
 git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
 git push origin v<major>.<minor>.<patch>
+gh release create v<major>.<minor>.<patch> \
+  --title "v<major>.<minor>.<patch> — <short release summary>" \
+  --notes-file <release-notes.md> \
+  --latest --verify-tag
 ```
+
+The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release — for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead.
 
 Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 
