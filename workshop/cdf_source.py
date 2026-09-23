@@ -564,7 +564,11 @@ def _seed_postgres(
     config: Any, spec: Any, repo_root: str, host: str, user: str, token: str,
     schema: str, logger: Any
 ) -> None:
-    """Seed Postgres schema + table + CSV data via driver-side COPY.
+    """Seed Postgres schema + table + CSV data via driver-side COPY, idempotently.
+
+    On a re-run, this function checks if the table is already fully seeded and skips
+    the COPY to avoid duplicate key violations. If the table exists with a different
+    row count, it is truncated and reloaded. On a fresh run, the COPY proceeds as normal.
 
     Args:
         config: WorkshopConfig.
@@ -602,6 +606,9 @@ def _seed_postgres(
             raise RuntimeError(f"CSV file is empty: {csv_path}")
         columns = list(rows[0].keys())
 
+    expected_row_count = len(rows)
+    table_fq = f"{schema}.{spec.txn_seed_dir}"
+
     logger(f"[CDF] Connecting to Postgres at {host} as user {user}")
     with psycopg.connect(
         host=host,
@@ -614,16 +621,50 @@ def _seed_postgres(
             logger(f"[CDF] Creating Postgres schema via schema.sql")
             cur.execute(schema_sql)
 
-            logger(
-                f"[CDF] Loading {len(rows)} rows into {schema}.{spec.txn_seed_dir}"
-            )
-            table_fq = f"{schema}.{spec.txn_seed_dir}"
-            with open(csv_path, "r") as csv_file:
-                with cur.copy(
-                    f"COPY {table_fq} ({', '.join(columns)}) FROM STDIN "
-                    f"WITH (FORMAT csv, HEADER true)"
-                ) as copy:
-                    copy.write(csv_file.read())
+            # Check current row count to decide whether to skip, truncate+reload, or load fresh
+            try:
+                cur.execute(f"SELECT count(*) FROM {table_fq}")
+                current_row_count = cur.fetchone()[0]
+            except Exception as e:
+                # Table may not exist yet or query failed; treat as empty (0 rows)
+                logger(f"[CDF] Could not query table row count: {e}; treating as empty")
+                current_row_count = 0
+
+            if current_row_count == expected_row_count:
+                # Table already fully seeded; skip COPY
+                logger(
+                    f"[CDF] Postgres table {table_fq} already has {current_row_count} rows; "
+                    f"skipping seed load"
+                )
+            elif current_row_count > 0:
+                # Partial or mismatched load; truncate and reload
+                logger(
+                    f"[CDF] Postgres table {table_fq} has {current_row_count} rows "
+                    f"(expected {expected_row_count}); truncating and reloading"
+                )
+                cur.execute(f"TRUNCATE TABLE {table_fq}")
+
+                logger(
+                    f"[CDF] Loading {expected_row_count} rows into {table_fq}"
+                )
+                with open(csv_path, "r") as csv_file:
+                    with cur.copy(
+                        f"COPY {table_fq} ({', '.join(columns)}) FROM STDIN "
+                        f"WITH (FORMAT csv, HEADER true)"
+                    ) as copy:
+                        copy.write(csv_file.read())
+            else:
+                # Fresh load (0 rows in table)
+                logger(
+                    f"[CDF] Loading {expected_row_count} rows into {table_fq}"
+                )
+                with open(csv_path, "r") as csv_file:
+                    with cur.copy(
+                        f"COPY {table_fq} ({', '.join(columns)}) FROM STDIN "
+                        f"WITH (FORMAT csv, HEADER true)"
+                    ) as copy:
+                        copy.write(csv_file.read())
+
         conn.commit()
     logger(f"[CDF] Postgres seeding complete")
 
