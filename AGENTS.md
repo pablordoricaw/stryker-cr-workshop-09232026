@@ -86,7 +86,7 @@ From the main worktree, merge without committing, then strip the maintainer-only
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
+git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents docs/facilitators generators
 ```
 
 The `git rm` uses `-f` because the no-commit merge stages these files as additions (they are absent from `main`'s tree between releases), which a plain `git rm` refuses to remove. It drops the maintainer `AGENTS.md` and leaves **no** root `AGENTS.md` on `main`. Verify before committing; no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
@@ -95,6 +95,7 @@ The `git rm` uses `-f` because the no-commit merge stages these files as additio
 test ! -e AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
+test ! -e docs/facilitators
 test ! -e generators
 test -e docs/genie/.assistant_instructions.md
 grep -q 'stryker-workshop:participant-hint-ladder' docs/genie/.assistant_instructions.md
@@ -107,12 +108,12 @@ Before committing the release merge, review the complete staged diff and run the
 git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
 git push origin v<major>.<minor>.<patch>
 gh release create v<major>.<minor>.<patch> \
-  --title "v<major>.<minor>.<patch> — <short release summary>" \
+  --title "v<major>.<minor>.<patch>: <short release summary>" \
   --notes-file <release-notes.md> \
   --latest --verify-tag
 ```
 
-The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release — for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead. Write the notes to summarize the promoted content (domains, notebooks, solutions, data, and any breaking changes) rather than relying on auto-generated commit logs.
+The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release; for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead. Write the notes to summarize the promoted content (domains, notebooks, solutions, data, and any breaking changes) rather than relying on auto-generated commit logs.
 
 Use a major version for participant-breaking changes, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 
@@ -122,7 +123,7 @@ Use a major version for participant-breaking changes, a minor version for new wo
 - `v2.0.0`: changes that substantially alter the workshop flow or invalidate prior setup/materials.
 - `v1.2.0-rc.1`: optional rehearsal/review release before a major workshop event.
 
-If the merge conflicts, preserve the participant-ready state on `main`; in particular, there must be **no** root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort the merge and report the blocker if any conflict cannot be resolved safely.
+If the merge conflicts, preserve the participant-ready state on `main`; in particular, there must be **no** root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, `docs/facilitators/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort the merge and report the blocker if any conflict cannot be resolved safely.
 
 Do not merge `main` back into `dev`, because doing so would carry the release-only deletion of the agent instructions into development. Apply fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again. Create release tags from `main` only.
 

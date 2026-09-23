@@ -21,7 +21,7 @@ Merge without committing, then strip the maintainer-only files (the `git rm` use
 ```bash
 git status --short --branch
 git merge --no-ff --no-commit dev
-git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents generators
+git rm -rf --ignore-unmatch AGENTS.md CLAUDE.md docs/agents docs/facilitators generators
 ```
 
 Verify the result: no root `AGENTS.md`, the other maintainer-only paths gone, and the participant hint ladder still present at its `docs/genie/` home (which the strip does not touch):
@@ -30,6 +30,7 @@ Verify the result: no root `AGENTS.md`, the other maintainer-only paths gone, an
 test ! -e AGENTS.md
 test ! -e CLAUDE.md
 test ! -e docs/agents
+test ! -e docs/facilitators
 test ! -e generators
 test -e docs/genie/.assistant_instructions.md
 grep -q 'stryker-workshop:participant-hint-ladder' docs/genie/.assistant_instructions.md
@@ -47,12 +48,12 @@ Then create an annotated Semantic Version tag on the release commit, push it, an
 git tag -a v<major>.<minor>.<patch> -m "Workshop release v<major>.<minor>.<patch>"
 git push origin v<major>.<minor>.<patch>
 gh release create v<major>.<minor>.<patch> \
-  --title "v<major>.<minor>.<patch> — <short release summary>" \
+  --title "v<major>.<minor>.<patch>: <short release summary>" \
   --notes-file <release-notes.md> \
   --latest --verify-tag
 ```
 
-The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release — for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead.
+The tag alone is not a published release: `gh release create` turns it into a GitHub release entry carrying curated notes. `--verify-tag` refuses to publish unless the tag was pushed first, and `--latest` marks it the newest stable release; for a pre-release `-rc.*` tag, drop `--latest` and pass `--prerelease` instead.
 
 Use a major version when a change breaks the participant experience, a minor version for new workshop content, and a patch version for compatible corrections. Use a pre-release suffix such as `-rc.1` for release candidates:
 
@@ -64,7 +65,7 @@ Use a major version when a change breaks the participant experience, a minor ver
 
 Tag only the release commit on `main`.
 
-If the merge conflicts, preserve the participant-ready state on `main`: there must be no root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
+If the merge conflicts, preserve the participant-ready state on `main`: there must be no root `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, `docs/facilitators/`, or `generators/`, while the participant hint ladder at `docs/genie/.assistant_instructions.md` must remain present and unchanged. Abort and report any conflict that cannot be resolved safely. Never merge `main` back into `dev`; make fixes on a feature branch based on `dev`, integrate them into `dev`, and promote again.
 
 ## Agent-Assisted Development
 
