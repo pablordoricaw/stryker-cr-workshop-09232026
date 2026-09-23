@@ -1,4 +1,67 @@
 # Databricks notebook source
+# MAGIC %md
+# MAGIC # 01 · Transactional ingestion to bronze
+# MAGIC
+# MAGIC Land the 3,000 synthetic transactions for **your domain** in one Delta
+# MAGIC table. The table name and grain key differ per domain — Finance's
+# MAGIC `bronze_sales_transactions` / `transaction_id`, Security's
+# MAGIC `bronze_scan_findings` / `finding_id`, ITSM's `bronze_service_tickets` /
+# MAGIC `ticket_id` — and are derived for you below from the domain you pick.
+# MAGIC
+# MAGIC ## 📦 CDF source detection and provisioning (optional)
+# MAGIC
+# MAGIC This notebook automatically ensures your domain's CDF history table is
+# MAGIC available via a **three-tier fallback**:
+# MAGIC
+# MAGIC 1. **Detect** — if the history table already exists in your catalog/schema,
+# MAGIC    it is used as-is.
+# MAGIC 2. **Provision real Lakebase CDF** — if you manually created a Lakebase
+# MAGIC    project (database instance) beforehand and entered it in the `lakebase_project`
+# MAGIC    widget, the notebook configures CDF→UC automatically to sync your Postgres
+# MAGIC    history table to Unity Catalog. Requires workspace admin to enable the
+# MAGIC    **Lakebase Lakehouse Sync / CDF** preview under workspace **Previews**. This is
+# MAGIC    the real CDF path and is optional — skip it to use the fallback below.
+# MAGIC 3. **Synthesize** — if you leave `lakebase_project` blank, or if real CDF
+# MAGIC    provisioning is unavailable or fails (e.g., default-storage catalogs are
+# MAGIC    unsupported), the history table is built in UC from the committed seed. The
+# MAGIC    participant's `# TODO` cells run identically in either mode, and the checkpoint
+# MAGIC    passes the same. This is the recommended path if you did not deploy a project.
+# MAGIC
+# MAGIC Both paths produce the same current-state bronze table and finish at the same
+# MAGIC checkpoint. **Leave `lakebase_project` blank to synthesize** (recommended for most
+# MAGIC participants); fill it only if you created and want to exercise the real Lakebase
+# MAGIC CDF sync.
+# MAGIC
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
+# MAGIC file for your domain and this checkpoint directly.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Install dependencies for Lakebase provisioning
+# MAGIC
+# MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
+# MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
+# MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
+# MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet --upgrade "psycopg[binary]" "databricks-sdk>=0.135"
+
+# COMMAND ----------
+
+# On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
+# installed package is not importable until the kernel restarts. Restart explicitly
+# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())
@@ -15,64 +78,75 @@ import workshop
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # 01 · Transactional ingestion to bronze
+# MAGIC ## 🛢️ Optional: deploy your Lakebase project first (for the real CDF path)
 # MAGIC
-# MAGIC Land the 3,000 synthetic transactions for **your domain** in one Delta
-# MAGIC table. The table name and grain key differ per domain — Finance's
-# MAGIC `bronze_sales_transactions` / `transaction_id`, Security's
-# MAGIC `bronze_scan_findings` / `finding_id`, ITSM's `bronze_service_tickets` /
-# MAGIC `ticket_id` — and are derived for you below from the domain you pick.
-# MAGIC Choose one source; both paths produce the same current-state bronze table
-# MAGIC and finish at the same checkpoint.
+# MAGIC If you want to exercise the real Lakebase CDF sync (recommended for learning), follow these steps to create a Lakebase project in your workspace. **This is optional** — if you skip it, the notebook will synthesize the history table from a committed seed and you'll complete the checkpoint identically.
 # MAGIC
-# MAGIC ## ⚠️ Lakebase CDF is an admin-enabled Beta/Preview
+# MAGIC ### Steps to create a Lakebase project:
 # MAGIC
-# MAGIC The **primary Lakebase CDF path does not work until a workspace admin**:
+# MAGIC 1. **In the Databricks workspace sidebar**, click **Compute** (or **Compute & SQL** depending on your Databricks version).
+# MAGIC 2. Click the **Lakebase** tab (or look for a **Lakebase** option in the compute menu).
+# MAGIC 3. Click **Create Lakebase project** (or **Create project**).
+# MAGIC 4. **Enter a project name** (e.g., `my-workshop-postgres`) and choose your cloud region (default is fine).
+# MAGIC 5. Click **Create**. The project auto-provisions:
+# MAGIC    - A `production` branch with a read-write endpoint
+# MAGIC    - A default database named `databricks_postgres` (this is the database you'll use unless you have a specific reason to create another one)
+# MAGIC 6. Once the project shows **Ready**, note its **project name** (the one you entered in step 4).
+# MAGIC 7. Come back to this notebook and fill the `lakebase_project` widget (below) with the project name you just created.
 # MAGIC
-# MAGIC 1. enables the **Lakebase Lakehouse Sync / CDF Beta/Preview** in the
-# MAGIC    workspace **Previews** settings;
-# MAGIC 2. provides a Lakebase Autoscaling Postgres 17 project seeded from
-# MAGIC    `data/<domain>/transactional/lakebase/`; and
-# MAGIC 3. configures CDF for the Postgres `<domain>_seed` schema into the Unity
-# MAGIC    Catalog catalog/schema entered below, then waits for your domain's CDF
-# MAGIC    history table to be online.
+# MAGIC **That's it.** The notebook will auto-detect your project and configure CDF→UC. If you don't see a **Lakebase** tab or option, ask your workspace admin to enable the **Lakebase Lakehouse Sync / CDF** preview under workspace **Previews** (or use the synthesized path by leaving `lakebase_project` blank).
 # MAGIC
-# MAGIC **No admin or preview access? Choose `delta_fallback`.** It reads the
-# MAGIC committed, pre-seeded Delta snapshot and is the supported workshop path
-# MAGIC for every participant. This notebook never creates a catalog.
-# MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
-# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
-# MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
-# MAGIC file for your domain and this checkpoint directly.
+# MAGIC ### Not deploying a project?
+# MAGIC **Just skip this step and leave `lakebase_project` blank.** The notebook will build the history table from the committed seed and the checkpoint passes identically.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 1. Reuse your setup configuration and pick your domain
 # MAGIC
-# MAGIC Enter the same existing catalog, schema, and volume you used in
-# MAGIC `00_setup`, and keep the **same domain** you chose there. This cell is done
-# MAGIC for you: it resolves your config and derives your domain's bronze table
-# MAGIC name, grain key, seeded row count, and committed Delta seed path.
+# MAGIC Configure your notebook using the widgets below. Most settings come from your earlier work in `00_setup`; the three Lakebase widgets are optional (leave blank for automatic setup).
+# MAGIC
+# MAGIC ### Widget reference
+# MAGIC
+# MAGIC | Widget | What to enter | Leave blank? |
+# MAGIC |--------|---------------|--------------|
+# MAGIC | **catalog** | Same existing catalog you chose in `00_setup` (your workshop catalog) — **required** | No — must always provide |
+# MAGIC | **domain** | Same domain you selected in `00_setup` (Finance / Security / ITSM) | Never — selects your transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your CDF approach: `auto` (recommended) = detect existing history, provision **real Lakebase CDF if you supplied a `lakebase_project`**, else synthesize from seed; `lakebase_cdf` = require real CDF (fails if you didn't create/supply a project or the preview is off); `delta_fallback` = skip Lakebase entirely, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project (database instance) you created** (see the deploy step above) to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
+# MAGIC | **lakebase_database** | Leave blank to use the instance's default `databricks_postgres` database; set only if you created a differently-named database in your Lakebase project | Yes — blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use your domain's default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC
+# MAGIC **Most participants:** use the defaults shown above — enter your **catalog** and pick your **domain**, leave everything else blank or as-is.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
-dbutils.widgets.text("volume", "landing", "UC Volume")
+dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
+dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain (same as in 00_setup)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
-    "delta_fallback",
-    ["delta_fallback", "lakebase_cdf"],
-    "Transactional source",
+    "auto",
+    ["auto", "delta_fallback", "lakebase_cdf"],
+    "Transactional source (auto recommended)",
+)
+dbutils.widgets.text(
+    "lakebase_project",
+    "",
+    "(Optional) Lakebase project you created — blank = synthesize",
+)
+dbutils.widgets.text(
+    "lakebase_database",
+    "",
+    "(Optional) Lakebase database — blank = default databricks_postgres",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
     "",
-    "Lakebase CDF history table (blank = your domain's default)",
+    "(Advanced) Lakebase CDF table — leave blank for domain default",
 )
 
 # COMMAND ----------
@@ -99,15 +173,78 @@ bronze_table = f"{config.quoted_schema()}.`{spec.bronze_txn_table}`"
 delta_seed_path = os.path.join(
     _root, "data", config.domain, "transactional", "delta", spec.txn_seed_dir
 )
-lakebase_cdf_table = dbutils.widgets.get("lakebase_cdf_table") or spec.lakebase_cdf_table
+widget_lakebase_cdf_table = dbutils.widgets.get("lakebase_cdf_table")
+
+# Lakebase provisioning will be triggered in the next cell if source_mode is "auto"
+# or "lakebase_cdf". The helper will resolve lakebase_cdf_table.
+lakebase_project = dbutils.widgets.get("lakebase_project") or None
+lakebase_database = dbutils.widgets.get("lakebase_database") or None
 
 print(f"Domain          : {config.domain}   ({spec.txn_entity_label})")
-print(f"Source          : {source_mode}")
+print(f"Source mode     : {source_mode}")
 print(f"Target          : {bronze_table}")
 print(f"Grain key       : {spec.transaction_key}")
 print(f"Expected rows   : {spec.expected_txn_rows:,}")
 print(f"Delta seed      : {delta_seed_path}")
-print(f"Lakebase CDF tbl: {lakebase_cdf_table}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Ensure CDF history table (done for you)
+# MAGIC
+# MAGIC This cell automatically resolves your domain's CDF history table via:
+# MAGIC detect (preexisting) → provision (Lakebase Postgres + CDF) → synthesize (UC).
+# MAGIC
+# MAGIC When `source_mode` is `auto` or `lakebase_cdf`, the helper handles it; when
+# MAGIC `delta_fallback` is explicit, the Delta snapshot is used instead.
+
+# COMMAND ----------
+
+# Resolve what CDF source to use based on source_mode widget.
+if source_mode == "delta_fallback":
+    # Explicit delta_fallback: use the Delta seed directly.
+    lakebase_cdf_table = None  # Signal that CDF is not being used
+    print(f"[01_bronze_txn] Using delta_fallback (CDF skipped per source_mode)")
+else:
+    # source_mode is "auto" (default) or "lakebase_cdf": try to provision CDF.
+    from databricks.sdk import WorkspaceClient
+
+    try:
+        w = WorkspaceClient()
+    except Exception as e:
+        w = None
+        print(f"[01_bronze_txn] Could not initialize WorkspaceClient: {e}. "
+              f"Provisioning will be skipped; synthesis will be attempted.")
+
+    try:
+        cdf_report = workshop.ensure_txn_cdf_source(
+            config=config,
+            spec=spec,
+            spark=spark,
+            repo_root=_root,
+            lakebase_project=lakebase_project,
+            lakebase_database=lakebase_database,
+            w=w,
+            timeout_s=120.0,
+            logger=print,
+        )
+        lakebase_cdf_table = cdf_report.cdf_history_table
+        print(f"[01_bronze_txn] CDF source report:")
+        print(f"  Mode:             {cdf_report.mode}")
+        print(f"  History table:    {cdf_report.cdf_history_table}")
+        print(f"  Lakebase project: {cdf_report.lakebase_project or 'none'}")
+        print(f"  Notes:            {cdf_report.notes}")
+    except Exception as e:
+        if source_mode == "lakebase_cdf":
+            # Explicit lakebase_cdf: fail hard if even synthesis fails.
+            raise RuntimeError(
+                f"source_mode is lakebase_cdf but could not ensure CDF source: {e}"
+            ) from e
+        else:
+            # auto mode: silently fall back to delta_fallback
+            lakebase_cdf_table = None
+            print(f"[01_bronze_txn] CDF provisioning/synthesis failed; "
+                  f"falling back to delta_fallback: {e}")
 
 # COMMAND ----------
 
@@ -134,7 +271,7 @@ print(f"Lakebase CDF tbl: {lakebase_cdf_table}")
 
 # TODO: Build a DataFrame named `transactions` from the selected source.
 #
-# if source_mode == "lakebase_cdf":
+# if lakebase_cdf_table is not None:
 #     # TODO: reconstruct current state from `lakebase_cdf_table`, keeping only the
 #     #       latest non-deleted row per `spec.transaction_key`.
 #     ...

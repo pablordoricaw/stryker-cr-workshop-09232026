@@ -20,6 +20,11 @@ variables. Later tickets extend the workshop by registering new checkpoints; see
 from __future__ import annotations
 
 from .bootstrap import bootstrap, find_repo_root
+from .cdf_source import (
+    CdfSourceReport,
+    ensure_txn_cdf_source,
+    shape_seed_to_cdc,
+)
 from .config import DOMAINS, WorkshopConfig, resolve_config
 from .context import CheckContext
 from .domains import DOMAIN_SPECS, DomainSpec, MetricViewSpec, domain_spec
@@ -121,4 +126,8 @@ __all__ = [
     "SeedRegistry",
     "DuplicateSeedError",
     "seed_load_errors",
+    # CDF source provisioning (ticket #40)
+    "ensure_txn_cdf_source",
+    "CdfSourceReport",
+    "shape_seed_to_cdc",
 ]

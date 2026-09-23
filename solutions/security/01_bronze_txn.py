@@ -1,4 +1,46 @@
 # Databricks notebook source
+# MAGIC %md
+# MAGIC # Solution · 01 Transactional ingestion to bronze — Security
+# MAGIC
+# MAGIC This solution automatically ensures the `lb_scan_findings_history` CDF
+# MAGIC history table is available, then reconstructs the current state and writes
+# MAGIC the bronze table. The Security transactional grain is one row per
+# MAGIC **vulnerability-scan finding** (3,000 rows), each carrying the `cve_id` that
+# MAGIC later joins the extracted CVE advisory in `03_gold`.
+# MAGIC
+# MAGIC ## Automatic CDF source detection and provisioning
+# MAGIC
+# MAGIC The notebook uses a three-tier fallback to guarantee the history table:
+# MAGIC
+# MAGIC 1. **Detect** — if already present, use it.
+# MAGIC 2. **Provision** — create a Lakebase Postgres project (if needed), seed it,
+# MAGIC    and configure CDF→UC (requires workspace admin to enable CDF preview).
+# MAGIC 3. **Synthesize** — on any failure, build the history table in UC from seed.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Install dependencies for Lakebase provisioning
+# MAGIC
+# MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
+# MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
+# MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
+# MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet --upgrade "psycopg[binary]" "databricks-sdk>=0.135"
+
+# COMMAND ----------
+
+# On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
+# installed package is not importable until the kernel restarts. Restart explicitly
+# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())
@@ -15,38 +57,51 @@ import workshop
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Solution · 01 Transactional ingestion to bronze — Security
+# MAGIC ## Configuration widgets
 # MAGIC
-# MAGIC Both source paths are implemented below and overwrite the same
-# MAGIC `bronze_scan_findings` table — the Security transactional grain is one row
-# MAGIC per **vulnerability-scan finding** (3,000 rows), each carrying the `cve_id`
-# MAGIC that later joins the extracted CVE advisory in `03_gold`.
+# MAGIC Configure your notebook using the widgets below. The `catalog` and `domain` are required; the Lakebase widgets are optional (leave blank for automatic setup).
 # MAGIC
-# MAGIC ## ⚠️ Lakebase CDF admin/preview dependency
+# MAGIC ### Widget reference
 # MAGIC
-# MAGIC `lakebase_cdf` requires a workspace admin to enable the **Lakebase
-# MAGIC Lakehouse Sync / CDF Beta/Preview** under workspace **Previews**, a
-# MAGIC Lakebase Autoscaling Postgres 17 project seeded from the committed
-# MAGIC `security_seed` SQL/CSV, and an ONLINE CDF config targeting the selected
-# MAGIC Unity Catalog schema. Without all three, use `delta_fallback`; it has no
-# MAGIC admin or preview dependency.
+# MAGIC | Widget | What to enter | Leave blank? |
+# MAGIC |--------|---------------|--------------|
+# MAGIC | **catalog** | Your existing workshop catalog — **required** | No — must always provide |
+# MAGIC | **domain** | Security (locked to this solution) | Never — selects the Security transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
+# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the Security default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC
+# MAGIC **Setup:** enter your **catalog**, leave the **domain** as Security, and leave everything else blank or as-is.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
-dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
-dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
-dbutils.widgets.text("volume", "landing", "UC Volume")
+dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
+dbutils.widgets.dropdown("domain", "security", ["security"], "Domain (Security — locked to this solution)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
-    "delta_fallback",
-    ["delta_fallback", "lakebase_cdf"],
-    "Transactional source",
+    "auto",
+    ["auto", "delta_fallback", "lakebase_cdf"],
+    "Transactional source (auto recommended)",
+)
+dbutils.widgets.text(
+    "lakebase_project",
+    "",
+    "(Optional) Lakebase project you created — blank = synthesize",
+)
+dbutils.widgets.text(
+    "lakebase_database",
+    "",
+    "(Advanced) Lakebase database — leave blank for default",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
-    "lb_scan_findings_history",
-    "Lakebase CDF history table",
+    "",
+    "(Advanced) Lakebase CDF table — leave blank for Security default",
 )
 
 # COMMAND ----------
@@ -62,6 +117,7 @@ config = workshop.resolve_config(
     volume=dbutils.widgets.get("volume") or None,
     identity=me,
 )
+spec = workshop.domain_spec(config.domain)
 source_mode = dbutils.widgets.get("source_mode")
 
 # The Security bronze transactional table name and grain key. These are
@@ -73,6 +129,43 @@ BRONZE_TXN_TABLE = "bronze_scan_findings"
 TRANSACTION_KEY = "finding_id"
 EXPECTED_TXN_ROWS = 3_000
 bronze_table = f"{config.quoted_schema()}.`{BRONZE_TXN_TABLE}`"
+lakebase_project = dbutils.widgets.get("lakebase_project") or None
+lakebase_database = dbutils.widgets.get("lakebase_database") or None
+
+# COMMAND ----------
+
+# Ensure CDF source (done for you)
+if source_mode == "delta_fallback":
+    lakebase_cdf_table = None
+    print(f"[Solution] Using delta_fallback (CDF skipped per source_mode)")
+else:
+    from databricks.sdk import WorkspaceClient
+
+    try:
+        w = WorkspaceClient()
+    except Exception as e:
+        w = None
+        print(f"[Solution] Could not initialize WorkspaceClient: {e}")
+
+    try:
+        cdf_report = workshop.ensure_txn_cdf_source(
+            config=config,
+            spec=spec,
+            spark=spark,
+            repo_root=_root,
+            lakebase_project=lakebase_project,
+            lakebase_database=lakebase_database,
+            w=w,
+            timeout_s=120.0,
+            logger=print,
+        )
+        lakebase_cdf_table = cdf_report.cdf_history_table
+        print(f"[Solution] CDF source: {cdf_report.mode} ({cdf_report.cdf_history_table})")
+    except Exception as e:
+        if source_mode == "lakebase_cdf":
+            raise RuntimeError(f"source_mode is lakebase_cdf but CDF failed: {e}") from e
+        lakebase_cdf_table = None
+        print(f"[Solution] CDF provisioning failed; using delta_fallback: {e}")
 
 # COMMAND ----------
 
@@ -112,19 +205,13 @@ FINDING_COLUMNS = [
     "source_updated_at",
 ]
 
-if source_mode == "lakebase_cdf":
-    cdf_table = ".".join(
-        [
-            config.quoted_schema(),
-            f"`{dbutils.widgets.get('lakebase_cdf_table').replace('`', '``')}`",
-        ]
-    )
-    cdf = spark.sql(f"SELECT * FROM {cdf_table}")
+if lakebase_cdf_table is not None:
+    cdf = spark.sql(f"SELECT * FROM {lakebase_cdf_table}")
     required_metadata = {"_pg_change_type", "_sort_by"}
     missing_metadata = required_metadata.difference(cdf.columns)
     if missing_metadata:
         raise RuntimeError(
-            "The selected table is not a Lakebase CDF history table; missing "
+            "The CDF history table is missing required columns; missing "
             f"columns: {sorted(missing_metadata)}"
         )
 
@@ -134,7 +221,7 @@ if source_mode == "lakebase_cdf":
         .where(F.col("_bronze_rank") == 1)
         .where(F.col("_pg_change_type") != "delete")
     )
-    print(f"Read current state from Lakebase CDF table {cdf_table}")
+    print(f"Read current state from Lakebase CDF table {lakebase_cdf_table}")
 else:
     source_seed = os.path.join(
         _root,
