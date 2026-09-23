@@ -3,9 +3,9 @@
 ![Platform: Databricks](https://img.shields.io/badge/Platform-Databricks-FF3621?logo=databricks&logoColor=white)
 ![Lakeflow](https://img.shields.io/badge/Lakeflow-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAIVBMVEX%2F%2F%2F%2F8w778wbz%2Bwr38wb36v7r7wLv%2FYEb%2FYUj%2FYEf%2FX0ZHYPIGAAAAAXRSTlMAQObYZgAAAAFvck5UAc%2Bid5oAAABuSURBVCjPrZFJDsAgDAPDkgby%2FweXUIKEoad2DlwGY0sQ%2FUqIAxQxDeKbSPkgmNtxoWDj9NhMcsgGGoYRUgxpu1HUjsx9IJQoo9BuSjPB8PJaZ2RFjKK95YA16QNcUDeYFA9sT4qv2LrE%2Bfz3CzeqUAS0Uz86oQAAAABJRU5ErkJggg%3D%3D)
 ![Lakebase](https://img.shields.io/badge/Lakebase-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAElBMVEX%2F%2F%2F%2F6v7r%2Fw73%2FXkX%2FX0b%2FYEcRmtWXAAAAAXRSTlMAQObYZgAAAFRJREFUKM%2BtkkESABEMBJHx%2Fy%2BTkthluKDd9KQypYTwlEi4SBOD0OBSLCd2Ow7q2nJbcNlK6uEJepzvQhRuBWQFgFjMRW6myRrDKOD8xEQXxNuPUABeCgKPeWIUjwAAAABJRU5ErkJggg%3D%3D)
-![Unity Catalog](https://img.shields.io/badge/Unity_Catalog-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAGFBMVEX%2F%2F%2F%2FX0b6vrn6v7r%2Bwr3%2FX0X%2FXkT%2FYEfA0FutAAAAAXRSTlMAQObYZgAAAAFvck5UAc%2Bid5oAAABvSURBVCjPpZFLDoAwCET5Ve5%2FY22mkhaLMZENKS8wUyD6E8yboiiA6lpXM0VO5AY28ojWR6CjpzaLSojNJo5VMD2fdgXzmd25UchdAE7YO4FDWYFnUI162VVlN3%2FQo7NaCZzYZonz2hMoD1Wf9nucAaUBuSTbLk8AAAAASUVORK5CYII%3D)
-![Genie Code](https://img.shields.io/badge/Genie_Code-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAElBMVEX%2F%2F%2F%2FXkX%2FX0b%2FYEf6v7r9wbybda%2B9AAAAAXRSTlMAQObYZgAAAF5JREFUKM%2FNkFEOgDAIQ6HA%2Fa8soC4Y2TL%2F7A%2FkdSsEop%2BIJxzSO4C0DjsXcB%2BF2ZCrqvZbFa6pu7FheGsupSxWPyTK15UPw8KogyP%2BTHnyusCbr24b6o%2Fo4i9RuzoAg%2BABjmebNh0AAAAASUVORK5CYII%3D)
-![Genie Agents](https://img.shields.io/badge/Genie_Agents-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAElBMVEX%2F%2F%2F%2FXkX%2FX0b%2FYEf6v7r9wbybda%2B9AAAAAXRSTlMAQObYZgAAAF5JREFUKM%2FNkFEOgDAIQ6HA%2Fa8soC4Y2TL%2F7A%2FkdSsEop%2BIJxzSO4C0DjsXcB%2BF2ZCrqvZbFa6pu7FheGsupSxWPyTK15UPw8KogyP%2BTHnyusCbr24b6o%2Fo4i9RuzoAg%2BABjmebNh0AAAAASUVORK5CYII%3D)
+![Unity Catalog](https://img.shields.io/badge/Unity_Catalog-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAGFBMVEX%2F%2F%2F%2F%2FX0b6vrn6v7r%2Bwr3%2FX0X%2FXkT%2FYEfA0FutAAAAAXRSTlMAQObYZgAAAAFvck5UAc%2Bid5oAAABvSURBVCjPpZFLDoAwCET5Ve5%2FY22mkhaLMZENKS8wUyD6E8yboiiA6lpXM0VO5AY28ojWR6CjpzaLSojNJo5VMD2fdgXzmd25UchdAE7YO4FDWYFnUI162VVlN3%2FQo7NaCZzYZonz2hMoD1Wf9nucAaUBuSTbLk8AAAAASUVORK5CYII%3D)
+![Genie Code](https://img.shields.io/badge/Genie_Code-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAElBMVEX%2F%2F%2F%2F%2FXkX%2FX0b%2FYEf6v7r9wbybda%2B9AAAAAXRSTlMAQObYZgAAAF5JREFUKM%2FNkFEOgDAIQ6HA%2Fa8soC4Y2TL%2F7A%2FkdSsEop%2BIJxzSO4C0DjsXcB%2BF2ZCrqvZbFa6pu7FheGsupSxWPyTK15UPw8KogyP%2BTHnyusCbr24b6o%2Fo4i9RuzoAg%2BABjmebNh0AAAAASUVORK5CYII%3D)
+![Genie Agents](https://img.shields.io/badge/Genie_Agents-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAElBMVEX%2F%2F%2F%2F%2FXkX%2FX0b%2FYEf6v7r9wbybda%2B9AAAAAXRSTlMAQObYZgAAAF5JREFUKM%2FNkFEOgDAIQ6HA%2Fa8soC4Y2TL%2F7A%2FkdSsEop%2BIJxzSO4C0DjsXcB%2BF2ZCrqvZbFa6pu7FheGsupSxWPyTK15UPw8KogyP%2BTHnyusCbr24b6o%2Fo4i9RuzoAg%2BABjmebNh0AAAAASUVORK5CYII%3D)
 ![Databricks Apps](https://img.shields.io/badge/Databricks_Apps-1B3139?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAJFBMVEX%2F%2F%2F%2F6wLv8wr3%2FYUf%2FX0b%2FYEf9wr38w77%2FYEb8wLv7v7v6v7pOiGY7AAAAAXRSTlMAQObYZgAAAAFvck5UAc%2Bid5oAAABlSURBVCjPrZBLDsAgCAXRgqi9%2F30LD9PWhUmbOKsXJ8iHaCsJZEsHOyJvUdRSFXtdiVUFfxLFCREM0VQ152aJKxDaztOxNzAL9jEwX%2BlDMEQN4SvdAluFSL%2FF9NW6eZS4OMHmc1y1jQRhKCPTFwAAAABJRU5ErkJggg%3D%3D)
 
 A ~4-hour, self-paced, hands-on workshop where you build the **same end-to-end data project** on **your team's domain dataset**, **entirely in the Databricks Workspace UI with no local setup required**. You pick one domain: Finance (Orthopedics), Security (infrastructure), or ITSM (IT-Ops). All of the workshop data is synthetically generated. You'll work through guided starter notebooks with `# TODO`s, validated at each checkpoint with `workshop.check()`, and get contextual help from **Genie Code** as you go.
@@ -111,13 +111,11 @@ stryker-cr-workshop-09232026/
 - Your facilitator will confirm any workspace toggles needed on the day.
 
 > [!NOTE]
-> **Databricks Free Edition is a valid fallback, but it has limits that affect this workshop.** It is for personal, non-commercial use, runs on serverless compute only under a fair-use quota (if you exceed it, your compute is shut off for the rest of the day, and in extreme cases the month), and is not covered by Databricks support or an SLA. Specific ceilings that matter here:
-> - **Databricks Apps:** up to 3 per account, and an app auto-stops 24 hours after it is started or redeployed (affects `07_app`).
-> - **Lakebase:** one project per account with scale-to-zero compute (affects the `07_app` synced table).
-> - **AI Functions / Foundation Models:** no provisioned throughput and some models are unavailable, so the AI-powered steps (silver parsing, metadata generation) may hit model or rate limits.
-> - **Genie Code** may be unavailable; if so, the hint ladder degrades to reading the solution directly (see [Free-Edition fallback](#free-edition-fallback) below).
->
-> See the [Databricks Free Edition limitations](https://docs.databricks.com/aws/en/getting-started/free-edition-limitations) for the full list.
+> **Databricks Free Edition works for this workshop.** Here is how its limits play out for the steps that could be affected:
+> - **Databricks App (`07_app`): you can deploy it.** Free Edition allows up to 3 apps, so the one you build fits easily. It auto-stops 24 hours after you deploy it, so if you come back the next day, redeploy or restart it to demo again.
+> - **Lakebase synced table (`07_app`): you can build it.** Free Edition includes one Lakebase project with scale-to-zero compute, which is all this module needs (you only ever create one).
+> - **AI Functions / Foundation Models (`02_silver_docs`, `04_metadata`): they work, but throttle.** Free Edition has no provisioned throughput and some models may be unavailable, so the AI-powered steps can hit rate limits. If a call is throttled, slow down and retry.
+> - **Genie Code: may be unavailable.** If it is, the hint ladder falls back to reading the solution directly (see [Free-Edition fallback](#free-edition-fallback) below).
 
 ### Get the workshop into your workspace
 
@@ -186,7 +184,7 @@ The result is a structured pass/fail message with targeted guidance on exactly w
 
 Genie Code is available in notebooks, the SQL editor, and other Databricks environments. To open it:
 
-- **Click the sparkle icon** (✨) in the upper-right corner of any page or notebook.
+- **Click the Genie Code icon** (a magic lamp) in the upper-right corner of any page or notebook.
 - Or from the Workspace home, select **Code** in the prompt box, enter your prompt, and submit.
 - Once the side pane opens, click **Maximize** to expand to full-page mode if needed.
 
