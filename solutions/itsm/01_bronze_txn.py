@@ -17,6 +17,19 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Install dependencies for Lakebase provisioning
+# MAGIC
+# MAGIC This cell installs `psycopg[binary]` (Postgres client) — required only if
+# MAGIC Lakebase provisioning is attempted. The `%pip install` magic will restart
+# MAGIC the Python kernel; the bootstrap cell below runs fresh in the restarted kernel.
+
+# COMMAND ----------
+
+# MAGIC %pip install psycopg[binary] --quiet
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())

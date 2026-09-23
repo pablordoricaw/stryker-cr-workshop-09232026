@@ -37,6 +37,19 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Install dependencies for Lakebase provisioning
+# MAGIC
+# MAGIC This cell installs `psycopg[binary]` (Postgres client) — required only if
+# MAGIC Lakebase provisioning is attempted. The `%pip install` magic will restart
+# MAGIC the Python kernel; the bootstrap cell below runs fresh in the restarted kernel.
+
+# COMMAND ----------
+
+# MAGIC %pip install psycopg[binary] --quiet
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())
@@ -138,10 +151,6 @@ print(f"Delta seed      : {delta_seed_path}")
 # MAGIC `delta_fallback` is explicit, the Delta snapshot is used instead.
 
 # COMMAND ----------
-
-# %pip install psycopg[binary] --quiet
-# (psycopg is only needed if Lakebase provisioning is attempted; keep it quiet
-#  so the UI is not cluttered)
 
 # Resolve what CDF source to use based on source_mode widget.
 if source_mode == "delta_fallback":
