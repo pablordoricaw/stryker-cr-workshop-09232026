@@ -14,6 +14,29 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Install dependencies
+# MAGIC
+# MAGIC This cell upgrades `databricks-sdk` (for the `databricks.sdk.service.postgres`
+# MAGIC Lakebase module used to create the synced table) and installs `psycopg` (the
+# MAGIC Postgres driver the `07_app` checkpoint uses to verify served rows) — the
+# MAGIC serverless-default kernel has neither. Installing does not restart the kernel
+# MAGIC on its own, so the next cell calls `dbutils.library.restartPython()` to make
+# MAGIC the packages importable; the bootstrap cell then runs fresh.
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet --upgrade "psycopg[binary]" "databricks-sdk>=0.135"
+
+# COMMAND ----------
+
+# On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
+# installed packages are not importable until the kernel restarts. Restart explicitly
+# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # --- Workshop bootstrap: run this first in every notebook ---
 import os, sys
 _root = os.path.abspath(os.getcwd())
