@@ -194,9 +194,11 @@ from dbxmetagen.main import main
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — stage the three modes</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — stage the three modes
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
@@ -216,7 +218,6 @@ from dbxmetagen.main import main
 # MAGIC dbxmetagen generates one mode at a time. `comment` first is a good habit —
 # MAGIC the other modes reuse its context. `schema_name` is your single resolved
 # MAGIC schema, so the review tables land beside the gold tables.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -259,9 +260,11 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — apply the reviewed metadata</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — apply the reviewed metadata
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC for mode in ("comment", "pi", "domain"):
 # MAGIC     main({
@@ -278,7 +281,6 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # MAGIC         "pi_classification_tag_name": pi_classification_tag_name,
 # MAGIC     })
 # MAGIC ```
-# MAGIC </details>
 
 # COMMAND ----------
 

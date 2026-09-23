@@ -86,13 +86,14 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # TODO: source: "<gold_sales>"; pick dimensions with useful cardinality and
 # TODO: define atomic measures (SUM(...)) plus one composed MEASURE()-ratio.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — a discount Metric View skeleton
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — a discount Metric View skeleton</summary>
-# MAGIC
 # MAGIC ```sql
 # MAGIC CREATE OR REPLACE VIEW <my_metrics>
 # MAGIC WITH METRICS LANGUAGE YAML AS $$
@@ -114,7 +115,6 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC ```
 # MAGIC
 # MAGIC The complete solution is in `solutions/finance/stretch/add_your_own.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -161,17 +161,17 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # TODO:         "Which product family gives the deepest discounts?"])
 # TODO: print(result); assert result.passed, result.message
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — why the superset check is safe
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — why the superset check is safe</summary>
-# MAGIC
 # MAGIC The `06_genie` check asserts your agent is attached to **at least** the
 # MAGIC `expected_sources` (a superset test) and that each benchmark question
 # MAGIC returns SQL touching a curated source. Adding `my_metrics` and two questions
 # MAGIC extends coverage; it never removes the default assets, so your agent still
 # MAGIC passes the plain `06_genie` grade too. Full example:
 # MAGIC `solutions/finance/stretch/add_your_own.py`.
-# MAGIC </details>

@@ -118,13 +118,14 @@ from pyspark.sql import functions as F
 #   - flatten its per-page `elements` into one `parsed_text` string,
 #   - keep `path`, `filename`, `source_class`, and drop any parse failures.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — parsing bytes into text
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — parsing bytes into text</summary>
-# MAGIC
 # MAGIC `ai_parse_document` returns a VARIANT with `document.elements[]`; each
 # MAGIC element has `content`. Concatenate them and filter parse errors:
 # MAGIC
@@ -144,7 +145,6 @@ from pyspark.sql import functions as F
 # MAGIC
 # MAGIC A clean parse leaves `error_status` a VARIANT JSON-null (not SQL `NULL`),
 # MAGIC so cast it to string before the null test: `parse_error::string IS NULL`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -167,13 +167,14 @@ import json
 #   3. Write `silver_docs` (overwrite) with path, filename, source_class,
 #      doc_class, parsed_text, processed_at.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — deriving labels and classifying
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — deriving labels and classifying</summary>
-# MAGIC
 # MAGIC ```python
 # MAGIC class_labels = [r[0] for r in
 # MAGIC     spark.table(bronze_docs).select("source_class").distinct().orderBy("source_class").collect()]
@@ -192,7 +193,6 @@ import json
 # MAGIC
 # MAGIC The label set is content, not code: `ai_classify` will only ever return one
 # MAGIC of the labels you pass, so the ground-truth folder names are a perfect fit.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -220,13 +220,14 @@ import json
 #      `extracted:response:<field>` PLUS `extracted:error_message::string AS
 #      extract_error`, and write `silver_<class>` (overwrite).
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — the ai_extract pattern for one class
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — the ai_extract pattern for one class</summary>
-# MAGIC
 # MAGIC Build a typed schema, run `ai_extract`, and read fields out of the returned
 # MAGIC VARIANT with the `:` operator. Loop the same pattern over every class:
 # MAGIC
@@ -254,7 +255,6 @@ import json
 # MAGIC The gated `solutions/finance/02_silver_docs.py` has all five Finance
 # MAGIC schemas, an `instructions` option for the contract's formats, and a loop
 # MAGIC that writes a table (with `extract_error`) for every class.
-# MAGIC </details>
 
 # COMMAND ----------
 

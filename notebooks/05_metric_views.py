@@ -123,9 +123,11 @@ for name, view in spec.metric_views.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — metric-view YAML skeleton</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — metric-view YAML skeleton
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```sql
 # MAGIC CREATE OR REPLACE VIEW <metric_view_fqn>
 # MAGIC WITH METRICS
@@ -148,7 +150,6 @@ for name, view in spec.metric_views.items():
 # MAGIC (the checkpoint matches on them). Define atomic measures before any composed
 # MAGIC ratio. The full field set and expressions for your domain are in the gated
 # MAGIC `solutions/<domain>/05_metric_views.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -164,14 +165,15 @@ for name, view in spec.metric_views.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — mart KPI pattern</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — mart KPI pattern
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC Source the second view from your gold **mart** table. Use `SUM(...)` for
 # MAGIC additive totals (including pre-aggregated counts like a per-key
 # MAGIC transaction/finding/incident count) and compose any ratio from atomic
 # MAGIC measures with `MEASURE()`. Exact expressions are in the gated solution.
-# MAGIC </details>
 
 # COMMAND ----------
 

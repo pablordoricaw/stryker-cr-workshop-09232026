@@ -106,13 +106,14 @@ print(f"  --var app_name={ns.app_name()}")
 # TODO: medallion DAG, each passing catalog/domain/schema/volume as base_parameters.
 # TODO: Declare NO schemas:/volumes: resources — 00_setup already made those.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — one serverless notebook task
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — one serverless notebook task</summary>
-# MAGIC
 # MAGIC ```yaml
 # MAGIC tasks:
 # MAGIC   - task_key: gold
@@ -127,7 +128,6 @@ print(f"  --var app_name={ns.app_name()}")
 # MAGIC
 # MAGIC No `new_cluster`/`job_cluster_key` → serverless. The complete job is in
 # MAGIC `solutions/finance/stretch/package_as_dab_bundle/pipeline/`.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -150,13 +150,14 @@ print(f"  --var app_name={ns.app_name()}")
 # TODO: source_code_path to that bundle-local app source. No `mode: development` —
 # TODO: the app name must match what the `07_app` checkpoint expects.
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — bundle-local app source + deploy order
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — bundle-local app source + deploy order</summary>
-# MAGIC
 # MAGIC ```yaml
 # MAGIC # app/databricks.yml (at your repo root)
 # MAGIC sync:
@@ -173,7 +174,6 @@ print(f"  --var app_name={ns.app_name()}")
 # MAGIC app**. There is no in-bundle handle between them — they agree by shared
 # MAGIC `--var catalog`/`schema` and by the gold table name. The full runbook + the
 # MAGIC *why* are in `solutions/finance/stretch/package_as_dab_bundle/README.md`.
-# MAGIC </details>
 
 # COMMAND ----------
 

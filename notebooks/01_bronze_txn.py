@@ -129,24 +129,6 @@ print(f"Lakebase CDF tbl: {lakebase_cdf_table}")
 # MAGIC
 # MAGIC Complete the branch you selected. Leave the other branch alone. Both derive
 # MAGIC from the names printed above, so the same cell works for every domain.
-# MAGIC
-# MAGIC <details>
-# MAGIC <summary>Hint: Lakebase CDF (nudge)</summary>
-# MAGIC
-# MAGIC Read `lakebase_cdf_table`, rank events within each `spec.transaction_key`
-# MAGIC (your domain's grain key) by descending `_sort_by`, keep rank 1 unless its
-# MAGIC `_pg_change_type` is `delete`, then drop the CDF metadata columns.
-# MAGIC </details>
-# MAGIC
-# MAGIC <details>
-# MAGIC <summary>Hint: Delta fallback (nudge)</summary>
-# MAGIC
-# MAGIC Spark executors need a workspace-accessible path. Copy the committed
-# MAGIC `delta_seed_path` (printed above — `data/<domain>/transactional/delta/...`)
-# MAGIC into a subdirectory of `config.volume_path`, then read that destination with
-# MAGIC `spark.read.format("delta")`. Your domain's gated
-# MAGIC `solutions/<domain>/01_bronze_txn.py` has the full staging loop.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -163,22 +145,52 @@ print(f"Lakebase CDF tbl: {lakebase_cdf_table}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### 💡 Hint — Lakebase CDF (nudge)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Read `lakebase_cdf_table`, rank events within each `spec.transaction_key`
+# MAGIC (your domain's grain key) by descending `_sort_by`, keep rank 1 unless its
+# MAGIC `_pg_change_type` is `delete`, then drop the CDF metadata columns.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — Delta fallback (nudge)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Spark executors need a workspace-accessible path. Copy the committed
+# MAGIC `delta_seed_path` (printed above — `data/<domain>/transactional/delta/...`)
+# MAGIC into a subdirectory of `config.volume_path`, then read that destination with
+# MAGIC `spark.read.format("delta")`. Your domain's gated
+# MAGIC `solutions/<domain>/01_bronze_txn.py` has the full staging loop.
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 3. Write the shared bronze table
 # MAGIC
 # MAGIC Overwrite the target as Delta so rerunning either path is deterministic.
-# MAGIC
-# MAGIC <details>
-# MAGIC <summary>Hint: write shape (nudge)</summary>
-# MAGIC
-# MAGIC Use `transactions.write.format("delta").mode("overwrite")`, allow schema
-# MAGIC overwrite, and save to the fully qualified `bronze_table` (derived above for
-# MAGIC your domain).
-# MAGIC </details>
 
 # COMMAND ----------
 
 # TODO: Write `transactions` to `bronze_table` in overwrite mode.
 # ...
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 Hint — write shape (nudge)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Use `transactions.write.format("delta").mode("overwrite")`, allow schema
+# MAGIC overwrite, and save to the fully qualified `bronze_table` (derived above for
+# MAGIC your domain).
 
 # COMMAND ----------
 

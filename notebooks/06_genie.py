@@ -97,9 +97,11 @@ print(f"Benchmarks  : {benchmark_questions}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — a unique, identity-derived agent name</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — a unique, identity-derived agent name
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC agent_name = ns.genie_agent_name()   # workshop_genie_<domain>_<you>
 # MAGIC ```
@@ -109,7 +111,6 @@ print(f"Benchmarks  : {benchmark_questions}")
 # MAGIC checkpoint resolves that **same** name (pass `namespace=ns`) — so generation
 # MAGIC and verification always agree. There is no shared default; two participants
 # MAGIC in the same workspace each pass with their own agent.
-# MAGIC </details>
 
 # COMMAND ----------
 
@@ -150,9 +151,11 @@ print(f"Benchmarks  : {benchmark_questions}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <details>
-# MAGIC <summary>💡 Hint — create the agent with the SDK</summary>
-# MAGIC
+# MAGIC ### 💡 Hint — create the agent with the SDK
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ```python
 # MAGIC import json, uuid
 # MAGIC from databricks.sdk import WorkspaceClient
@@ -181,7 +184,6 @@ print(f"Benchmarks  : {benchmark_questions}")
 # MAGIC
 # MAGIC The full solution (your domain's sample questions, instructions, and an
 # MAGIC idempotent create-or-update) is in `solutions/<domain>/06_genie.py`.
-# MAGIC </details>
 
 # COMMAND ----------
 
