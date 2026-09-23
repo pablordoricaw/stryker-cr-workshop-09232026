@@ -85,7 +85,7 @@ Creates two governed UC Metric Views in your resolved participant schema:
 
 Builds a curated **Genie agent** as a natural-language interface:
 
-- Attaches your gold tables and Metric Views (all four Finance data assets, for example: `gold_sales`, `gold_contract_performance`, `finance_sales_metrics`, `finance_contract_metrics`).
+- Attaches your gold tables and Metric Views (all four domain data assets, for example: `gold_sales`, `gold_contract_performance`, `finance_sales_metrics`, `finance_contract_metrics`).
 - Gives the agent a **per-participant, identity-derived name** so teammates in the same workspace do not collide.
 - Adds pre-authored sample questions.
 - Ends on `06_genie`. The checkpoint finds your own agent by name, confirms the expected sources are attached (binding to your own workspace namespace), and asks benchmark questions. Each must return SQL that genuinely queries the curated data (mentioning a source name in a string, comment, alias, or CTE name does not count).

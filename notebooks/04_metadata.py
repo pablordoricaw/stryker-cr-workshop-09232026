@@ -304,8 +304,8 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # The sensitive columns to PI-classify come from the domain spec (resolved in §1),
-# so this shared cell names no domain-specific table or column literal — a
-# Security/ITSM participant tags their own columns, never Finance's.
+# so this shared cell names no domain-specific table or column literal — your
+# domain's participant tags their own columns, never another domain's.
 def _bq(*parts):
     """Backtick-quote each identifier part and join with dots."""
     return ".".join("`" + p.replace("`", "``") + "`" for p in parts)

@@ -73,8 +73,8 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC %md
 # MAGIC ## 2. Add your own Metric View
 # MAGIC
-# MAGIC Author a third governed Metric View in your schema for a question Finance
-# MAGIC asks often — e.g. discounting by product family and sales channel. Keep the
+# MAGIC Author a third governed Metric View in your schema for a question your
+# MAGIC domain asks often — e.g. discounting by product family and sales channel. Keep the
 # MAGIC YAML `source:` pointed at a gold table, define atomic measures first, then
 # MAGIC compose a ratio with `MEASURE()`. Confirmed `gold_sales` columns you can use:
 # MAGIC `product_family`, `sales_region`, `customer_type`, `sales_channel`,

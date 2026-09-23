@@ -1,13 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 🚀 Stretch · Package your work as a DAB (Finance gap)
+# MAGIC # 🚀 Stretch · Package your work as a DAB
 # MAGIC
 # MAGIC **Optional Tier-3 module.** Your workshop is already complete without it.
 # MAGIC
-# MAGIC The Finance team ships pipelines and apps by hand. A **Databricks Asset
-# MAGIC Bundle (DAB)** versions your **built work** as source-controlled YAML, so it
-# MAGIC is reviewable, re-runnable, and promotable between workspaces. This module
-# MAGIC has you package what you built — **not as one monolithic bundle**.
+# MAGIC Your team — Finance, Security, or ITSM — ships pipelines and apps by hand.
+# MAGIC A **Databricks Asset Bundle (DAB)** versions your **built work** as
+# MAGIC source-controlled YAML, so it is reviewable, re-runnable, and promotable
+# MAGIC between workspaces. This module has you package what you built — **not as one
+# MAGIC monolithic bundle**.
 # MAGIC
 # MAGIC **Package the built work as two independently-deployable bundles**, grouped
 # MAGIC by lifecycle / ownership / deploy cadence:

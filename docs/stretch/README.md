@@ -24,8 +24,8 @@ Everything here honours the same two workshop rules as the core path:
 
 ## 1. Package your work as a DAB
 
-**The gap this closes.** The Finance team ships pipelines and apps by hand.
-[Databricks Asset Bundles (DABs)](https://docs.databricks.com/aws/en/dev-tools/bundles/)
+**The gap this closes.** Your team — Finance, Security, or ITSM — ships pipelines
+and apps by hand. [Databricks Asset Bundles (DABs)](https://docs.databricks.com/aws/en/dev-tools/bundles/)
 version your **built work** as source-controlled YAML, so it is reviewable,
 re-runnable, and promotable between workspaces.
 
@@ -86,9 +86,9 @@ already accept your own contract through `workshop.check` extras:
   **superset** test, so adding assets never breaks the default grade.
 
 This is the same pattern the Security (#13) and ITSM (#14) domains use to reuse
-the generic checkpoints, so it is worth understanding even on Finance. The gated
-solution shows one concrete extra Metric View (`finance_discount_metrics`) and
-two extra benchmark questions end to end.
+the generic checkpoints, so it is worth understanding regardless of your domain.
+The gated solution shows one concrete extra Metric View (`finance_discount_metrics`)
+and two extra benchmark questions end to end.
 
 ## 3. From-scratch mode (documented once, applied on every stage)
 
