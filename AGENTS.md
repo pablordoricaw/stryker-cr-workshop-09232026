@@ -7,7 +7,7 @@ This repository is developed with multiple coding agents using Git worktrees. Fo
 - `dev` is the development integration branch. All feature work starts from and returns to `dev`.
 - `main` is the participant-ready release branch and the remote default branch. It must not contain the **maintainer** `AGENTS.md` (the worktree/Git workflow documented in this file), `CLAUDE.md`, the `docs/agents/` skill configuration, `generators/`, or other maintainer-only material. It ships **no** root `AGENTS.md`: Genie Code does not auto-discover a repo `AGENTS.md` by walking the directory tree, so the **participant hint ladder** is delivered another way; it lives at `docs/genie/.assistant_instructions.md` (on both `dev` and `main`) and the `00_setup` notebook injects it into each participant's personal `~/.assistant_instructions.md`, which Genie Code auto-loads at session start.
 - Feature branches use one dedicated worktree per agent task.
-- `worktrees/dev/` and `worktrees/main/` are reserved for coordination, review, and integration. Do not make feature changes directly in either worktree.
+- `worktrees/dev/` and `worktrees/main/` are reserved for review, integration, and release promotion. Do not make feature changes directly in either worktree.
 
 The maintainer agent instructions live on `dev`, so workshop participants who clone the default `main` branch receive only workshop material. The participant hint ladder rides along as `docs/genie/.assistant_instructions.md` and reaches Genie Code through the `00_setup` injection, not through a root `AGENTS.md`.
 
@@ -16,7 +16,7 @@ The maintainer agent instructions live on `dev`, so workshop participants who cl
 1. Run `git status --short --branch` and confirm the current worktree and branch.
 2. Work only in the worktree and branch assigned to you.
 3. Confirm that the feature branch is based on `dev`, not `main`.
-4. If you are on `dev` or `main` and the task requires code or workshop-content changes, stop and ask the coordinator for a feature worktree.
+4. If you are on `dev` or `main` and the task requires code or workshop-content changes, stop and request a dedicated feature worktree based on `dev`.
 5. Inspect existing changes before editing. Treat changes you did not create as user or agent work and preserve them.
 
 ## Worktree and Branch Ownership
@@ -25,7 +25,7 @@ The maintainer agent instructions live on `dev`, so workshop participants who cl
 - Use descriptive branch names that identify the agent and task, such as `codex/add-exercises`, `claude/update-docs`, or `cursor/fix-validation`.
 - Never use the same branch in more than one worktree.
 - Do not switch branches inside an assigned worktree.
-- Do not create, move, lock, unlock, prune, or remove worktrees unless you are the coordinating agent or the user explicitly asks you to.
+- Do not create, move, lock, unlock, prune, or remove worktrees unless the user explicitly asks you to.
 - Do not modify files inside the bare repository or its internal `worktrees/` metadata directory.
 
 ## Making Changes
@@ -42,7 +42,7 @@ All commit messages must follow the [Conventional Commits v1.0.0 specification](
 
 ## Feature Branch History
 
-Feature development maintains a linear history. Feature branches are rebased onto `dev`, and the coordinator integrates them into `dev` using fast-forward-only merges.
+Feature development maintains a linear history. Feature branches are rebased onto `dev`, then integrated into `dev` from the dev worktree using fast-forward-only merges.
 
 ### Update a feature branch
 
@@ -53,7 +53,7 @@ git status --short
 git rebase dev
 ```
 
-The worktree must be clean before rebasing. If `dev` needs to be refreshed from the remote, the coordinating agent must first update it in the dev worktree using a fast-forward-only operation.
+The worktree must be clean before rebasing. If `dev` needs to be refreshed from the remote, refresh it in the dev worktree using a fast-forward-only operation first.
 
 If the rebase has conflicts:
 
@@ -68,7 +68,7 @@ Because rebase rewrites commit IDs, a previously published feature branch may on
 
 ### Integrate a completed feature
 
-Only the coordinating agent integrates feature branches. In the dev worktree:
+Integrate feature branches only in the dev worktree, never from a feature worktree:
 
 ```bash
 git status --short --branch
@@ -79,7 +79,7 @@ Do not use a regular merge or create a merge commit when integrating a feature i
 
 ## Promote a Workshop Release
 
-The coordinating agent or a human maintainer may promote `dev` to `main`. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge. There is **no** hint-ladder swap; Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`) and only the maintainer-only paths are stripped.
+Promote `dev` to `main` from the main worktree. Release promotion is intentionally different from feature integration: `main` omits the maintainer-only files, so promotion uses a merge commit rather than a fast-forward merge. There is **no** hint-ladder swap; Genie Code does not auto-discover a repo `AGENTS.md`, so the participant hint ladder ships unchanged at `docs/genie/.assistant_instructions.md` (the `00_setup` notebook injects it into each participant's `~/.assistant_instructions.md`) and only the maintainer-only paths are stripped.
 
 From the main worktree, merge without committing, then strip the maintainer-only files:
 
@@ -133,4 +133,11 @@ Do not merge `main` back into `dev`, because doing so would carry the release-on
 - If a check cannot be run, state which check was skipped and why.
 - Leave the worktree clean at handoff unless the user explicitly asks for uncommitted changes.
 - Report the worktree path, branch name, commit IDs, validation performed, and any remaining risks or unresolved issues.
-- Do not merge the branch, remove its worktree, or delete its branch as part of handoff. The coordinating agent performs those steps after review.
+- Do not merge the branch, remove its worktree, or delete its branch as part of handoff. Those steps happen in the dev worktree after review.
+
+## Writing
+
+These rules apply to everything you write in this repository: code, comments, documentation, and instructions.
+
+1. Write without em-dashes. When a sentence reaches for one, recast the sentence rather than swapping in a semicolon or other punctuation.
+2. Write in short paragraphs and lists. Keep prose to a few sentences per paragraph, and use bullet or numbered lists for any set or sequence. This matters most in Markdown.
