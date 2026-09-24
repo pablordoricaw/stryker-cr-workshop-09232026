@@ -125,45 +125,23 @@ print(f"gold_serving   : {gold_serving}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Add your synced serving table to your 01_bronze_txn Lakebase project (CLI)
+# MAGIC ## 2. Add your synced serving table to your 01_bronze_txn Lakebase project
 # MAGIC
-# MAGIC Run this in a terminal with your `--profile`. **Reuse the Lakebase project you
-# MAGIC created for `01_bronze_txn`** — 07_app does not create one. Create the synced
-# MAGIC table straight into your **existing** catalog/schema — there is **no catalog to
-# MAGIC create or register** (`create-catalog` is not used). It lands as a **distinct
-# MAGIC table** in that same project, alongside 01_bronze_txn's CDF history table (they
-# MAGIC don't collide — different table, and a different Postgres schema). Snapshot mode
-# MAGIC is simplest on Free Edition; Triggered/Continuous need Change Data Feed on the
-# MAGIC gold table.
-
-# COMMAND ----------
-
-print(f"""# 2a. Reuse your 01_bronze_txn Lakebase project '{project_id}' — no create step.
-#     Only if you have NO project yet (you used 01_bronze_txn's synthesized path):
-#       databricks postgres create-project {project_id} \\
-#         --json '{{"spec": {{"display_name": "Stryker workshop — {me}"}}}}' --profile <p>
-
-# 2b. Create the synced table from the gold serving table (Snapshot mode). The id
-#     is a UC name in YOUR existing catalog/schema — there is NO create-catalog.
-databricks postgres create-synced-table {synced_table} \\
-  --json '{{"spec": {{
-    "source_table_full_name": "{gold_serving}",
-    "primary_key_columns": ["incident_id"],
-    "scheduling_policy": "SNAPSHOT",
-    "branch": "{branch}",
-    "postgres_database": "databricks_postgres",
-    "create_database_objects_if_missing": true,
-    "new_pipeline_spec": {{"storage_catalog": "{config.catalog}", "storage_schema": "{config.schema}"}}
-  }}}}' --profile <p>
-
-# 2c. Wait for the sync to be ONLINE
-databricks postgres get-synced-table "synced_tables/{synced_table}" --profile <p>
-""")
+# MAGIC Everything here stays in the Databricks workspace — no terminal needed.
+# MAGIC **Reuse the Lakebase project you created for `01_bronze_txn`** — 07_app does
+# MAGIC not create one. Need a refresher on creating the project? Go back to
+# MAGIC `01_bronze_txn`, which walks through it in the UI (Compute → Lakebase). Then
+# MAGIC run the cell below to create the **synced table** in-notebook with the SDK. It
+# MAGIC lands straight into your **existing** catalog/schema — there is **no catalog to
+# MAGIC create or register** — as a **distinct table** in that same project, alongside
+# MAGIC 01_bronze_txn's CDF history table (they don't collide — different table, and a
+# MAGIC different Postgres schema). Snapshot mode is simplest on Free Edition;
+# MAGIC Triggered/Continuous need Change Data Feed on the gold table.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC The same via the SDK, in-notebook (equivalent to the CLI above):
+# MAGIC Create the synced table in-notebook via the SDK, then poll until it is ONLINE:
 
 # COMMAND ----------
 
@@ -258,31 +236,51 @@ print("synced table ONLINE")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Deploy, wire resources, and START the app (CLI)
+# MAGIC ## 4. Deploy the app and wire its resources (Databricks UI)
 # MAGIC
-# MAGIC Deploying can leave the app **stopped** — start it explicitly. Add a Genie
-# MAGIC space resource (`genie-space`, Can run) and your Lakebase database
-# MAGIC (`postgres`, Can connect and create). After the sync is online, grant the
-# MAGIC app's service principal SELECT on the synced table.
+# MAGIC Do all of this in the workspace — no terminal. **Deploying an app starts it
+# MAGIC automatically**, so there is no separate start step. The `app/` folder already
+# MAGIC lives in your cloned workshop repo, so you deploy straight from it.
+# MAGIC
+# MAGIC 1. **Create** — app switcher (top-left grid) → **Databricks Apps** →
+# MAGIC    **+ Create app** → **Create a custom app**. Name it the `app_name` printed
+# MAGIC    below (the name is immutable), then **Create app**.
+# MAGIC 2. **Add resources** (in the Configure step, or later via **Edit → App
+# MAGIC    resources**):
+# MAGIC    - **+ Add resource → Genie Agent** → pick your `06_genie` space →
+# MAGIC      permission **Can run** (resource key `genie-space`; this fills the app's
+# MAGIC      `GENIE_SPACE_ID`).
+# MAGIC    - **+ Add resource → Database** → pick your `01_bronze_txn` Lakebase
+# MAGIC      project, its `production` branch, and `databricks_postgres` → permission
+# MAGIC      **Can connect and create** (key `postgres`; injects
+# MAGIC      `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD` + `LAKEBASE_ENDPOINT`).
+# MAGIC    - Set the env var **`SERVING_TABLE`** to your synced table's Postgres name
+# MAGIC      (the `serving_table` printed below) — edit `app/app.yaml` or set it in
+# MAGIC      the app's config.
+# MAGIC 3. **Deploy** — on the app page click **Deploy**, choose the **`app/` folder in
+# MAGIC    your cloned workshop repo** in the folder picker, then **Deploy**. The app
+# MAGIC    builds, starts on its own, and its URL becomes clickable.
+# MAGIC 4. **Grant read access** — wiring the database resource gives the app's service
+# MAGIC    principal a Postgres role with connect/create, but **not** read access, so
+# MAGIC    you grant `SELECT` yourself (next cell). Do this **after** the first deploy,
+# MAGIC    which is what creates the service principal's Postgres role.
 
 # COMMAND ----------
 
-print(f"""# 4a. Create + sync code + deploy + START
-databricks apps create {app_name} --profile <p>
-databricks sync ./app "/Workspace/Users/{me}/{app_name}" --profile <p>
-databricks apps deploy {app_name} --source-code-path "/Workspace/Users/{me}/{app_name}" --profile <p>
-databricks apps start {app_name} --profile <p>
+print(f"""# Plug these per-participant values into the Apps UI:
+#   App name         : {app_name}                 (Create a custom app → this name)
+#   Genie space id   : {dbutils.widgets.get("genie_space_id") or "your 06_genie space id"}   (resource: Genie Agent, Can run)
+#   Lakebase project : {project_id}                (resource: Database, Can connect and create)
+#   SERVING_TABLE    : {serving_table}
+#   Deploy source    : the app/ folder in your cloned workshop repo
 
-# 4b. Wire resources (Apps UI → Edit → Resources, or `databricks apps create-update`):
-#   genie-space  (Can run)                 → GENIE_SPACE_ID  ({dbutils.widgets.get("genie_space_id") or "your 06_genie space id"})
-#   postgres     (Can connect and create)  → PGHOST/... + LAKEBASE_ENDPOINT
-#   env SERVING_TABLE = {serving_table}
-
-# 4c. Grant the app SP SELECT on the synced table (run as project owner). The
-#     synced table lands in the Postgres schema "{config.schema}" (= your UC schema):
+# After the first deploy, grant the app's service principal read access to the
+# synced table. Do it in the UI: app switcher → Lakebase Postgres → your project →
+# SQL Editor (as a Lakebase superuser). The synced table lands in Postgres schema
+# "{config.schema}" (= your UC schema):
 #   GRANT USAGE ON SCHEMA "{config.schema}" TO "<app_sp_client_id>";
 #   GRANT SELECT ON ALL TABLES IN SCHEMA "{config.schema}" TO "<app_sp_client_id>";
-# app_sp_client_id: databricks apps get {app_name} --profile <p>  (service_principal_client_id)
+# Find <app_sp_client_id> on the app's Authorization tab (it is also the app's PGUSER).
 """)
 
 # COMMAND ----------

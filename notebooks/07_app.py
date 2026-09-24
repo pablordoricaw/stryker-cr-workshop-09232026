@@ -208,8 +208,9 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # TODO: Create the Lakebase synced table from `gold_serving` into `synced_table`
 # TODO: (your existing catalog/schema, already derived above), primary key
 # TODO: `primary_key` (your domain's key). Snapshot mode is simplest on Free
-# TODO: Edition. You can use the CLI or the SDK; the synced-table id is a UC name
-# TODO: in YOUR catalog — there is no Lakebase catalog to create.
+# TODO: Edition. Use the SDK in-notebook (sketch below) — no terminal needed; the
+# TODO: synced-table id is a UC name in YOUR catalog — there is no Lakebase catalog
+# TODO: to create.
 #
 # SDK sketch (see solutions/<domain>/07_app.py for the complete, waited version):
 #   from databricks.sdk import WorkspaceClient
@@ -239,70 +240,80 @@ print(f"Gold source     : {gold_serving}   (primary key: {', '.join(primary_key)
 # MAGIC %md
 # MAGIC Put the name of the project you created in `01_bronze_txn` in the
 # MAGIC `lakebase_project` widget — 07_app reuses it and does **not** create a project.
-# MAGIC Only if you have none (you used 01_bronze_txn's synthesized path), create one:
-# MAGIC ```bash
-# MAGIC databricks postgres create-project <project_id> \
-# MAGIC   --json '{"spec": {"display_name": "<project_id>"}}' --profile <p>
-# MAGIC ```
-# MAGIC A project auto-creates a `production` branch + `primary` endpoint
-# MAGIC (scale-to-zero). You do **not** run `databricks postgres create-catalog`.
+# MAGIC Don't have one yet (you used 01_bronze_txn's synthesized path)? Go back to
+# MAGIC `01_bronze_txn` and create it in the UI (Compute → Lakebase) — you never have to
+# MAGIC leave the workspace. A project auto-creates a `production` branch + `primary`
+# MAGIC endpoint (scale-to-zero), and there is **no** Lakebase catalog to create.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — create the synced table (CLI)
+# MAGIC ### 💡 Hint — create the synced table (SDK, in-notebook)
 # MAGIC
-# MAGIC ```bash
-# MAGIC databricks postgres create-synced-table <catalog>.<schema>.<serving_base>_<suffix> \
-# MAGIC   --json '{"spec": {
-# MAGIC     "source_table_full_name": "<catalog>.<schema>.<gold_serving_table>",
-# MAGIC     "primary_key_columns": ["<your_primary_key>"],
-# MAGIC     "scheduling_policy": "SNAPSHOT",
-# MAGIC     "branch": "projects/<project_id>/branches/production",
-# MAGIC     "postgres_database": "databricks_postgres",
-# MAGIC     "create_database_objects_if_missing": true,
-# MAGIC     "new_pipeline_spec": {"storage_catalog": "<your_catalog>", "storage_schema": "<your_schema>"}
-# MAGIC   }}' --profile <p>
+# MAGIC Fill in the SDK sketch above with the concrete names printed in cell 1:
+# MAGIC ```python
+# MAGIC w.postgres.create_synced_table(
+# MAGIC     synced_table_id=synced_table,
+# MAGIC     synced_table=SyncedTable(spec=SyncedTableSyncedTableSpec(
+# MAGIC         source_table_full_name=gold_serving,
+# MAGIC         primary_key_columns=primary_key, scheduling_policy=Policy.SNAPSHOT,
+# MAGIC         branch=branch, postgres_database="databricks_postgres",
+# MAGIC         create_database_objects_if_missing=True,
+# MAGIC         new_pipeline_spec=NewPipelineSpec(
+# MAGIC             storage_catalog=config.catalog, storage_schema=config.schema))),
+# MAGIC ).wait()
 # MAGIC ```
-# MAGIC The synced-table id is a UC name **in your own catalog** — there is no
-# MAGIC `create-catalog`. `storage_catalog` / `storage_schema` (DLT pipeline
-# MAGIC metadata) are a **regular UC catalog/schema** — your existing ones are fine.
-# MAGIC Use the concrete names printed in cell 1. Check status with
-# MAGIC `databricks postgres get-synced-table "synced_tables/<synced_table>"` and
-# MAGIC wait for it to be **online** before deploying.
+# MAGIC The synced-table id is a UC name **in your own catalog** — there is no Lakebase
+# MAGIC catalog to create, and `storage_catalog` / `storage_schema` (DLT pipeline
+# MAGIC metadata) are just your existing UC catalog/schema. Then poll
+# MAGIC `w.postgres.get_synced_table(name=f"synced_tables/{synced_table}")` until its
+# MAGIC detailed state is **online** before deploying. The complete, waited version is
+# MAGIC in `solutions/<domain>/07_app.py`.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Deploy and **start** the app
+# MAGIC ## 3. Deploy the app and wire its resources (UI)
 # MAGIC
-# MAGIC Deploy `app/` as a Databricks App named `app_name`, add its resources, and
-# MAGIC **start it** — deploying can leave the app stopped, and a stopped app answers
-# MAGIC nothing.
+# MAGIC Deploy `app/` (already in your cloned workshop repo) as a Databricks App named
+# MAGIC `app_name`, add its resources, and serve your rows — all in the workspace, no
+# MAGIC terminal. **Deploying starts the app automatically**, so there is no separate
+# MAGIC start step.
 # MAGIC
-# MAGIC Add resources (Apps UI → Edit → Resources, or CLI): a **Genie space** (key
-# MAGIC `genie-space`, *Can run*) and your **Lakebase database** (key `postgres`,
-# MAGIC *Can connect and create*). Set `SERVING_TABLE` to your synced table's
-# MAGIC Postgres name — `<schema>.<table>`, the `serving_table` printed above
-# MAGIC (e.g. `<your_schema>.<serving_base>_<suffix>`).
+# MAGIC Add resources (in the Configure step or later via **Edit → App resources**): a
+# MAGIC **Genie Agent** (key `genie-space`, *Can run* — fills `GENIE_SPACE_ID`) and your
+# MAGIC **Lakebase database** (key `postgres`, *Can connect and create* — injects
+# MAGIC `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD` + `LAKEBASE_ENDPOINT`). Set
+# MAGIC `SERVING_TABLE` to your synced table's Postgres name — `<schema>.<table>`, the
+# MAGIC `serving_table` printed above (e.g. `<your_schema>.<serving_base>_<suffix>`).
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — deploy + start (CLI)
+# MAGIC ### 💡 Hint — deploy + wire in the UI
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ```bash
-# MAGIC databricks apps create <app_name> --profile <p>            # once
-# MAGIC databricks sync ./app "/Workspace/Users/<me>/<app_name>" --profile <p>
-# MAGIC databricks apps deploy <app_name> \
-# MAGIC   --source-code-path "/Workspace/Users/<me>/<app_name>" --profile <p>
-# MAGIC databricks apps start <app_name> --profile <p>             # explicit start!
-# MAGIC ```
-# MAGIC After the synced table is online, grant the app's service principal SELECT on
-# MAGIC it (see solutions/<domain>/07_app.py).
+# MAGIC 1. **Create** — app switcher → **Databricks Apps** → **+ Create app** →
+# MAGIC    **Create a custom app**. Name it `app_name` (immutable), then **Create app**.
+# MAGIC 2. **Add resources** — **+ Add resource → Genie Agent** (your `06_genie` space,
+# MAGIC    *Can run*) and **+ Add resource → Database** (your `01_bronze_txn` project /
+# MAGIC    `production` branch / `databricks_postgres`, *Can connect and create*). Set
+# MAGIC    env `SERVING_TABLE` to your `serving_table` (edit `app/app.yaml` or the app's
+# MAGIC    config).
+# MAGIC 3. **Deploy** — click **Deploy**, pick the **`app/` folder in your cloned
+# MAGIC    workshop repo**, then **Deploy**. It builds and starts on its own.
+# MAGIC 4. **Grant read access** — the wired database resource lets the app's service
+# MAGIC    principal connect, but not read. **After the first deploy**, open **Lakebase
+# MAGIC    Postgres → your project → SQL Editor** (as a Lakebase superuser) and grant it
+# MAGIC    `SELECT`:
+# MAGIC    ```sql
+# MAGIC    GRANT USAGE ON SCHEMA "<your_schema>" TO "<app_sp_client_id>";
+# MAGIC    GRANT SELECT ON ALL TABLES IN SCHEMA "<your_schema>" TO "<app_sp_client_id>";
+# MAGIC    ```
+# MAGIC    Find `<app_sp_client_id>` on the app's **Authorization** tab (also its
+# MAGIC    `PGUSER`). Full solution: `solutions/<domain>/07_app.py`.
 
 # COMMAND ----------
 
