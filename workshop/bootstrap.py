@@ -1,14 +1,14 @@
 """Make ``import workshop`` work from anywhere inside the repo.
 
 In a Databricks Git folder, starter notebooks live under ``notebooks/`` and the
-repo root is **not** guaranteed to be on ``sys.path`` — the notebook's working
+repo root is **not** guaranteed to be on ``sys.path``. The notebook's working
 directory is typically its own folder, so a bare ``import workshop`` can fail
 for every participant.
 
 The canonical fix is a tiny, self-contained first cell (documented in the
 top-level ``README.md`` and ``workshop/README.md``) that walks up from the
-current directory to the repo root — anchored on ``workshop/__init__.py``, never
-a hardcoded path — and puts it on ``sys.path`` *before* importing workshop::
+current directory to the repo root, anchored on ``workshop/__init__.py`` and never
+a hardcoded path, and puts it on ``sys.path`` *before* importing workshop::
 
     import os, sys
     _root = os.path.abspath(os.getcwd())
@@ -24,7 +24,7 @@ a hardcoded path — and puts it on ``sys.path`` *before* importing workshop::
     import workshop
 
 Once ``workshop`` is importable, :func:`bootstrap` exposes the identical anchor
-logic as a reusable, idempotent call — handy for notebooks that re-run their
+logic as a reusable, idempotent call, handy for notebooks that re-run their
 cells or code that wants the repo root programmatically. It is dependency-free
 and Free-Edition-safe (pure stdlib, no Spark, no network).
 """

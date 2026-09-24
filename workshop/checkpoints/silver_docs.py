@@ -10,7 +10,7 @@ top of the ``01_bronze_docs`` bronze table:
    per-class ``silver_<class>`` table.
 
 Like ``01_bronze_docs``, it asserts only externally-observable Unity Catalog
-state — table existence, per-document identity, and extraction success — never
+state, table existence, per-document identity, and extraction success, never
 *how* the notebook parsed, classified, or extracted. A participant can reach the
 same state with SQL AI functions, PySpark ``expr``, a Declarative Pipeline, or
 anything else.
@@ -19,7 +19,7 @@ anything else.
 shipped documents (``<class>/<filename>`` for each direct ``<class>/*.pdf`` the
 workshop ships for the run's domain, located via the notebook bootstrap's repo
 anchor) and requires the observed ``source_class``/``filename`` set in
-``silver_docs`` to equal it exactly — so a missing document, a duplicate, or an
+``silver_docs`` to equal it exactly, so a missing document, a duplicate, or an
 unexpected one all fail, where an aggregate count would not.
 
 **Extraction must succeed, not merely produce a row.** ``ai_extract`` returns a
@@ -40,17 +40,17 @@ Run it as::
 
 Extras forwarded through ``ctx.extras``:
 
-* ``domain`` — which shipped dataset determines the expected documents.
-* ``docs_table`` — consolidated parsed+classified table (default ``silver_docs``).
-* ``class_column`` — the predicted-class column in ``docs_table`` (default
+* ``domain`` selects which shipped dataset determines the expected documents.
+* ``docs_table`` is the consolidated parsed+classified table (default ``silver_docs``).
+* ``class_column`` is the predicted-class column in ``docs_table`` (default
   ``doc_class``).
-* ``text_column`` — the parsed-text column in ``docs_table`` (default
+* ``text_column`` is the parsed-text column in ``docs_table`` (default
   ``parsed_text``).
-* ``extract_error_column`` — the ``ai_extract`` error column in each per-class
+* ``extract_error_column`` is the ``ai_extract`` error column in each per-class
   table (default ``extract_error``).
-* ``class_table_prefix`` — prefix for the per-class extraction tables (default
+* ``class_table_prefix`` is the prefix for the per-class extraction tables (default
   ``silver_``, so class ``vendor_invoice`` -> ``silver_vendor_invoice``).
-* ``expected_doc_keys`` — an explicit ``{"<class>/<filename>", ...}`` override
+* ``expected_doc_keys`` is an explicit ``{"<class>/<filename>", ...}`` override
   that bypasses source derivation (a documented fallback for contexts where the
   committed source tree is not on disk).
 
@@ -163,7 +163,7 @@ def check_silver_docs(ctx: CheckContext) -> CheckResult:
         return _fail(
             "No catalog/schema to check. Call workshop.check('02_silver_docs', "
             "spark=spark, catalog=config.catalog, schema=config.schema, "
-            "domain=config.domain) — the notebook does this for you.",
+            "domain=config.domain). The notebook does this for you.",
             {"catalog": catalog, "schema": schema},
         )
 
@@ -255,7 +255,7 @@ def check_silver_docs(ctx: CheckContext) -> CheckResult:
     if distinct_keys != total:
         return _fail(
             f"{fq_docs} has {total} row(s) but only {distinct_keys} distinct "
-            f"documents ({ID_CLASS_COLUMN}/{ID_NAME_COLUMN}) — {total - distinct_keys} "
+            f"documents ({ID_CLASS_COLUMN}/{ID_NAME_COLUMN}), {total - distinct_keys} "
             f"duplicate row(s). Parse and classify each document exactly once.",
             {
                 "stage": "silver_docs",
@@ -291,7 +291,7 @@ def check_silver_docs(ctx: CheckContext) -> CheckResult:
             },
         )
 
-    # Every predicted class must be one the workshop ships — a stray/hallucinated
+    # Every predicted class must be one the workshop ships, so a stray/hallucinated
     # label means classification drifted off the fixed label set.
     predicted = {
         row[0]
@@ -351,7 +351,7 @@ def check_silver_docs(ctx: CheckContext) -> CheckResult:
     if per_class_errors > 0:
         return _fail(
             f"{per_class_errors} extracted row(s) across the "
-            f"`{class_prefix}<class>` tables carry a non-null `{err_column}` — "
+            f"`{class_prefix}<class>` tables carry a non-null `{err_column}`, "
             f"ai_extract failed for them. A row with an extraction error does not "
             f"count as extracted; fix the inputs/schema so every extraction "
             f"succeeds.",

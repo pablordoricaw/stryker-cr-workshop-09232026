@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 01 · Bronze documents — SOLUTION (Security)
+# MAGIC # 01 · Bronze documents · SOLUTION (Security)
 # MAGIC
 # MAGIC **Gated reference solution.** This is the fully-worked version of the
 # MAGIC `01_bronze_docs` starter notebook and the ground truth maintainer CI runs
@@ -8,13 +8,13 @@
 # MAGIC `01_bronze_docs` checkpoint) before peeking here.
 # MAGIC
 # MAGIC It lands the committed Security source PDFs into your UC Volume and
-# MAGIC registers a **bronze documents table** over the raw files — a faithful
+# MAGIC registers a **bronze documents table** over the raw files, a faithful
 # MAGIC bronze layer: one row per document, raw bytes plus lightweight provenance
 # MAGIC (path, filename, ground-truth class from the folder, size, modified time),
 # MAGIC no parsing yet. Module #6 parses and classifies from here.
 # MAGIC
 # MAGIC The Security document classes are `vulnerability_scan`, `cve_advisory`,
-# MAGIC `pentest_report`, `cloud_posture_finding`, and `other` — five two-page PDFs
+# MAGIC `pentest_report`, `cloud_posture_finding`, and `other`, with five two-page PDFs
 # MAGIC each (25 total). The pipeline itself is identical to the other domains; only
 # MAGIC the dataset differs.
 
@@ -44,7 +44,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "security", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -65,7 +65,7 @@ config = workshop.resolve_config(
 
 print("Your workshop environment:")
 print(f"  domain : {config.domain}")
-print(f"  catalog: {config.catalog}   (existing — not created)")
+print(f"  catalog: {config.catalog}   (existing, not created)")
 print(f"  schema : {config.schema}")
 print(f"  volume : {config.volume}   (files land in {config.volume_path})")
 
@@ -79,7 +79,7 @@ print(f"  volume : {config.volume}   (files land in {config.volume_path})")
 # MAGIC into a `documents/` folder inside your UC Volume with `dbutils.fs.cp`. The
 # MAGIC repo path is local to the Git folder, so it needs a `file:` scheme; the
 # MAGIC destination is the `/Volumes/...` path from your config. Re-running is safe
-# MAGIC — it overwrites the same files.
+# MAGIC because it overwrites the same files.
 
 # COMMAND ----------
 
@@ -100,13 +100,13 @@ for entry in dbutils.fs.ls(docs_path):
 # MAGIC
 # MAGIC Read the raw PDFs with Spark's `binaryFile` format (recursively, PDFs
 # MAGIC only) and write a Delta table with **one row per document**. We keep it a
-# MAGIC true bronze layer — the raw `content` bytes plus lightweight provenance:
+# MAGIC true bronze layer with the raw `content` bytes plus lightweight provenance:
 # MAGIC
 # MAGIC | column | source |
 # MAGIC | --- | --- |
 # MAGIC | `path` | full `/Volumes/...` path (from `binaryFile`) |
 # MAGIC | `filename` | last path segment |
-# MAGIC | `source_class` | parent folder — the ground-truth class |
+# MAGIC | `source_class` | parent folder, the ground-truth class |
 # MAGIC | `size_bytes` | `binaryFile.length` |
 # MAGIC | `modification_time` | `binaryFile.modificationTime` |
 # MAGIC | `content` | raw file bytes (module #6 parses these) |
@@ -167,7 +167,7 @@ display(
 # MAGIC %md
 # MAGIC ## 4. Checkpoint: `01_bronze_docs`
 # MAGIC
-# MAGIC Confirms — by looking at your volume and catalog, not this notebook — that
+# MAGIC Confirms, by looking at your volume and catalog rather than this notebook, that
 # MAGIC the PDFs landed and the bronze table registers all of them. The expected
 # MAGIC count is derived from the committed `data/security/documents/` tree (25),
 # MAGIC so nothing is hardcoded. Green means you're ready for module #6.

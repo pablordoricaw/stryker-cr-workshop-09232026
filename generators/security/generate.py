@@ -19,7 +19,7 @@ present.
 
 The transactional grain intentionally mirrors Finance's join spine: every
 finding carries a ``cve_id``, and the ``cve_advisory`` documents each publish one
-``cve_id`` — so ``bronze_scan_findings.cve_id`` joins the extracted
+``cve_id``, so ``bronze_scan_findings.cve_id`` joins the extracted
 ``silver_cve_advisory.cve_id`` exactly the way Finance's ``contract_id`` joins
 ``agreement_id``. The distinct ``cve_id`` set defines the gold mart grain.
 """
@@ -137,7 +137,7 @@ VULN_CATEGORIES = (
     "Cryptographic Weakness",
 )
 
-# Base remediation effort (hours) by category — deterministic per finding before
+# Base remediation effort (hours) by category, deterministic per finding before
 # a small seeded jitter. Higher for the harder-to-fix classes.
 CATEGORY_BASE_HOURS = {
     "Remote Code Execution": Decimal("16.0"),
@@ -268,7 +268,7 @@ def _severity_for(score: Decimal) -> str:
 
 
 def _sla_for(severity: str) -> int:
-    """Remediation SLA (days) by severity — the workshop's fixed policy."""
+    """Remediation SLA (days) by severity, the workshop's fixed policy."""
     return {"Critical": 7, "High": 30, "Medium": 90, "Low": 180}[severity]
 
 
@@ -406,7 +406,7 @@ class SecurityPdf:
         self.pdf.setFillColor(colors.HexColor("#5B6573"))
         self.pdf.setFont("Helvetica", 7)
         self.pdf.drawString(
-            40, 24, "Synthetic workshop document — no real company or system data"
+            40, 24, "Synthetic workshop document | no real company or system data"
         )
         self.pdf.drawRightString(570, 24, f"Page {self.page}")
 
@@ -587,7 +587,7 @@ def cve_advisory_pdf(path: Path, index: int, rng: random.Random) -> dict[str, st
     published = date(2026, 6, 3) + timedelta(days=index * 11)
     doc = SecurityPdf(path, f"Security Advisory {cve_id}", colors.HexColor("#6941C6"), index)
     doc.text(
-        f"{cve_id} — {title}. This advisory describes a single vulnerability, its "
+        f"{cve_id}: {title}. This advisory describes a single vulnerability, its "
         "affected products, and the recommended remediation. It is the "
         "authoritative per-CVE record that vulnerability-scan findings reference."
     )
@@ -732,7 +732,7 @@ def cloud_posture_finding_pdf(path: Path, index: int, rng: random.Random) -> dic
     doc.text(
         f"Finding {finding_ref} | {providers[index]} {services[index]} | Control "
         f"{controls[index]}. This is a cloud-posture / compliance finding raised by "
-        "continuous configuration monitoring — a control deviation on a cloud "
+        "continuous configuration monitoring. It is a control deviation on a cloud "
         "resource, distinct from a software-CVE advisory."
     )
     doc.kv(
@@ -981,8 +981,8 @@ def generate_findings() -> list[dict[str, Any]]:
         severity = cve["severity"]
         category = cve["category"]
 
-        # Status mix. Production during a Q1-2026 remediation backlog skews Open —
-        # a traceable "production critical backlog" story for later exercises.
+        # Status mix. Production during a Q1-2026 remediation backlog skews Open,
+        # giving a traceable "production critical backlog" story for later exercises.
         in_backlog = asset[3] == "Production" and date(2026, 1, 15) <= scan_date <= date(2026, 3, 31)
         if in_backlog:
             status = rng.choices(

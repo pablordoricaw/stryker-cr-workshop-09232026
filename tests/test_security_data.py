@@ -1,4 +1,4 @@
-"""Committed Security dataset integrity — pure stdlib, off-platform.
+"""Committed Security dataset integrity. Pure stdlib, off-platform.
 
 These tests guard the *committed* ``data/security`` artifacts (the ones shipped
 to participants) without the heavy generator dependencies (pyarrow / deltalake /

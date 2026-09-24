@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 07 · Data app over a Lakebase synced table — SOLUTION (Security)
+# MAGIC # 07 · Data app over a Lakebase synced table · SOLUTION (Security)
 # MAGIC
 # MAGIC **Gated reference solution.** Ships the provided Streamlit app (`app/`) wired
 # MAGIC to a per-participant **Genie agent** (#11) and a **Lakebase synced table**
@@ -19,7 +19,7 @@
 # MAGIC
 # MAGIC This cell upgrades `databricks-sdk` (for the `databricks.sdk.service.postgres`
 # MAGIC Lakebase module used to create the synced table) and installs `psycopg` (the
-# MAGIC Postgres driver the `07_app` checkpoint uses to verify served rows) — the
+# MAGIC Postgres driver the `07_app` checkpoint uses to verify served rows). The
 # MAGIC serverless-default kernel has neither. Installing does not restart the kernel
 # MAGIC on its own, so the next cell calls `dbutils.library.restartPython()` to make
 # MAGIC the packages importable; the bootstrap cell then runs fresh.
@@ -32,7 +32,7 @@
 
 # On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
 # installed packages are not importable until the kernel restarts. Restart explicitly
-# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+# here, before any state is built, so the bootstrap cell below runs in the fresh kernel.
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -52,17 +52,17 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
 dbutils.widgets.text("genie_space_id", "", "Genie space id (from 06_genie)")
-dbutils.widgets.text("lakebase_project", "", "Lakebase project — reuse the one from 01_bronze_txn (required)")
+dbutils.widgets.text("lakebase_project", "", "Lakebase project, reuse the one from 01_bronze_txn (required)")
 
 # COMMAND ----------
 
 # Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
-# created, and your namespace — the one source of truth for every unique name in
+# created, and your namespace, the one source of truth for every unique name in
 # the shared workspace (app, Lakebase project, synced table).
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
@@ -82,7 +82,7 @@ ns = workshop.namespace(me, domain=config.domain)
 # MAGIC ## 1. Per-participant names (identity-derived)
 # MAGIC
 # MAGIC The app, Lakebase project, and synced table are workspace-scoped, so each
-# MAGIC name carries an identity suffix — like the `06_genie` agent name. The
+# MAGIC name carries an identity suffix, like the `06_genie` agent name. The
 # MAGIC Security serving table syncs from `gold_cve_exposure` on `cve_id`, so its
 # MAGIC serving-table base is `gold_cve_exposure_served`.
 
@@ -97,7 +97,7 @@ SERVING_BASE = "gold_cve_exposure_served"
 app_name = ns.app_name()
 
 # Bring-your-own Lakebase project: reuse the SAME project you created for
-# 01_bronze_txn (supplied via the widget). 07_app does NOT create a project — its
+# 01_bronze_txn (supplied via the widget). 07_app does NOT create a project. Its
 # synced serving table lands there as a DISTINCT table, alongside (not colliding
 # with) 01_bronze_txn's CDF history table (different table, different Postgres schema).
 project_id = dbutils.widgets.get("lakebase_project") or None
@@ -111,7 +111,7 @@ if not project_id:
 branch = f"projects/{project_id}/branches/production"
 gold_serving = f"{config.catalog}.{config.schema}.gold_cve_exposure"
 
-# The synced table lands in YOUR existing catalog + schema — no catalog is
+# The synced table lands in YOUR existing catalog + schema, so no catalog is
 # created, and none is registered. The synced-table id `<catalog>.<schema>.<table>`
 # doubles as a Unity Catalog virtual table AND a Postgres table `<table>` in
 # schema `<schema>`, so the app reads `<schema>.<table>` from Postgres directly.
@@ -131,14 +131,14 @@ print(f"gold_serving   : {gold_serving}")
 # MAGIC %md
 # MAGIC ## 2. Add your synced serving table to your 01_bronze_txn Lakebase project
 # MAGIC
-# MAGIC Everything here stays in the Databricks workspace — no terminal needed.
-# MAGIC **Reuse the Lakebase project you created for `01_bronze_txn`** — 07_app does
+# MAGIC Everything here stays in the Databricks workspace, with no terminal needed.
+# MAGIC **Reuse the Lakebase project you created for `01_bronze_txn`**, because 07_app does
 # MAGIC not create one. Need a refresher on creating the project? Go back to
 # MAGIC `01_bronze_txn`, which walks through it in the UI (Compute → Lakebase). Then
 # MAGIC run the cell below to create the **synced table** in-notebook with the SDK. It
-# MAGIC lands straight into your **existing** catalog/schema — there is **no catalog to
-# MAGIC create or register** — as a **distinct table** in that same project, alongside
-# MAGIC 01_bronze_txn's CDF history table (they don't collide — different table, and a
+# MAGIC lands straight into your **existing** catalog/schema (there is **no catalog to
+# MAGIC create or register**) as a **distinct table** in that same project, alongside
+# MAGIC 01_bronze_txn's CDF history table (they don't collide, since it is a different table, and a
 # MAGIC different Postgres schema). Snapshot mode is simplest on Free Edition;
 # MAGIC Triggered/Continuous need Change Data Feed on the gold table.
 
@@ -162,9 +162,9 @@ import time
 w = WorkspaceClient()
 
 # Assumes the project (2a) already exists. The synced-table id is a UC name in
-# your existing catalog — there is NO Lakebase catalog. NOTE: `.wait()` returns
+# your existing catalog, and there is NO Lakebase catalog. NOTE: `.wait()` returns
 # once the resource is provisioned, which can still be SYNCED_TABLE_PROVISIONING
-# — it does NOT block until the initial snapshot finishes. So poll below until
+# and it does NOT block until the initial snapshot finishes. So poll below until
 # the sync is ONLINE before deploying the app / expecting served rows. The
 # `07_app` checkpoint correctly stays RED until the table is online and serving.
 synced = w.postgres.create_synced_table(
@@ -209,13 +209,13 @@ print("synced table ONLINE")
 # MAGIC
 # MAGIC The complete code for each `PARTICIPANT GAP`. Paste these bodies over the
 # MAGIC `raise NotImplementedError(...)` lines in `app/backend.py`, then redeploy.
-# MAGIC The app is domain-agnostic — it selects from whatever `SERVING_TABLE` names,
+# MAGIC The app is domain-agnostic and selects from whatever `SERVING_TABLE` names,
 # MAGIC so the Security serving table works unchanged.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **GAP 1 of 2 — Genie Conversation API connection** (`Backend.ask_genie`):
+# MAGIC **GAP 1 of 2, Genie Conversation API connection** (`Backend.ask_genie`):
 # MAGIC ```python
 # MAGIC def ask_genie(self, question: str) -> dict:
 # MAGIC     msg = self._ws().genie.start_conversation_and_wait(GENIE_SPACE_ID, question)
@@ -229,7 +229,7 @@ print("synced table ONLINE")
 # MAGIC     return {"status": str(status).lower(), "answer": answer_text, "sql": sql}
 # MAGIC ```
 # MAGIC
-# MAGIC **GAP 2 of 2 — Lakebase read** (`Backend.fetch_serving_rows`):
+# MAGIC **GAP 2 of 2, Lakebase read** (`Backend.fetch_serving_rows`):
 # MAGIC ```python
 # MAGIC def fetch_serving_rows(self, limit: int = SERVING_LIMIT) -> list[dict]:
 # MAGIC     schema, table = SERVING_TABLE.split(".", 1)
@@ -244,11 +244,11 @@ print("synced table ONLINE")
 # MAGIC %md
 # MAGIC ## 4. Deploy the app and wire its resources (Databricks UI)
 # MAGIC
-# MAGIC Do all of this in the workspace — no terminal. **Deploying an app starts it
+# MAGIC Do all of this in the workspace, with no terminal. **Deploying an app starts it
 # MAGIC automatically**, so there is no separate start step. The `app/` folder already
 # MAGIC lives in your cloned workshop repo, so you deploy straight from it.
 # MAGIC
-# MAGIC 1. **Create** — app switcher (top-left grid) → **Databricks Apps** →
+# MAGIC 1. **Create**. App switcher (top-left grid) → **Databricks Apps** →
 # MAGIC    **+ Create app** → **Create a custom app**. Name it the `app_name` printed
 # MAGIC    below (the name is immutable), then **Create app**.
 # MAGIC 2. **Add resources** (in the Configure step, or later via **Edit → App
@@ -261,12 +261,12 @@ print("synced table ONLINE")
 # MAGIC      **Can connect and create** (key `postgres`; injects
 # MAGIC      `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD` + `LAKEBASE_ENDPOINT`).
 # MAGIC    - Set the env var **`SERVING_TABLE`** to your synced table's Postgres name
-# MAGIC      (the `serving_table` printed below) — edit `app/app.yaml` or set it in
+# MAGIC      (the `serving_table` printed below), then edit `app/app.yaml` or set it in
 # MAGIC      the app's config.
-# MAGIC 3. **Deploy** — on the app page click **Deploy**, choose the **`app/` folder in
+# MAGIC 3. **Deploy**. On the app page click **Deploy**, choose the **`app/` folder in
 # MAGIC    your cloned workshop repo** in the folder picker, then **Deploy**. The app
 # MAGIC    builds, starts on its own, and its URL becomes clickable.
-# MAGIC 4. **Grant read access** — wiring the database resource gives the app's service
+# MAGIC 4. **Grant read access**. Wiring the database resource gives the app's service
 # MAGIC    principal a Postgres role with connect/create, but **not** read access, so
 # MAGIC    you grant `SELECT` yourself (next cell). Do this **after** the first deploy,
 # MAGIC    which is what creates the service principal's Postgres role.

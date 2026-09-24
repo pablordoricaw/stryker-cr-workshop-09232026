@@ -132,7 +132,7 @@ def test_missing_domain_and_no_override():
 
 def test_no_committed_source_docs_for_empty_domain(tmp_path, monkeypatch):
     # Empty-domain behaviour, asserted against an ISOLATED, guaranteed-empty
-    # source tree — never a real repo domain. Point the checkpoint's repo-root
+    # source tree, never a real repo domain. Point the checkpoint's repo-root
     # discovery at a tmp dir containing an existing-but-empty
     # data/<domain>/documents folder, so the check derives an expected count of 0
     # with no dependency on security/itsm/finance (all of which are, or will be,

@@ -3,7 +3,7 @@
 Ticket #11 has the participant build a curated Genie Agent (formerly a Genie
 Space) over the gold tables and Metric Views produced by #8/#10. This checkpoint
 proves the *deployed* agent, reading **only externally-observable Genie state**
-through the Genie API — never the notebook, the creation mechanism, or any
+through the Genie API, never the notebook, the creation mechanism, or any
 intermediate variable. A participant can reach the same state with the Databricks
 SDK, the ``databricks genie create-space`` CLI, or the Genie UI, and it passes
 identically.
@@ -13,8 +13,8 @@ Three observable facts are asserted, each a distinct false-pass guard:
 * **The caller's own agent exists.** A whole team shares one workspace, and a
   Genie Agent is workspace-scoped, so the agent name must carry a per-participant
   identity suffix (see #22). The check therefore takes the expected
-  ``agent_name`` as a **required** input — there is deliberately no default,
-  fixed, or shared name baked in — and resolves the caller's own agent by that
+  ``agent_name`` as a **required** input, since there is deliberately no default,
+  fixed, or shared name baked in, and resolves the caller's own agent by that
   exact title (or verifies a supplied ``genie_space_id`` carries it). A missing
   or ambiguous name is RED.
 * **It is configured over the expected data assets.** The agent's attached data
@@ -26,12 +26,12 @@ Three observable facts are asserted, each a distinct false-pass guard:
   through the Conversation API; the reply must reach a terminal *completed*
   state with generated SQL that references at least one expected source. An empty
   answer, a failure, a clarifying question, or SQL that never touches the
-  curated data is RED — a hallucinated or off-topic answer cannot pass.
+  curated data is RED, since a hallucinated or off-topic answer cannot pass.
 
 **Domain-generic.** No Finance-only object name is hardcoded in the logic. The
 expected sources, the benchmark questions, and the tag/name inputs are all
 overridable through ``workshop.check`` extras so Security (#13) and ITSM (#14)
-reuse this module with their own agent, sources, and questions — no edits.
+reuse this module with their own agent, sources, and questions, with no edits.
 
 **Off-platform testable.** Like every other checkpoint, this one takes its
 Databricks dependency by injection rather than importing an SDK at module load:
@@ -53,24 +53,24 @@ Run it as::
 
 Extras forwarded through ``ctx.extras``:
 
-* ``agent_name`` — the expected per-participant agent title (**required**).
-* ``genie`` — a normalized Genie client, a raw ``WorkspaceClient``, or ``None``
+* ``agent_name`` is the expected per-participant agent title (**required**).
+* ``genie`` is a normalized Genie client, a raw ``WorkspaceClient``, or ``None``
   to build one from the ambient workspace credentials.
-* ``owner_path`` — the caller's workspace namespace prefix (e.g.
+* ``owner_path`` is the caller's workspace namespace prefix (e.g.
   ``/Workspace/Users/<me>``). When set, a same-title agent counts as the
-  caller's own only if its ``parent_path`` lives under it — so a title collision
+  caller's own only if its ``parent_path`` lives under it, so a title collision
   can never adopt or grade another participant's agent. Strongly recommended in
   a shared workspace; #22's namespacing helper can later supply it unchanged.
-* ``genie_space_id`` — the agent's space id, when already known (skips the
+* ``genie_space_id`` is the agent's space id, when already known (skips the
   by-title lookup but still verifies the title *and* ownership).
-* ``expected_sources`` — the data assets that must be attached (default: the
+* ``expected_sources`` are the data assets that must be attached (default: the
   Finance gold tables and Metric Views). Local names are resolved in the
   participant schema; a dotted name is treated as an explicit fully-qualified
   reference.
-* ``benchmark_questions`` — the questions to ask (default: Finance samples),
+* ``benchmark_questions`` are the questions to ask (default: Finance samples),
   overridable for domain reuse. The graded path always requires at least one
   answered question, so an empty list does **not** yield a pass.
-* ``ask_benchmarks`` — set ``False`` to skip the answer phase; the checkpoint
+* ``ask_benchmarks`` can be set to ``False`` to skip the answer phase; the checkpoint
   then stays **RED** (answers unverified), never a structure-only pass.
 """
 
@@ -88,7 +88,7 @@ from workshop.results import CheckResult
 
 GENIE_CHECKPOINT_ID = "06_genie"
 
-#: The data assets a Finance agent must curate — the #8 gold tables plus the #10
+#: The data assets a Finance agent must curate, the #8 gold tables plus the #10
 #: Metric Views. Local names resolve in the participant schema. Overridable via
 #: the ``expected_sources`` extra so Security/ITSM point at their own assets.
 DEFAULT_EXPECTED_SOURCES: tuple[str, ...] = (
@@ -137,7 +137,7 @@ class GenieSpace:
     """One agent's observable configuration: id, title, parent path, sources.
 
     ``sources`` is the flat list of fully-qualified source identifiers attached
-    to the agent — both plain tables and Metric Views — exactly as Genie stores
+    to the agent, both plain tables and Metric Views, exactly as Genie stores
     them, before normalization. ``parent_path`` is the owning workspace folder.
     """
 
@@ -173,7 +173,7 @@ def _fail(message: str, details: dict[str, Any]) -> CheckResult:
 def _normalize_reference(value: str) -> str:
     """Compare UC references independent of SQL quoting/case/whitespace.
 
-    Mirrors ``metrics._normalize_reference`` — backticks, double quotes, and
+    Mirrors ``metrics._normalize_reference``. Backticks, double quotes, and
     spaces are removed and the result lowercased; dots are preserved so
     ``catalog.schema.table`` stays comparable.
     """
@@ -216,7 +216,7 @@ def _benchmark_questions(value: Any) -> tuple[str, ...]:
     """Resolve the benchmark questions from an extra.
 
     Unset preserves the Finance defaults. A non-empty list overrides them. An
-    explicit empty list yields no questions — which the checkpoint treats as RED
+    explicit empty list yields no questions, which the checkpoint treats as RED
     (unverifiable answers), not a pass.
     """
     if value is _UNSET or value is None:
@@ -268,7 +268,7 @@ def _relation_refs(sql: str) -> list[str]:
 
     Only the reference immediately after a ``FROM``/``JOIN`` keyword, plus any
     comma-separated continuations in a ``FROM`` list, are returned. Subqueries
-    (a following ``(``) are skipped, and trailing aliases are never captured —
+    (a following ``(``) are skipped, and trailing aliases are never captured,
     so a column/CTE alias, string, or comment can never be mistaken for a source.
     """
     refs: list[str] = []
@@ -307,8 +307,8 @@ def _relation_refs(sql: str) -> list[str]:
 def _sql_matches(sql: str, expected: list[_ExpectedSource]) -> list[str]:
     """Return the display names of expected sources the SQL genuinely queries.
 
-    A source counts only when it appears in a relation position — as the whole
-    fully-qualified reference or as the object name of an unqualified reference —
+    A source counts only when it appears in a relation position, as the whole
+    fully-qualified reference or as the object name of an unqualified reference,
     after comments and string literals are stripped and CTE names excluded. This
     is what makes ``SELECT 'gold_sales'``, ``SELECT 1 AS gold_sales``, a comment,
     or ``WITH gold_sales AS (...)`` fail to match, while a real
@@ -485,14 +485,14 @@ def _under(parent_path: str | None, owner_path: str) -> bool:
 def _locate_space(
     client: Any, ctx: CheckContext, agent_name: str, owner_path: str | None
 ) -> GenieSpace | CheckResult:
-    """Resolve the caller's OWN agent — never adopt another participant's.
+    """Resolve the caller's OWN agent, never another participant's.
 
     Identity is the per-participant ``agent_name`` (identity-derived, so two
     participants do not collide by title). When ``owner_path`` is supplied it is
     an additional, ownership-scoped guard: a same-title agent is treated as the
     caller's own only if its ``parent_path`` lives under ``owner_path`` (the
-    caller's workspace namespace). This is enforced on **both** resolution paths
-    — an explicit ``genie_space_id`` and a by-title lookup — and an ambiguous set
+    caller's workspace namespace). This is enforced on **both** resolution paths,
+    an explicit ``genie_space_id`` and a by-title lookup, and an ambiguous set
     of owned same-title agents is rejected rather than picked arbitrarily.
 
     ``owner_path`` is optional for backward compatibility, but callers should
@@ -550,7 +550,7 @@ def _locate_space(
                     {"stage": "ownership", "space_id": space.space_id,
                      "owner_path": owner_path, "parent_path": space.parent_path},
                 )
-            continue  # a same-title agent owned by someone else — skip it
+            continue  # a same-title agent owned by someone else, so skip it
         owned.append(space)
 
     if not owned:
@@ -591,7 +591,7 @@ def check_genie(ctx: CheckContext) -> CheckResult:
     # namespace is supplied the agent name and owner_path are derived from it, so
     # the check resolves the SAME name the notebook created; an explicit
     # agent_name/owner_path still wins for a custom setup. Passing a namespace is
-    # what makes a fixed/shared name impossible — the name is identity-derived.
+    # what makes a fixed/shared name impossible, since the name is identity-derived.
     ns = ctx.extras.get("namespace")
     agent_name = ctx.extras.get("agent_name")
     if (not isinstance(agent_name, str) or not agent_name.strip()) and ns is not None:
@@ -698,7 +698,7 @@ def check_genie(ctx: CheckContext) -> CheckResult:
         if not referenced:
             return _fail(
                 f"Genie agent {agent_name!r} answered {question!r} with SQL that "
-                "does not reference any expected data asset — likely an off-topic "
+                "does not reference any expected data asset, likely an off-topic "
                 "or hallucinated answer.",
                 {"stage": "answer", "space_id": space.space_id, "question": question,
                  "sql": answer.sql},

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 05 · Governed Metric Views — SOLUTION (Finance)
+# MAGIC # 05 · Governed Metric Views · SOLUTION (Finance)
 # MAGIC
 # MAGIC This solution creates two Unity Catalog Metric Views in the participant's
 # MAGIC existing resolved schema. They are semantic definitions over the #8 gold
@@ -29,7 +29,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -182,7 +182,7 @@ assert result.passed, result.message
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Stretch — add your own governed metric
+# MAGIC ## Add your own governed metric (stretch)
 # MAGIC
 # MAGIC Create another Metric View in this same schema, for example a sales-channel
 # MAGIC or procedure-category metric. Keep the YAML source pointed at a gold table,

@@ -21,7 +21,7 @@ class SeedContext:
         spark: Active ``SparkSession``, or ``None`` when run with no workspace.
             Use :meth:`require_spark` to fail with a clear message instead of an
             ``AttributeError``.
-        extras: Free-form keyword arguments forwarded from ``run_seeds`` — a
+        extras: Free-form keyword arguments forwarded from ``run_seeds``, a
             later hook can accept tuning inputs without changing this class.
     """
 

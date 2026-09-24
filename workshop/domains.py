@@ -1,19 +1,19 @@
-"""Per-domain scaffold spec — the one place that names each domain's transactional-track objects.
+"""Per-domain scaffold spec, the one place that names each domain's transactional-track objects.
 
 The workshop is one shared curriculum across three domains (Finance, Security,
 ITSM); only the dataset and pre-authored semantic content differ. The
 document-intelligence track (``00_setup`` / ``01_bronze_docs`` /
 ``02_silver_docs``) is already domain-parameterised through
 :class:`~workshop.config.WorkshopConfig` and generic table names (``bronze_docs``
-/ ``silver_docs``). The **transactional** track — bronze transactions, the gold
-medallion, governed metadata, Metric Views, the Genie agent, and the app — names
+/ ``silver_docs``). The **transactional** track covers bronze transactions, the gold
+medallion, governed metadata, Metric Views, the Genie agent, and the app. It names
 different tables, keys, and measures per domain.
 
 The domain-generic checkpoints already take every one of those names as a
 ``workshop.check`` extra, defaulting to Finance. This module is the single source
 of truth those extras come from, so the **shared** participant STARTER notebooks
 derive domain-correct names from ``config.domain`` instead of hardcoding Finance
-literals — a Security or ITSM participant runs the exact same notebooks and
+literals, so a Security or ITSM participant runs the exact same notebooks and
 reaches green on their domain.
 
 Every value here mirrors exactly what the matching ``solutions/<domain>/``
@@ -22,7 +22,7 @@ notebook builds and what its ``workshop.check(...)`` call passes, so *generation
 construction. Finance's values equal the checkpoints' built-in defaults, so a
 Finance participant sees byte-identical behaviour to before this spec existed.
 
-Pure Python — no Spark, no SDK, no network — so it is unit-testable off-platform
+Pure Python, with no Spark, no SDK, and no network, so it is unit-testable off-platform
 and safe to import from the connection-free framework.
 """
 
@@ -88,7 +88,7 @@ class DomainSpec:
     detail_table: str
     #: The gold mart table (one row per business key, with additive measures).
     mart_table: str
-    #: The business key — the mart grain, and the transaction column that joins the document.
+    #: The business key, which is the mart grain and the transaction column that joins the document.
     group_key: str
     #: The unique key in the silver document table (its join side).
     document_key: str
@@ -129,7 +129,7 @@ class DomainSpec:
     # --- derived convenience -------------------------------------------------
     @property
     def source_table(self) -> str:
-        """The gold check's ``source_table`` — the transactional bronze table."""
+        """The gold check's ``source_table`` is the transactional bronze table."""
         return self.bronze_txn_table
 
     @property

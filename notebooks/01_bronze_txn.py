@@ -3,25 +3,25 @@
 # MAGIC # 01 · Transactional ingestion to bronze
 # MAGIC
 # MAGIC Land the 3,000 synthetic transactions for **your domain** in one Delta
-# MAGIC table. The table name and grain key differ per domain — Finance's
+# MAGIC table. The table name and grain key differ per domain (Finance's
 # MAGIC `bronze_sales_transactions` / `transaction_id`, Security's
 # MAGIC `bronze_scan_findings` / `finding_id`, ITSM's `bronze_service_tickets` /
-# MAGIC `ticket_id` — and are derived for you below from the domain you pick.
+# MAGIC `ticket_id`) and are derived for you below from the domain you pick.
 # MAGIC
 # MAGIC ## 📦 CDF source detection and provisioning (optional)
 # MAGIC
 # MAGIC This notebook automatically ensures your domain's CDF history table is
 # MAGIC available via a **three-tier fallback**:
 # MAGIC
-# MAGIC 1. **Detect** — if the history table already exists in your catalog/schema,
+# MAGIC 1. **Detect.** If the history table already exists in your catalog/schema,
 # MAGIC    it is used as-is.
-# MAGIC 2. **Provision real Lakebase CDF** — if you manually created a Lakebase
+# MAGIC 2. **Provision real Lakebase CDF.** If you manually created a Lakebase
 # MAGIC    project (database instance) beforehand and entered it in the `lakebase_project`
 # MAGIC    widget, the notebook configures CDF→UC automatically to sync your Postgres
 # MAGIC    history table to Unity Catalog. Requires workspace admin to enable the
 # MAGIC    **Lakebase Lakehouse Sync / CDF** preview under workspace **Previews**. This is
-# MAGIC    the real CDF path and is optional — skip it to use the fallback below.
-# MAGIC 3. **Synthesize** — if you leave `lakebase_project` blank, or if real CDF
+# MAGIC    the real CDF path and is optional, so skip it to use the fallback below.
+# MAGIC 3. **Synthesize.** If you leave `lakebase_project` blank, or if real CDF
 # MAGIC    provisioning is unavailable or fails (e.g., default-storage catalogs are
 # MAGIC    unsupported), the history table is built in UC from the committed seed. The
 # MAGIC    participant's `# TODO` cells run identically in either mode, and the checkpoint
@@ -32,9 +32,9 @@
 # MAGIC participants); fill it only if you created and want to exercise the real Lakebase
 # MAGIC CDF sync.
 # MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
-# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint,
+# MAGIC starting with a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time. You can also open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
 
@@ -44,8 +44,8 @@
 # MAGIC ## Install dependencies for Lakebase provisioning
 # MAGIC
 # MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
-# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
-# MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module).
+# MAGIC It is needed only if Lakebase provisioning is attempted. Installing does not restart the
 # MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
 # MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
 
@@ -57,7 +57,7 @@
 
 # On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
 # installed package is not importable until the kernel restarts. Restart explicitly
-# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+# here, before any state is built, so the bootstrap cell below runs in the fresh kernel.
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -80,7 +80,7 @@ import workshop
 # MAGIC %md
 # MAGIC ## 🛢️ Optional: deploy your Lakebase project first (for the real CDF path)
 # MAGIC
-# MAGIC If you want to exercise the real Lakebase CDF sync (recommended for learning), follow these steps to create a Lakebase project in your workspace. **This is optional** — if you skip it, the notebook will synthesize the history table from a committed seed and you'll complete the checkpoint identically.
+# MAGIC If you want to exercise the real Lakebase CDF sync (recommended for learning), follow these steps to create a Lakebase project in your workspace. **This is optional.** If you skip it, the notebook will synthesize the history table from a committed seed and you'll complete the checkpoint identically.
 # MAGIC
 # MAGIC ### Steps to create a Lakebase project:
 # MAGIC
@@ -110,22 +110,22 @@ import workshop
 # MAGIC
 # MAGIC | Widget | What to enter | Leave blank? |
 # MAGIC |--------|---------------|--------------|
-# MAGIC | **catalog** | Same existing catalog you chose in `00_setup` (your workshop catalog) — **required** | No — must always provide |
-# MAGIC | **domain** | Same domain you selected in `00_setup` (Finance / Security / ITSM) | Never — selects your transactional schema |
-# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
-# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
-# MAGIC | **source_mode** | Choose your CDF approach: `auto` (recommended) = detect existing history, provision **real Lakebase CDF if you supplied a `lakebase_project`**, else synthesize from seed; `lakebase_cdf` = require real CDF (fails if you didn't create/supply a project or the preview is off); `delta_fallback` = skip Lakebase entirely, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
-# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project (database instance) you created** (see the deploy step above) to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
-# MAGIC | **lakebase_database** | Leave blank to use the instance's default `databricks_postgres` database; set only if you created a differently-named database in your Lakebase project | Yes — blank is the recommended default |
-# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use your domain's default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC | **catalog** | Same existing catalog you chose in `00_setup` (your workshop catalog), **required** | No. Must always provide |
+# MAGIC | **domain** | Same domain you selected in `00_setup` (Finance / Security / ITSM) | Never. Selects your transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes. Blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes. If you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your CDF approach: `auto` (recommended) = detect existing history, provision **real Lakebase CDF if you supplied a `lakebase_project`**, else synthesize from seed; `lakebase_cdf` = require real CDF (fails if you didn't create/supply a project or the preview is off); `delta_fallback` = skip Lakebase entirely, use committed Delta seed only (fastest) | No. `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project (database instance) you created** (see the deploy step above) to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes. Blank is the recommended default |
+# MAGIC | **lakebase_database** | Leave blank to use the instance's default `databricks_postgres` database; set only if you created a differently-named database in your Lakebase project | Yes. Blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use your domain's default history table; fill only if bringing your own CDF table | Yes. Blank is the recommended default |
 # MAGIC
-# MAGIC **Most participants:** use the defaults shown above — enter your **catalog** and pick your **domain**, leave everything else blank or as-is.
+# MAGIC **Most participants:** use the defaults shown above. Enter your **catalog** and pick your **domain**, then leave everything else blank or as-is.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
+dbutils.widgets.text("catalog", "", "Catalog (required, enter your existing workshop catalog)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain (same as in 00_setup)")
-dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you>, recommended)")
 dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
@@ -136,23 +136,23 @@ dbutils.widgets.dropdown(
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "(Optional) Lakebase project you created — blank = synthesize",
+    "(Optional) Lakebase project you created, blank = synthesize",
 )
 dbutils.widgets.text(
     "lakebase_database",
     "",
-    "(Optional) Lakebase database — blank = default databricks_postgres",
+    "(Optional) Lakebase database, blank = default databricks_postgres",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
     "",
-    "(Advanced) Lakebase CDF table — leave blank for domain default",
+    "(Advanced) Lakebase CDF table, leave blank for domain default",
 )
 
 # COMMAND ----------
 
 # Your identity gives you a unique schema in the shared team catalog
-# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+# (workshop_<you>), the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -251,13 +251,13 @@ else:
 # MAGIC %md
 # MAGIC ## 🚀 From-scratch mode (optional stretch)
 # MAGIC
-# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC This stage ships in **guided** mode, with the `# TODO` cells and collapsible
 # MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
 # MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
-# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both
 # MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
 # MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
-# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+# MAGIC not a setting**. See [`docs/stretch/README.md`](../docs/stretch/README.md).
 
 # COMMAND ----------
 
@@ -282,7 +282,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — Lakebase CDF (nudge)
+# MAGIC ### 💡 Hint for Lakebase CDF (nudge)
 
 # COMMAND ----------
 
@@ -294,13 +294,13 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — Delta fallback (nudge)
+# MAGIC ### 💡 Hint for the Delta fallback (nudge)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC Spark executors need a workspace-accessible path. Copy the committed
-# MAGIC `delta_seed_path` (printed above — `data/<domain>/transactional/delta/...`)
+# MAGIC `delta_seed_path` (printed above as `data/<domain>/transactional/delta/...`)
 # MAGIC into a subdirectory of `config.volume_path`, then read that destination with
 # MAGIC `spark.read.format("delta")`. Your domain's gated
 # MAGIC `solutions/<domain>/01_bronze_txn.py` has the full staging loop.
@@ -320,7 +320,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — write shape (nudge)
+# MAGIC ### 💡 Hint for the write shape (nudge)
 
 # COMMAND ----------
 
@@ -337,7 +337,7 @@ else:
 # MAGIC The check observes only Unity Catalog state. It passes whether the rows
 # MAGIC came from Lakebase CDF or from the Delta fallback. Your domain's table name,
 # MAGIC grain key, and seeded row count are passed to the shared, domain-generic
-# MAGIC checkpoint from the domain spec — nothing Finance-specific is assumed.
+# MAGIC checkpoint from the domain spec. Nothing Finance-specific is assumed.
 
 # COMMAND ----------
 

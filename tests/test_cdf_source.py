@@ -1,4 +1,4 @@
-"""Tests for workshop.cdf_source — pure logic, off-platform.
+"""Pure-logic, off-platform tests for workshop.cdf_source.
 
 Unit tests for mode selection and CDC row shaping logic, which are pure Python
 and unit-testable without Spark or live workspace access.

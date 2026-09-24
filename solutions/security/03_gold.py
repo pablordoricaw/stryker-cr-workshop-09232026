@@ -1,13 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Gold medallion layer — SOLUTION (Security)
+# MAGIC # 03 · Gold medallion layer · SOLUTION (Security)
 # MAGIC
 # MAGIC **Gated reference solution.** This notebook turns the upstream Security
 # MAGIC tables into two analytics-ready, governed Delta tables:
 # MAGIC
-# MAGIC - **`gold_findings`** — one row per `finding_id`, enriched with its
+# MAGIC - **`gold_findings`** holds one row per `finding_id`, enriched with its
 # MAGIC   document-derived **CVE advisory**; and
-# MAGIC - **`gold_cve_exposure`** — one row per `cve_id`, with additive exposure,
+# MAGIC - **`gold_cve_exposure`** holds one row per `cve_id`, with additive exposure,
 # MAGIC   remediation-effort, and value-at-risk measures for BI, Metric Views, and
 # MAGIC   the app.
 # MAGIC
@@ -42,7 +42,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -73,7 +73,7 @@ gold_cve_exposure = workshop.fully_qualified(
 )
 
 print("Your workshop environment:")
-print(f"  catalog : {config.catalog}   (existing — not created)")
+print(f"  catalog : {config.catalog}   (existing, not created)")
 print(f"  schema  : {config.schema}")
 print(f"  detail  : {gold_findings}")
 print(f"  mart    : {gold_cve_exposure}")

@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 🚀 Stretch · Add your own metrics + Genie questions — SOLUTION (Finance)
+# MAGIC # 🚀 Stretch · Add your own metrics + Genie questions · SOLUTION (Finance)
 # MAGIC
 # MAGIC One concrete extension of the semantic + Genie layers you built, end to end:
 # MAGIC a third Metric View (`finance_discount_metrics` over `gold_sales`) and two
-# MAGIC extra Genie benchmark questions — each validated by the **existing** generic
+# MAGIC extra Genie benchmark questions, each validated by the **existing** generic
 # MAGIC checkpoints through `workshop.check` extras, with no framework change. Run
 # MAGIC `05_metric_views` and `06_genie` first.
 
@@ -25,7 +25,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -60,7 +60,7 @@ print(f"Schema: {config.schema}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. A third Metric View — discounting by product family and channel
+# MAGIC ## 1. A third Metric View for discounting by product family and channel
 
 # COMMAND ----------
 
@@ -117,7 +117,7 @@ display(
 # MAGIC ## 3. Validate the new Metric View via a `metric_views` contract
 # MAGIC
 # MAGIC The generic `05_metrics` check validates any view you describe. This is a
-# MAGIC per-call contract — it does not change how the default `05_metrics` grade
+# MAGIC per-call contract. It does not change how the default `05_metrics` grade
 # MAGIC (the two required views) works.
 
 # COMMAND ----------

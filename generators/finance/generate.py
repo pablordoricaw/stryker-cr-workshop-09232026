@@ -267,7 +267,7 @@ class FinancePdf:
         self.pdf.setFillColor(colors.HexColor("#5B6573"))
         self.pdf.setFont("Helvetica", 7)
         self.pdf.drawString(
-            40, 24, "Synthetic workshop document — no real company or patient data"
+            40, 24, "Synthetic workshop document | no real company or patient data"
         )
         self.pdf.drawRightString(570, 24, f"Page {self.page}")
 
@@ -479,7 +479,7 @@ def purchase_order_pdf(path: Path, index: int, rng: random.Random) -> dict[str, 
     )
     doc = FinancePdf(path, titles[index], colors.HexColor("#067647"), index + 1)
     doc.text(
-        "STRYKER ORTHOPAEDICS — Strategic Sourcing | This numbered document authorizes delivery subject to the commercial and quality terms below."
+        "STRYKER ORTHOPAEDICS | Strategic Sourcing | This numbered document authorizes delivery subject to the commercial and quality terms below."
     )
     doc.kv(
         [
@@ -684,7 +684,7 @@ def statement_pdf(path: Path, index: int, rng: random.Random) -> dict[str, str]:
     net_income = (revenue * Decimal("0.154")).quantize(MONEY)
     titles = (
         "Quarterly Financial Statement",
-        "Management Results — Quarter End",
+        "Management Results at Quarter End",
         "Condensed Segment Accounts",
         "Quarterly Performance Book",
         "Form 10-Q Segment Extract",

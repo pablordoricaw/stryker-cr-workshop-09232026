@@ -1,4 +1,4 @@
-"""``workshop`` — the single validation seam for the Stryker Databricks workshop.
+"""``workshop`` is the single validation seam for the Stryker Databricks workshop.
 
 Participants call :func:`check` at each checkpoint to get an unambiguous
 pass/fail plus a targeted message::
@@ -12,7 +12,7 @@ workshop`` works from any notebook with no install step.
 
 Checks assert only externally-observable state (catalog objects, row counts,
 tag/comment presence, metric-view resolvability, Genie answer sanity,
-synced-table row parity) — never notebook cell structure or intermediate
+synced-table row parity), never notebook cell structure or intermediate
 variables. Later tickets extend the workshop by registering new checkpoints; see
 :mod:`workshop.registry` for the registration API.
 """
@@ -62,8 +62,8 @@ from .seeds import (
 
 # Import the checkpoint modules so their @checkpoint decorators self-register on
 # the default registry. Done here (after the registry is defined) so a plain
-# ``import workshop`` makes every checkpoint — the smoke check today, everything
-# later tickets add — immediately available to workshop.check().
+# ``import workshop`` makes every checkpoint immediately available to
+# workshop.check(). That is the smoke check today, and everything later tickets add.
 from . import checkpoints as _checkpoints  # noqa: E402
 from . import seeds as _seeds  # noqa: E402
 

@@ -441,7 +441,7 @@ def test_resolves_agent_and_owner_path_from_namespace():
 
 def test_namespace_resolves_callers_own_name_not_a_fixed_one():
     # Two participants sharing the workspace derive distinct agent names, and each
-    # check resolves ITS caller's name — so B's check does not adopt A's agent.
+    # check resolves ITS caller's name, so B's check does not adopt A's agent.
     ns_a = workshop.namespace("ada@a.com", domain="finance")
     ns_b = workshop.namespace("grace@b.com", domain="finance")
     assert ns_a.genie_agent_name() != ns_b.genie_agent_name()

@@ -1,14 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 04 · Governed metadata with dbxmetagen — SOLUTION (Security)
+# MAGIC # 04 · Governed metadata with dbxmetagen · SOLUTION (Security)
 # MAGIC
 # MAGIC **Gated reference solution.** Generates and applies governed metadata to
 # MAGIC the gold tables with [**dbxmetagen**](https://github.com/databricks-industry-solutions/dbxmetagen)
 # MAGIC in all three modes:
 # MAGIC
-# MAGIC - **`comment`** — table + column descriptions;
-# MAGIC - **`pi`** — a `data_classification` tag on sensitive columns; and
-# MAGIC - **`domain`** — a `domain` tag on each table.
+# MAGIC - **`comment`** writes table + column descriptions;
+# MAGIC - **`pi`** adds a `data_classification` tag on sensitive columns; and
+# MAGIC - **`domain`** adds a `domain` tag on each table.
 # MAGIC
 # MAGIC The flow is **stage → review → apply**: run each mode with
 # MAGIC `apply_ddl=false` first (metadata staged in review tables, nothing touches
@@ -40,7 +40,7 @@ import urllib.request
 
 try:
     urllib.request.urlopen("https://pypi.org/simple/", timeout=5)
-    print("✅ PyPI reachable — run the %pip cell below, then continue.")
+    print("✅ PyPI reachable. Run the %pip cell below, then continue.")
 except Exception as exc:  # any failure ⇒ treat PyPI as unreachable
     raise RuntimeError(
         f"No PyPI egress from this workspace ({type(exc).__name__}). dbxmetagen's "
@@ -86,7 +86,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -119,7 +119,7 @@ table_names = ",".join(
 )
 
 print("Your workshop environment:")
-print(f"  catalog       : {config.catalog}   (existing — not created)")
+print(f"  catalog       : {config.catalog}   (existing, not created)")
 print(f"  schema        : {config.schema}   (dbxmetagen output lands here too)")
 print(f"  documenting   : {table_names}")
 print(f"  model endpoint: {model_endpoint}")
@@ -129,9 +129,9 @@ print(f"  PI tag key    : {pi_classification_tag_name}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC > ⏳ **Heads up — this is slow.**
+# MAGIC > ⏳ **Heads up. This is slow.**
 # MAGIC >
-# MAGIC > Each mode re-invokes the foundation-model endpoint once per target table. A single staging or apply pass takes several minutes (longer on cold/scale-to-zero endpoints). This is expected — let it run.
+# MAGIC > Each mode re-invokes the foundation-model endpoint once per target table. A single staging or apply pass takes several minutes (longer on cold/scale-to-zero endpoints). This is expected, so let it run.
 
 # COMMAND ----------
 
@@ -239,16 +239,16 @@ display(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 🛟 No-PyPI fallback — document the tables without dbxmetagen
+# MAGIC ## 🛟 No-PyPI fallback (document the tables without dbxmetagen)
 # MAGIC
 # MAGIC **Run this section only if the §0 egress precheck stopped you.** Run the §0
 # MAGIC *workshop bootstrap* cell (`import workshop`) and the §1 *config* cell first
-# MAGIC — neither needs dbxmetagen — then run the cell below. It reaches the *same*
+# MAGIC (neither needs dbxmetagen), then run the cell below. It reaches the *same*
 # MAGIC Unity Catalog state the checkpoint verifies (a comment on every table and
 # MAGIC column, a PI tag on the sensitive columns, a domain tag per table) with
 # MAGIC hand-written DDL. Column comments are derived from the column names.
 # MAGIC
-# MAGIC Comments always apply; `SET TAGS` is **best-effort** — under a governed tag
+# MAGIC Comments always apply; `SET TAGS` is **best-effort**. Under a governed tag
 # MAGIC policy, set the §1 tag-key widgets to a permitted key (as in §4) and re-run.
 
 # COMMAND ----------
@@ -331,7 +331,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     tables=target_tables,
-    # Verify the same tag keys generation wrote — never the defaults if overridden.
+    # Verify the same tag keys generation wrote, never the defaults if overridden.
     domain_tag_name=domain_tag_name,
     pi_tag_name=pi_classification_tag_name,
 )

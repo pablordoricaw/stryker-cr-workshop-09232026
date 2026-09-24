@@ -2,8 +2,8 @@
 
 Green once the participant has (a) copied the committed source PDFs into their UC
 Volume and (b) registered a bronze documents table over those raw files. It
-asserts only externally-observable state — the count of PDFs under the volume's
-``documents/`` folder and the bronze table's existence and row count — never
+asserts only externally-observable state, the count of PDFs under the volume's
+``documents/`` folder and the bronze table's existence and row count, never
 *how* the notebook did either, so a participant can reach the same state with
 ``dbutils.fs.cp``, a Spark write, ``read_files``, or anything else.
 
@@ -23,7 +23,7 @@ Run it as::
 Extras forwarded through ``ctx.extras``: ``volume`` (UC Volume name, as in
 ``00_setup``), ``domain`` (which shipped dataset sets the expected count),
 ``table`` (bronze table name, default ``bronze_docs``), and ``expected_docs`` (an
-explicit expected count that overrides source-count derivation — a documented
+explicit expected count that overrides source-count derivation, a documented
 fallback for contexts where the committed source tree is not on disk).
 """
 
@@ -112,14 +112,14 @@ def check_bronze_docs(ctx: CheckContext) -> CheckResult:
             False,
             "No catalog/schema to check. Call workshop.check('01_bronze_docs', "
             "spark=spark, catalog=config.catalog, schema=config.schema, "
-            "volume=config.volume, domain=config.domain) — the notebook does this "
+            "volume=config.volume, domain=config.domain). The notebook does this "
             "for you.",
             {"catalog": catalog, "schema": schema},
         )
 
     # How many documents SHOULD be here: the count the workshop ships for this
     # domain (derived from the committed source), unless an explicit override is
-    # passed. This keeps the bar domain-generic — no hardcoded number.
+    # passed. This keeps the bar domain-generic, with no hardcoded number.
     if expected is None:
         if not domain:
             return CheckResult(

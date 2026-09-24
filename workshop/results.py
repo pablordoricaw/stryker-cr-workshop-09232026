@@ -1,7 +1,7 @@
 """The structured result returned by every ``workshop.check`` call.
 
 A :class:`CheckResult` is the single, stable contract between the checkpoint
-framework and everything that consumes it — participant notebooks, the
+framework and everything that consumes it, such as participant notebooks, the
 Genie-Code hint agent, and maintainer CI. Later tickets add checkpoints, but
 they all return this same shape, so downstream code never has to special-case a
 checkpoint.
@@ -21,7 +21,7 @@ class CheckResult:
         checkpoint: The checkpoint id that was run (e.g. ``"smoke"``).
         passed: ``True`` when the observable state satisfies the checkpoint.
         message: A human-readable, targeted explanation. On failure this should
-            tell the participant *what* is wrong and *where* to look — never a
+            tell the participant *what* is wrong and *where* to look, never a
             bare "failed".
         details: Optional structured extras (row counts, missing objects, the
             Genie answer that was scored, ...). Kept machine-readable so CI and

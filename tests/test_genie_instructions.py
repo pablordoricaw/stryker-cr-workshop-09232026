@@ -1,7 +1,7 @@
 """Unit tests for the Genie Code hint-ladder injection helpers (#27).
 
-These pin the pure-text contract of :mod:`workshop.genie_instructions` — the
-build → merge → strip pipeline that splices the hint ladder into a participant's
+These pin the pure-text contract of :mod:`workshop.genie_instructions`, namely the
+build, merge, and strip pipeline that splices the hint ladder into a participant's
 ``~/.assistant_instructions.md``. They are dependency-free (no Spark, no SDK) and
 stand in for the safety guarantees the live validation must NOT prove by
 mutating a real personal file: personal content is preserved, re-runs are
@@ -68,7 +68,7 @@ def test_build_strips_maintainer_comment_and_wraps_in_sentinels() -> None:
 def test_build_reports_domain_not_yet_chosen_when_blank() -> None:
     for domain in (None, "", "   "):
         block = build_injection_block(_source(), "/x", domain)
-        assert "My domain: not yet chosen — ask me" in block
+        assert "My domain: not chosen yet, so ask me" in block
 
 
 def test_build_uses_the_exact_header_and_domain_line_for_each_domain() -> None:
@@ -196,7 +196,7 @@ def test_strip_ignores_a_malformed_half_block() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# B1: byte-exact preservation — build → merge → strip round-trips personal text
+# B1: byte-exact preservation. build, merge, and strip round-trip personal text
 #     unchanged, including surrounding whitespace no editor would normalize.
 # --------------------------------------------------------------------------- #
 def test_build_merge_strip_round_trip_is_byte_exact() -> None:
@@ -220,7 +220,7 @@ def test_build_merge_strip_round_trip_is_byte_exact() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# B2: robust sentinel handling — single-block invariant + never clobber personal
+# B2: robust sentinel handling. single-block invariant, and never clobber personal
 #     text that merely contains (or dangles) the sentinel strings.
 # --------------------------------------------------------------------------- #
 def test_merge_and_strip_preserve_sentinel_strings_in_personal_text() -> None:
@@ -241,7 +241,7 @@ def test_merge_and_strip_preserve_sentinel_strings_in_personal_text() -> None:
 
 def test_merge_and_strip_leave_a_non_workshop_sentinel_pair_intact() -> None:
     # A full START..END pair that is NOT the workshop's (no HINTS_HEADER) must be
-    # treated as personal content — never replaced or removed.
+    # treated as personal content, never replaced or removed.
     personal = f"{SENTINEL_START}\nmy own bracketed note, not the workshop\n{SENTINEL_END}\n"
     block = build_injection_block(_source(), "/repo", "finance")
     merged = merge_block(personal, block)

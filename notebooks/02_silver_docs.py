@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 02 · Silver documents — parse, classify, extract
+# MAGIC # 02 · Parse, classify, and extract silver documents
 # MAGIC
 # MAGIC The document-intelligence step. You'll turn the raw `bronze_docs` table
 # MAGIC from module #5 into a governed **silver layer** using Databricks **AI
-# MAGIC Functions** — no model endpoints, no API keys:
+# MAGIC Functions**, with no model endpoints and no API keys:
 # MAGIC
 # MAGIC 1. **parse** each document's raw bytes into text with `ai_parse_document`,
 # MAGIC 2. **classify** each into one of your domain's document classes with
@@ -12,7 +12,7 @@
 # MAGIC 3. **extract** class-specific structured fields with `ai_extract` into one
 # MAGIC    **`silver_<class>`** table per class.
 # MAGIC
-# MAGIC Run `01_bronze_docs` first — this notebook reads the `bronze_docs` table it
+# MAGIC Run `01_bronze_docs` first. This notebook reads the `bronze_docs` table it
 # MAGIC registers. Fill in each **`# TODO`** cell, then run the checkpoint at the
 # MAGIC bottom until it's green.
 # MAGIC
@@ -25,9 +25,9 @@
 # MAGIC inference, so materialize each stage to a Delta table once rather than
 # MAGIC re-invoking the functions on every downstream read.
 # MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
-# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint,
+# MAGIC starting with a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time. You can also open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
 
@@ -56,7 +56,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -64,7 +64,7 @@ dbutils.widgets.text("volume", "landing", "UC Volume")
 # COMMAND ----------
 
 # Your identity gives you a unique schema in the shared team catalog
-# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+# (workshop_<you>), the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -82,7 +82,7 @@ silver_docs = workshop.fully_qualified(config.catalog, config.schema, "silver_do
 
 print("Your workshop environment:")
 print(f"  domain : {config.domain}")
-print(f"  catalog: {config.catalog}   (existing — not created)")
+print(f"  catalog: {config.catalog}   (existing, not created)")
 print(f"  schema : {config.schema}")
 print(f"  bronze : {bronze_docs}")
 
@@ -91,13 +91,13 @@ print(f"  bronze : {bronze_docs}")
 # MAGIC %md
 # MAGIC ## 🚀 From-scratch mode (optional stretch)
 # MAGIC
-# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC This stage ships in **guided** mode, with the `# TODO` cells and collapsible
 # MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
 # MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
-# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both
 # MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
 # MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
-# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+# MAGIC not a setting**. See [`docs/stretch/README.md`](../docs/stretch/README.md).
 
 # COMMAND ----------
 
@@ -106,7 +106,7 @@ print(f"  bronze : {bronze_docs}")
 # MAGIC
 # MAGIC Read the raw PDF bytes from `bronze_docs.content` and parse them into a
 # MAGIC single `parsed_text` column. Carry `path`, `filename`, and `source_class`
-# MAGIC (the ground-truth folder) through — you'll classify *without* looking at
+# MAGIC (the ground-truth folder) through, but you'll classify *without* looking at
 # MAGIC `source_class`. Build a DataFrame named `parsed`.
 
 # COMMAND ----------
@@ -121,7 +121,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — parsing bytes into text
+# MAGIC ### 💡 Hint for parsing bytes into text
 
 # COMMAND ----------
 
@@ -170,7 +170,7 @@ import json
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — deriving labels and classifying
+# MAGIC ### 💡 Hint for deriving labels and classifying
 
 # COMMAND ----------
 
@@ -201,13 +201,13 @@ import json
 # MAGIC
 # MAGIC Each class carries different fields, so route each class to its own
 # MAGIC `ai_extract` schema and write one **`silver_<class>`** table per class
-# MAGIC (e.g. `silver_vendor_invoice`). Create a table for **every** class — even
-# MAGIC one with zero classified documents — so the silver schema is complete.
+# MAGIC (e.g. `silver_vendor_invoice`). Create a table for **every** class, even
+# MAGIC one with zero classified documents, so the silver schema is complete.
 # MAGIC
 # MAGIC Your domain's target fields per class are the **extraction-field contract**
 # MAGIC in `data/<your-domain>/README.md`. Use ISO `YYYY-MM-DD` dates, numeric USD
 # MAGIC amounts, and decimal rates; leave missing fields null. Also keep
-# MAGIC `ai_extract`'s `error_message` as an **`extract_error`** column — the
+# MAGIC `ai_extract`'s `error_message` as an **`extract_error`** column. The
 # MAGIC checkpoint fails if any row has a non-null `extract_error`, so a failed
 # MAGIC extraction can't slip through as "done".
 
@@ -223,7 +223,7 @@ import json
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — the ai_extract pattern for one class
+# MAGIC ### 💡 Hint for the ai_extract pattern for one class
 
 # COMMAND ----------
 
@@ -261,7 +261,7 @@ import json
 # MAGIC %md
 # MAGIC ## 5. Checkpoint: `02_silver_docs`
 # MAGIC
-# MAGIC Confirms — by looking at your catalog, not this notebook — that every
+# MAGIC Confirms, by looking at your catalog, not this notebook, that every
 # MAGIC bronze document was parsed and classified into `silver_docs`, and that
 # MAGIC `ai_extract` populated one `silver_<class>` table per class covering them
 # MAGIC all. Green means you're ready for the gold layer (module #8).

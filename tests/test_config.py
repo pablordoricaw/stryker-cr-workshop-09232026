@@ -1,4 +1,4 @@
-"""Tests for WorkshopConfig resolution — pure, off-platform.
+"""Pure, off-platform tests for WorkshopConfig resolution.
 
 Bring-your-own-catalog: `catalog` is required (the workshop never creates one).
 """
@@ -61,7 +61,7 @@ def test_blank_optional_strings_fall_back_to_defaults():
 
 def test_whitespace_only_schema_and_volume_fall_back_to_defaults():
     # A widget left as spaces ("   ") is truthy but must not collapse to an empty
-    # identifier — it should use the default.
+    # identifier, so it should use the default.
     cfg = resolve_config(catalog="c", domain="finance", schema="   ", volume="  ")
     assert cfg.schema == "finance"  # default = domain
     assert cfg.volume == DEFAULT_VOLUME

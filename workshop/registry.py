@@ -1,4 +1,4 @@
-"""The checkpoint registry — the extension point for every later ticket.
+"""The checkpoint registry, the extension point for every later ticket.
 
 This ticket ships an (almost) empty registry plus a smoke checkpoint. Later
 tickets add checkpoints by dropping a module into ``workshop/checkpoints/`` and

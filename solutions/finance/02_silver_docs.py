@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 02 · Silver documents — SOLUTION (Finance)
+# MAGIC # 02 · Silver documents · SOLUTION (Finance)
 # MAGIC
 # MAGIC **Gated reference solution.** The fully-worked version of the
 # MAGIC `02_silver_docs` starter and the ground truth maintainer CI runs end to
@@ -8,7 +8,7 @@
 # MAGIC `02_silver_docs` checkpoint) before peeking here.
 # MAGIC
 # MAGIC It builds the **document-intelligence silver layer** on top of the
-# MAGIC `bronze_docs` table from module #5, using Databricks AI Functions — no
+# MAGIC `bronze_docs` table from module #5, using Databricks AI Functions, with no
 # MAGIC model endpoints, no API keys:
 # MAGIC
 # MAGIC 1. **parse** each document's raw bytes with `ai_parse_document`,
@@ -48,11 +48,11 @@ import workshop
 # MAGIC
 # MAGIC Same widgets as `00_setup`, so this notebook reads the bronze table in the
 # MAGIC schema you already provisioned. Module #5 (`01_bronze_docs`) must be green
-# MAGIC first — it registers the `bronze_docs` table this notebook reads.
+# MAGIC first because it registers the `bronze_docs` table this notebook reads.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -84,7 +84,7 @@ def silver_class_table(cls: str) -> str:
 
 print("Your workshop environment:")
 print(f"  domain : {config.domain}")
-print(f"  catalog: {config.catalog}   (existing — not created)")
+print(f"  catalog: {config.catalog}   (existing, not created)")
 print(f"  schema : {config.schema}")
 print(f"  bronze : {bronze_docs}")
 
@@ -98,7 +98,7 @@ print(f"  bronze : {bronze_docs}")
 # MAGIC concatenate the element text into a single `parsed_text` column and drop
 # MAGIC any document whose `error_status` is set (none, for the clean synthetic
 # MAGIC set). We carry `source_class` (the ground-truth folder from bronze) purely
-# MAGIC for later comparison — classification below does **not** look at it.
+# MAGIC for later comparison. Classification below does **not** look at it.
 
 # COMMAND ----------
 
@@ -121,7 +121,7 @@ parsed = (
     .drop("parse_error")
 )
 
-# `parsed` is lazy — we deliberately do NOT force it here. ai_parse_document is a
+# `parsed` is lazy, so we deliberately do NOT force it here. ai_parse_document is a
 # billed LLM call, so we let parsing run exactly once, when silver_docs is
 # written below, and read counts back from the persisted table afterward.
 
@@ -133,7 +133,7 @@ parsed = (
 # MAGIC `ai_classify` routes each parsed document to exactly one of a fixed label
 # MAGIC set. We derive that label set from the ground-truth class folders present
 # MAGIC in bronze (`SELECT DISTINCT source_class`), so this stage stays
-# MAGIC domain-generic — the same code classifies Finance, Security, or ITSM. We
+# MAGIC domain-generic, so the same code classifies Finance, Security, or ITSM. We
 # MAGIC read the predicted label out of the returned VARIANT (`:response[0]`) and
 # MAGIC write the consolidated one-row-per-document `silver_docs` table.
 
@@ -171,7 +171,7 @@ silver = (
 )
 
 silver.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_docs)
-# Count the PERSISTED table (cheap Delta metadata) — this does not re-run parse
+# Count the PERSISTED table (cheap Delta metadata). This does not re-run parse
 # or classify, which already ran once during the write above.
 print(f"Registered {silver_docs} ({spark.table(silver_docs).count()} rows)")
 
@@ -181,7 +181,7 @@ print(f"Registered {silver_docs} ({spark.table(silver_docs).count()} rows)")
 # MAGIC ### Peek: predicted vs. ground-truth class
 # MAGIC
 # MAGIC The `other` documents deliberately mention invoices, orders, pricing, and
-# MAGIC quarters, so a keyword rule would misfire — `ai_classify` handles them.
+# MAGIC quarters, so a keyword rule would misfire, but `ai_classify` handles them.
 
 # COMMAND ----------
 
@@ -203,7 +203,7 @@ display(
 # MAGIC Scalar fields are cast to their contract types; nested `line_items` /
 # MAGIC `covered_products` stay as VARIANT. An `instructions` option keeps dates
 # MAGIC ISO `YYYY-MM-DD`, money numeric USD, and rates decimal. We create a table
-# MAGIC for **every** class — even one with zero classified documents — so the
+# MAGIC for **every** class, even one with zero classified documents, so the
 # MAGIC silver schema is complete and stable.
 # MAGIC
 # MAGIC We also persist `ai_extract`'s `error_message` as an **`extract_error`**
@@ -213,7 +213,7 @@ display(
 
 # COMMAND ----------
 
-# Per-class ai_extract schemas — the issue #6 extraction-field contract.
+# Per-class ai_extract schemas for the issue #6 extraction-field contract.
 EXTRACTION_SCHEMAS: dict[str, dict] = {
     "vendor_invoice": {
         "invoice_number": {"type": "string"},
@@ -334,7 +334,7 @@ def extract_projection(schema: dict) -> list[str]:
 
 # COMMAND ----------
 
-# Guide the model on the contract's formats — cheap, and it keeps dates ISO and
+# Guide the model on the contract's formats. This is cheap, and it keeps dates ISO and
 # money/rates numeric. Escaped for embedding in the SQL expression below.
 EXTRACT_INSTRUCTIONS = (
     "Dates as ISO YYYY-MM-DD. Monetary amounts as numeric USD (no symbols or "
@@ -390,7 +390,7 @@ display(
 # MAGIC %md
 # MAGIC ## 5. Checkpoint: `02_silver_docs`
 # MAGIC
-# MAGIC Confirms — by looking at your catalog, not this notebook — that every
+# MAGIC Confirms, by looking at your catalog rather than this notebook, that every
 # MAGIC bronze document was parsed and classified into `silver_docs`, and that
 # MAGIC `ai_extract` populated one `silver_<class>` table per class covering them
 # MAGIC all. Green means you're ready for the gold layer (module #8).

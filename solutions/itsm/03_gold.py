@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Gold medallion layer — SOLUTION (ITSM)
+# MAGIC # 03 · Gold medallion layer · SOLUTION (ITSM)
 # MAGIC
 # MAGIC The conformed key is `incident_id`: it joins the ticket lifecycle to the
 # MAGIC incident-report document and is the unique grain of the serving mart.
@@ -21,7 +21,7 @@ if _root not in sys.path:
 import workshop
 from pyspark.sql import functions as F
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 

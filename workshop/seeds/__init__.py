@@ -1,4 +1,4 @@
-"""Seed hooks — the extension point later data tickets populate.
+"""Seed hooks, the extension point later data tickets populate.
 
 The setup notebook provisions a participant's catalog/schema/volume and then
 calls :func:`workshop.run_seeds` to load that environment's data. *What* gets
@@ -8,8 +8,8 @@ Security #13; ITSM #14) add real loaders by dropping a module into this package
 and decorating a function with :func:`seed_hook`.
 
 Discovery mirrors ``workshop/checkpoints``: every non-private module here is
-imported on ``import workshop`` so its ``@seed_hook`` decorators self-register —
-there is no central list to edit. Framework internals are ``_``-prefixed so they
+imported on ``import workshop`` so its ``@seed_hook`` decorators self-register.
+There is no central list to edit. Framework internals are ``_``-prefixed so they
 are skipped by discovery; only real seed modules (``placeholder`` today) load.
 
 **Per-module isolation:** a seed module that fails to import (e.g. a missing

@@ -1,11 +1,11 @@
 """The ``04_metadata`` checkpoint: governed metadata applied to the gold tables.
 
 Ticket #9 runs `dbxmetagen <https://github.com/databricks-industry-solutions/dbxmetagen>`_
-against the gold tables in its three modes — ``comment``, ``pi``, and
-``domain`` — staging the generated metadata for review (``apply_ddl=false``)
+against the gold tables in its three modes, ``comment``, ``pi``, and
+``domain``, staging the generated metadata for review (``apply_ddl=false``)
 and then applying it. This checkpoint proves the *applied* result, reading
-**only externally-observable Unity Catalog state** — table/column comments and
-UC tags — never how the notebook generated them. A participant can reach the
+**only externally-observable Unity Catalog state**, table/column comments and
+UC tags, never how the notebook generated them. A participant can reach the
 same state with dbxmetagen, hand-written ``COMMENT ON`` / ``ALTER … SET TAGS``
 DDL, or anything else, and it passes identically.
 
@@ -30,7 +30,7 @@ What the three modes leave behind, and what this check observes:
 check; the *columns*, the PI-tagged set, and the domain values are all read from
 live catalog state. Security (#13) and ITSM (#14) reuse this module with their
 own gold tables and, if they diverge from dbxmetagen's defaults, their own tag
-keys — no edits.
+keys, with no edits.
 
 Run it as::
 
@@ -39,14 +39,14 @@ Run it as::
 
 Extras forwarded through ``ctx.extras``:
 
-* ``tables`` — target table names (default the two gold tables above).
-* ``pi_tag_name`` — the column PI classification tag key (default
+* ``tables`` sets the target table names (default the two gold tables above).
+* ``pi_tag_name`` is the column PI classification tag key (default
   ``data_classification``, dbxmetagen's default).
-* ``domain_tag_name`` — the table domain tag key (default ``domain``).
-* ``min_pi_columns`` — minimum distinct columns that must carry a non-blank PI
+* ``domain_tag_name`` is the table domain tag key (default ``domain``).
+* ``min_pi_columns`` is the minimum distinct columns that must carry a non-blank PI
   tag across the target tables (default ``1``). Guards against ``pi`` mode never
   having run.
-* ``expected_pi_columns`` — an explicit ``{"<table>.<column>", ...}`` set the
+* ``expected_pi_columns`` is an explicit ``{"<table>.<column>", ...}`` set the
   PI-tagged columns must equal *exactly* (a documented pin for a domain that
   wants to assert the precise sensitive-column set). Overrides
   ``min_pi_columns`` when given.
@@ -62,7 +62,7 @@ from workshop.results import CheckResult
 
 METADATA_CHECKPOINT_ID = "04_metadata"
 
-#: Default target tables — the gold marts built by ``03_gold`` (#8). Overridable
+#: Default target tables, the gold marts built by ``03_gold`` (#8). Overridable
 #: via the ``tables`` extra so Security/ITSM point at their own gold tables.
 DEFAULT_TABLES: tuple[str, ...] = ("gold_sales", "gold_contract_performance")
 
@@ -94,7 +94,7 @@ def _literal(value: str) -> str:
 
 
 def _is_blank(value: Any) -> bool:
-    """True for NULL/empty/whitespace-only — an empty comment or tag is not set."""
+    """True for NULL/empty/whitespace-only. An empty comment or tag is not set."""
     return value is None or str(value).strip() == ""
 
 
@@ -201,8 +201,8 @@ def check_metadata(ctx: CheckContext) -> CheckResult:
         )
 
     # 2. Column-level comment coverage (comment mode, column grain). The column
-    #    set is read live, so coverage is derived from the actual tables — no
-    #    hardcoded column names — and one blank comment fails.
+    #    set is read live, so coverage is derived from the actual tables, not
+    #    hardcoded column names, and one blank comment fails.
     try:
         column_rows = spark.sql(
             f"""/* metadata:columns */
@@ -250,7 +250,7 @@ def check_metadata(ctx: CheckContext) -> CheckResult:
         )
 
     # 3. PI classification tag (pi mode, column grain). A missing tag key returns
-    #    zero rows; a blank tag value is treated as unset — both must fail so a
+    #    zero rows; a blank tag value is treated as unset, and both must fail so a
     #    stripped or emptied PI tag cannot pass.
     try:
         pi_rows = spark.sql(

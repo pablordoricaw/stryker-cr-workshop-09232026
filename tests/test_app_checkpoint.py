@@ -2,9 +2,9 @@
 
 Every test drives the real ``workshop.check`` seam with an injected fake app
 client, so no Databricks SDK, notebook, or network is needed. The fake serves
-only observable platform state — a Databricks App's deploy/run state and a
-Lakebase synced table's source/key/owner/sync state (and its served row count) —
-which is exactly what the checkpoint is allowed to assert on.
+only observable platform state. That state is a Databricks App's deploy/run
+state and a Lakebase synced table's source/key/owner/sync state (and its served
+row count), which is exactly what the checkpoint is allowed to assert on.
 """
 
 from __future__ import annotations
@@ -266,7 +266,7 @@ def test_wrong_source_table_is_red():
 
 def test_same_basename_wrong_catalog_schema_is_red():
     # Another participant's <other>.<other>.gold_contract_performance shares the
-    # basename but is NOT the caller's own — must be RED (no basename fallback).
+    # basename but is NOT the caller's own, so it must be RED (no basename fallback).
     other = "other-catalog.other-schema.gold_contract_performance"
     result = _check(FakeApps(synced=_synced(source=other)))
     assert result.passed is False
@@ -424,7 +424,7 @@ def test_invalid_primary_key_is_red():
 
 # --- live SDK adapter (w.postgres synced-table surface) ---------------------
 # These exercise `_SdkAppClient.get_synced_table` against a fake WorkspaceClient
-# shaped like the modern Lakebase Autoscaling SDK — no network. The synced-table
+# shaped like the modern Lakebase Autoscaling SDK, with no network. The synced-table
 # GET returns ONLY status (no spec), so the adapter reads the source table from
 # the Unity Catalog table entry's `source_table` property and the primary key
 # from Postgres. These guard that multi-source mapping and pin the retired legacy
@@ -449,7 +449,7 @@ class _FakeStatus:
 class _FakeSyncedTable:
     """Shaped like databricks.sdk.service.postgres.SyncedTable (status only).
 
-    The real GET response carries NO ``.spec`` — a ``spec`` here would be a trap:
+    The real GET response carries NO ``.spec``, so a ``spec`` here would be a trap:
     the adapter must not read source/PK from it.
     """
 
@@ -535,7 +535,7 @@ def _adapter_info_for_state(detailed_state: str):
 
 
 def test_sdk_adapter_provisioning_state_is_not_online():
-    # `.wait()` on create can return at SYNCED_TABLE_PROVISIONING — a not-yet-online
+    # `.wait()` on create can return at SYNCED_TABLE_PROVISIONING, and a not-yet-online
     # table must NOT pass the online guard (the checkpoint stays RED until serving).
     info = _adapter_info_for_state("SYNCED_TABLE_PROVISIONING")
     assert info.detailed_state == "synced_table_provisioning"
@@ -544,7 +544,7 @@ def test_sdk_adapter_provisioning_state_is_not_online():
 
 def test_sdk_adapter_triggered_update_is_online():
     # SYNCED_TABLE_ONLINE_TRIGGERED_UPDATE is a real live state (observed even for a
-    # SNAPSHOT request) — accepted as online by the startswith('synced_table_online')
+    # SNAPSHOT request), and is accepted as online by the startswith('synced_table_online')
     # logic, so the checkpoint proceeds to the serving proof.
     info = _adapter_info_for_state("SYNCED_TABLE_ONLINE_TRIGGERED_UPDATE")
     assert info.detailed_state == "synced_table_online_triggered_update"
@@ -608,7 +608,7 @@ def test_resolves_app_and_synced_table_from_namespace():
 
 def test_namespace_binds_ownership_to_the_caller():
     # A different participant's namespace derives a different owner, so the check
-    # refuses to adopt objects owned by someone else — the two-participant guard.
+    # refuses to adopt objects owned by someone else. This is the two-participant guard.
     other = workshop.namespace(OTHER, domain="finance")
     result = workshop.check(
         APP_CHECKPOINT_ID, catalog=CATALOG, schema=SCHEMA,
@@ -629,7 +629,7 @@ def test_explicit_names_override_namespace():
 
 def test_namespace_serving_base_flows_through_for_non_finance_domain():
     # FOLD-IN #22: a non-Finance domain gets its OWN serving table through the
-    # namespace by passing serving_base (+ its own source_table) — no ad-hoc
+    # namespace by passing serving_base (+ its own source_table), with no ad-hoc
     # synced_table override, and the checkpoint resolves that derived name.
     ns = workshop.namespace(OWNER, domain="itsm")
     expected = ns.synced_table_fqn(CATALOG, SCHEMA, base="gold_incidents_served")

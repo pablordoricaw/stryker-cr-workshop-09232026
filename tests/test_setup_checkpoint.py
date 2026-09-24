@@ -1,7 +1,7 @@
 """Tests for the 00_setup checkpoint, off-platform via a fake Spark session.
 
 The checkpoint asserts the catalog is accessible and the schema + UC Volume
-exist — never that a catalog was created (participants bring their own).
+exist, never that a catalog was created (participants bring their own).
 """
 
 from __future__ import annotations

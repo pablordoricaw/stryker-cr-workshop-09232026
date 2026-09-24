@@ -1,9 +1,9 @@
 """Auto-detect/provision Lakebase CDF source or synthesize the history table.
 
 This module implements the three-tier fallback for 01_bronze_txn:
-1. Detect — if the CDF history table already exists, use it.
-2. Provision — create a Lakebase Postgres project, seed it, configure CDF→UC.
-3. Synthesize — on any failure, build the history table in UC from seed.
+1. Detect. If the CDF history table already exists, use it.
+2. Provision. Create a Lakebase Postgres project, seed it, configure CDF→UC.
+3. Synthesize. On any failure, build the history table in UC from seed.
 
 The flow is fail-soft: a readable history table is guaranteed, or a clear error
 is raised only if synthesis also fails.
@@ -169,9 +169,9 @@ def ensure_txn_cdf_source(
     """Guarantee the domain's CDF history table exists via detect/provision/synthesize.
 
     Three-tier fail-soft flow:
-    1. Detect — if history table exists, return it (preexisting).
-    2. Provision — create/reuse Lakebase project, seed Postgres, configure CDF (provisioned).
-    3. Synthesize — on any failure, build history table in UC from committed seed (synthesized).
+    1. Detect. If history table exists, return it (preexisting).
+    2. Provision. Create/reuse Lakebase project, seed Postgres, configure CDF (provisioned).
+    3. Synthesize. On any failure, build history table in UC from committed seed (synthesized).
 
     Args:
         config: WorkshopConfig with catalog/schema/domain/volume_path.
@@ -346,7 +346,7 @@ def _provision_lakebase_cdf_config(
 
     Returns:
         (project_id, database_resource_path, discovered_uc_table)
-        — the identities needed by the notebook and the actual UC table created by CDF.
+        These are the identities needed by the notebook and the actual UC table created by CDF.
 
     Raises:
         Exception: If any step fails (branch not found, database not found, CDF errors,

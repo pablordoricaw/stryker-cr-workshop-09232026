@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Solution · 01 Transactional ingestion to bronze — Security
+# MAGIC # Solution · 01 Transactional ingestion to bronze (Security)
 # MAGIC
 # MAGIC This solution automatically ensures the `lb_scan_findings_history` CDF
 # MAGIC history table is available, then reconstructs the current state and writes
@@ -12,10 +12,10 @@
 # MAGIC
 # MAGIC The notebook uses a three-tier fallback to guarantee the history table:
 # MAGIC
-# MAGIC 1. **Detect** — if already present, use it.
-# MAGIC 2. **Provision** — create a Lakebase Postgres project (if needed), seed it,
+# MAGIC 1. **Detect**. If already present, use it.
+# MAGIC 2. **Provision**. Create a Lakebase Postgres project (if needed), seed it,
 # MAGIC    and configure CDF→UC (requires workspace admin to enable CDF preview).
-# MAGIC 3. **Synthesize** — on any failure, build the history table in UC from seed.
+# MAGIC 3. **Synthesize**. On any failure, build the history table in UC from seed.
 
 # COMMAND ----------
 
@@ -23,7 +23,7 @@
 # MAGIC ## Install dependencies for Lakebase provisioning
 # MAGIC
 # MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
-# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module),
 # MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
 # MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
 # MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
@@ -36,7 +36,7 @@
 
 # On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
 # installed package is not importable until the kernel restarts. Restart explicitly
-# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+# here, before any state is built, so the bootstrap cell below runs in the fresh kernel.
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -65,22 +65,22 @@ import workshop
 # MAGIC
 # MAGIC | Widget | What to enter | Leave blank? |
 # MAGIC |--------|---------------|--------------|
-# MAGIC | **catalog** | Your existing workshop catalog — **required** | No — must always provide |
-# MAGIC | **domain** | Security (locked to this solution) | Never — selects the Security transactional schema |
-# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
-# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
-# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
-# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
-# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
-# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the Security default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC | **catalog** | Your existing workshop catalog, **required** | No, must always provide |
+# MAGIC | **domain** | Security (locked to this solution) | Never, selects the Security transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes, blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes, if you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No, `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes, blank is the recommended default |
+# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes, blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the Security default history table; fill only if bringing your own CDF table | Yes, blank is the recommended default |
 # MAGIC
 # MAGIC **Setup:** enter your **catalog**, leave the **domain** as Security, and leave everything else blank or as-is.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
-dbutils.widgets.dropdown("domain", "security", ["security"], "Domain (Security — locked to this solution)")
-dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("catalog", "", "Catalog (required, enter your existing workshop catalog)")
+dbutils.widgets.dropdown("domain", "security", ["security"], "Domain (Security, locked to this solution)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you>, recommended)")
 dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
@@ -91,17 +91,17 @@ dbutils.widgets.dropdown(
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "(Optional) Lakebase project you created — blank = synthesize",
+    "(Optional) Lakebase project you created (blank = synthesize)",
 )
 dbutils.widgets.text(
     "lakebase_database",
     "",
-    "(Advanced) Lakebase database — leave blank for default",
+    "(Advanced) Lakebase database (leave blank for default)",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
     "",
-    "(Advanced) Lakebase CDF table — leave blank for Security default",
+    "(Advanced) Lakebase CDF table (leave blank for Security default)",
 )
 
 # COMMAND ----------
@@ -123,7 +123,7 @@ source_mode = dbutils.widgets.get("source_mode")
 # The Security bronze transactional table name and grain key. These are
 # domain-specific; the domain-generic `01_bronze_txn` checkpoint takes them (and
 # the expected row count) as inputs so the same shared checkpoint validates every
-# domain — Finance's `bronze_sales_transactions`/`transaction_id`, Security's
+# domain, whether Finance's `bronze_sales_transactions`/`transaction_id` or Security's
 # `bronze_scan_findings`/`finding_id`.
 BRONZE_TXN_TABLE = "bronze_scan_findings"
 TRANSACTION_KEY = "finding_id"
@@ -175,7 +175,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 # The Security scan-findings schema (mirrors data/security/transactional). Every
-# finding carries a non-null `cve_id` — the join key to the CVE advisory in gold.
+# finding carries a non-null `cve_id`, the join key to the CVE advisory in gold.
 FINDING_COLUMNS = [
     "finding_id",
     "scan_id",

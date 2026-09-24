@@ -7,7 +7,7 @@ per class extracts every document once with no ``ai_extract`` errors.
 
 Behavioral tests inject the expected shape by **mocking the source-discovery
 seam** (``_source_doc_keys``) or via the ``expected_doc_keys`` override, so they
-never depend on which PDFs a domain happens to ship in the repo today — when #13
+never depend on which PDFs a domain happens to ship in the repo today. When #13
 adds Security documents, none of these tests change. One test exercises the real
 discovery function against this ticket's committed Finance tree, and one uses a
 temp tree to pin the non-recursive globbing.

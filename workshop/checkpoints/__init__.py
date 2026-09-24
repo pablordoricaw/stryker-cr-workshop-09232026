@@ -1,15 +1,15 @@
-"""Checkpoint modules — auto-discovered so later tickets add checks by dropping
+"""Checkpoint modules, auto-discovered so later tickets add checks by dropping
 a file here.
 
 Any module in this package (except those whose name starts with ``_``) is
 imported when :func:`load_all` runs, which triggers the ``@checkpoint``
 decorators inside it to register on the default registry. ``workshop/__init__``
 calls :func:`load_all` on import, so ``import workshop`` is enough to make every
-checkpoint available — a later ticket never edits a central list.
+checkpoint available, and a later ticket never edits a central list.
 
 **Per-module isolation:** discovery catches each module's import failure so a
-single broken checkpoint module — e.g. one that imports an unavailable optional
-dependency — can never break ``import workshop`` or the connection-free smoke
+single broken checkpoint module, e.g. one that imports an unavailable optional
+dependency, can never break ``import workshop`` or the connection-free smoke
 checkpoint. A module that fails to import is recorded in :data:`LOAD_ERRORS` and
 surfaced as an *unavailable* checkpoint (keyed by the module name) that returns
 a failed result explaining the problem, instead of taking the whole framework
@@ -40,7 +40,7 @@ def _register_unavailable(
             passed=False,
             message=(
                 f"Checkpoint module '{_mod}' failed to import: "
-                f"{type(_exc).__name__}: {_exc}. This is a workshop bug — tell "
+                f"{type(_exc).__name__}: {_exc}. This is a workshop bug, so tell "
                 f"your facilitator. Other checkpoints are unaffected."
             ),
             details={"unavailable": True, "error_type": type(_exc).__name__},

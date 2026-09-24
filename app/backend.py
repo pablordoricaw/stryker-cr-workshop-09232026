@@ -1,23 +1,23 @@
-"""Data-access layer for the provided workshop app — WITH THE TWO PARTICIPANT GAPS.
+"""Data-access layer for the provided workshop app, WITH THE TWO PARTICIPANT GAPS.
 
 This module ships **complete except for exactly two functions** each participant
 fills in:
 
-  * GAP 1 of 2 — :meth:`Backend.ask_genie`   (the Genie Conversation API call)
-  * GAP 2 of 2 — :meth:`Backend.fetch_serving_rows`  (the Lakebase read)
+  * GAP 1 of 2, :meth:`Backend.ask_genie`   (the Genie Conversation API call)
+  * GAP 2 of 2, :meth:`Backend.fetch_serving_rows`  (the Lakebase read)
 
 The Streamlit UI in :mod:`app` calls exactly these two methods. Everything around
-them — configuration, connection setup, health reporting, and error handling — is
+them, from configuration and connection setup to health reporting and error handling, is
 already written. Find each ``PARTICIPANT GAP`` banner below, replace the
 ``raise NotImplementedError(...)`` with the few lines it describes, then redeploy.
 The reference implementation is in ``solutions/finance/07_app.py``.
 
 Design notes:
-  * Authentication uses the Databricks SDK ``Config`` / ``WorkspaceClient`` — never
+  * Authentication uses the Databricks SDK ``Config`` / ``WorkspaceClient``, never
     hardcoded tokens (they are auto-injected for a deployed app).
   * Resource ids come from environment variables wired via ``app.yaml``'s
     ``valueFrom`` (Genie space) and Lakebase's auto-injected ``PG*`` /
-    ``LAKEBASE_ENDPOINT`` vars — never hardcoded.
+    ``LAKEBASE_ENDPOINT`` vars, never hardcoded.
   * The app **starts cleanly even with the gaps unfilled**: the gaps raise only
     when their serving/chat action is triggered, so the app can be deployed and
     started (and the ``07_app`` checkpoint's app-side can pass) before the gaps
@@ -56,7 +56,7 @@ class Backend:
     """The app's data access layer. Two methods are participant gaps."""
 
     def __init__(self) -> None:
-        # Lazy — the SDK client is only built when a data route is called, so the
+        # Lazy. The SDK client is only built when a data route is called, so the
         # app process starts even if the SDK/creds are not yet available.
         self._workspace = None
 
@@ -75,7 +75,7 @@ class Backend:
 
         Prefers the auto-injected ``PGPASSWORD``; otherwise mints a short-lived
         OAuth credential from the injected ``LAKEBASE_ENDPOINT``. This helper is
-        already written — GAP 2 only has to *use* it to run a query.
+        already written, and GAP 2 only has to *use* it to run a query.
         """
         import psycopg
 
@@ -102,7 +102,7 @@ class Backend:
         }
 
     # =======================================================================
-    # PARTICIPANT GAP 1 of 2 — Genie Conversation API connection
+    # PARTICIPANT GAP 1 of 2: Genie Conversation API connection
     # -----------------------------------------------------------------------
     # Relay `question` to the participant's Genie agent (space id GENIE_SPACE_ID)
     # through the Conversation API and return (status, answer_text, sql).
@@ -125,7 +125,7 @@ class Backend:
         )
 
     # =======================================================================
-    # PARTICIPANT GAP 2 of 2 — Lakebase read
+    # PARTICIPANT GAP 2 of 2: Lakebase read
     # -----------------------------------------------------------------------
     # Read up to `limit` rows from the Lakebase-synced serving table
     # (SERVING_TABLE) and return them as a list of dicts. Use the already-written

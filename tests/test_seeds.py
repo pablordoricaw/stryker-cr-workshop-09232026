@@ -1,4 +1,4 @@
-"""Tests for the seed-hook framework — registry, discovery, and run_seeds."""
+"""Tests for the seed-hook framework covering registry, discovery, and run_seeds."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 🚀 Stretch · Package your work as a DAB — SOLUTION (Finance)
+# MAGIC # 🚀 Stretch · Package your work as a DAB · SOLUTION (Finance)
 # MAGIC
 # MAGIC The gated solution for the "package your work as a DAB" stretch. The
 # MAGIC complete, validated artifact is the **bundle set** next to this notebook:
@@ -21,7 +21,7 @@
 # MAGIC    deploys.
 # MAGIC 2. **Package the built work, not the provisioning.** Your schema + UC Volume
 # MAGIC    were created by `00_setup` (the notebook path), so neither bundle declares
-# MAGIC    a schema/volume resource — they **target** the existing `catalog.schema`
+# MAGIC    a schema/volume resource. They **target** the existing `catalog.schema`
 # MAGIC    by variable. That is what makes the runbook deployable without colliding
 # MAGIC    with pre-existing UC objects. Never `CREATE CATALOG`.
 # MAGIC
@@ -52,7 +52,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -75,7 +75,7 @@ notebooks_root = f"/Workspace/Users/{me}/stryker-cr-workshop/notebooks"
 
 print(f"Example bundle set : {bundle_root}")
 print("pipeline --var:")
-print(f"  catalog={config.catalog}   (existing — provisioned by 00_setup, never created)")
+print(f"  catalog={config.catalog}   (existing, provisioned by 00_setup, never created)")
 print(f"  schema={config.schema}     (provisioned by 00_setup)")
 print(f"  volume={config.volume}")
 print(f"  notebooks_root={notebooks_root}")
@@ -103,7 +103,7 @@ print(f"  app_name={ns.app_name()}")
 # MAGIC ## 3. Deploy in order (pipeline → run → app)
 # MAGIC
 # MAGIC Deploy order is the only cross-bundle dependency; there is no in-bundle
-# MAGIC handle between the bundles — they agree by shared `--var catalog`/`schema`
+# MAGIC handle between the bundles. They agree by shared `--var catalog`/`schema`
 # MAGIC and by the gold table name. Neither bundle creates the schema/volume
 # MAGIC `00_setup` provisioned, so nothing collides.
 # MAGIC
@@ -114,13 +114,13 @@ print(f"  app_name={ns.app_name()}")
 # MAGIC     --var notebooks_root=/Workspace/Users/you/stryker-cr-workshop/notebooks --profile "$PROFILE" \
 # MAGIC   && databricks bundle run medallion_build --profile "$PROFILE")
 # MAGIC
-# MAGIC # (create the Genie agent [06] and Lakebase synced table [07] out-of-band —
-# MAGIC #  they are not DAB resources.)
+# MAGIC # (create the Genie agent [06] and Lakebase synced table [07] out-of-band,
+# MAGIC #  since they are not DAB resources.)
 # MAGIC
 # MAGIC (cd app && databricks bundle deploy --var app_name="$APPNAME" --profile "$PROFILE" \
 # MAGIC   && databricks apps start "$APPNAME" --profile "$PROFILE")
 # MAGIC ```
 # MAGIC
-# MAGIC No `workshop.check` for this stretch — a clean `bundle validate --strict` on
+# MAGIC No `workshop.check` for this stretch. A clean `bundle validate --strict` on
 # MAGIC both bundles (and, if you deploy, a green pipeline run + a running app) is
 # MAGIC the bar. The full rationale and runbook live in the bundle-set README.

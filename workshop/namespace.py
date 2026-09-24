@@ -1,4 +1,4 @@
-"""Per-participant namespacing — one identity-derived namespace, used everywhere.
+"""Per-participant namespacing, one identity-derived namespace used everywhere.
 
 A whole workshop team shares **one** Unity Catalog catalog and **one** workspace,
 so every object a participant creates in a shared space must be uniquely named,
@@ -6,8 +6,8 @@ and every check must validate the **caller's own** object rather than a fixed,
 shared name. This module is the single source of truth for those names: given a
 participant's identity (their ``current_user()``), it derives a stable,
 collision-resistant, SQL-safe **schema** name plus the identity **suffix** that
-workspace-scoped objects — the Genie agent, the Databricks App, the Lakebase
-project, the synced table — carry.
+workspace-scoped objects carry. Those are the Genie agent, the Databricks App, the Lakebase
+project, and the synced table.
 
 Deriving the names here, rather than ad hoc in each notebook, is what makes
 *generation* (the notebook that creates the object) and *verification* (the
@@ -21,8 +21,8 @@ helper with the same identity and get byte-identical names.
    single separator and leading/trailing separators stripped. ``_`` is the
    separator for SQL identifiers (schema, tables, the Genie title); ``-`` for
    RFC 1123 / DNS names (the Databricks App, the Lakebase project).
-2. A **digest** — the first 8 hex characters of ``sha256`` of the *full* raw
-   identity — is appended (``<slug>_<digest>``). The digest is what makes the
+2. A **digest**, the first 8 hex characters of ``sha256`` of the *full* raw
+   identity, is appended (``<slug>_<digest>``). The digest is what makes the
    suffix collision-resistant: two distinct identities that sanitize to the same
    slug (``ada@a.com`` vs ``ada@b.com``) still get different suffixes. It is
    stable (same identity → same digest, always) and, being pure hex, is
@@ -35,7 +35,7 @@ The schema is ``workshop_<suffix>``; the common ``workshop_`` prefix means every
 participant's schema sorts together in Catalog Explorer and none collides with a
 teammate's.
 
-Everything here is pure Python — no Spark, no SDK, no network — so it is unit
+Everything here is pure Python, with no Spark, no SDK, and no network, so it is unit
 testable off-platform and safe to import from the connection-free framework.
 """
 
@@ -54,7 +54,7 @@ WORKSHOP_SCHEMA_PREFIX = "workshop_"
 #: staying short enough for the length-limited App / Lakebase names.
 _DIGEST_LEN = 8
 
-#: The default serving-table base for the synced-table name — the Finance gold
+#: The default serving-table base for the synced-table name, the Finance gold
 #: serving mart. It is only a *default*: a domain reusing the helper passes its
 #: own base (``synced_table_name(base=...)`` / ``synced_table_fqn(base=...)``),
 #: and the ``07_app`` checkpoint forwards a ``serving_base`` extra to it, so the
@@ -93,12 +93,12 @@ class Namespace:
 
     Attributes:
         identity: The raw identity the names were derived from (e.g.
-            ``current_user()`` — ``ada@stryker.com``). Used verbatim as the app
+            ``current_user()``, such as ``ada@stryker.com``). Used verbatim as the app
             owner and workspace ``owner_path``.
         domain: The workshop domain (``finance`` / ``security`` / ``itsm``); a
             component of the *workspace-scoped* object names (Genie agent,
             Databricks App, Lakebase project) so those stay distinct across
-            domains. The namespace isolates **participants** — each participant
+            domains. The namespace isolates **participants**, so each participant
             runs a single domain per the workshop design. The :attr:`schema` is
             deliberately NOT domain-scoped, so a same-identity run of two domains
             would still collide on shared table names (``bronze_docs`` /
@@ -200,7 +200,7 @@ class Namespace:
         """The synced table's fully-qualified UC name in the caller's catalog/schema.
 
         The synced-table id doubles as a UC entity ``<catalog>.<schema>.<table>``
-        and a Postgres table in the participant's *existing* catalog — no catalog
+        and a Postgres table in the participant's *existing* catalog. No catalog
         is ever created.
         """
         return f"{catalog}.{schema}.{self.synced_table_name(base=base)}"
@@ -250,7 +250,7 @@ def sanitize_identity(identity: str) -> str:
     """The SQL-safe, collision-resistant per-participant suffix for ``identity``.
 
     This is the ``<slug>_<digest>`` token the schema and SQL object names are
-    built from — ``namespace(identity, domain=...).suffix`` without needing a
+    built from. It is ``namespace(identity, domain=...).suffix`` without needing a
     domain (the suffix does not depend on it). The schema is
     ``WORKSHOP_SCHEMA_PREFIX + sanitize_identity(identity)``.
 

@@ -1,6 +1,6 @@
 """The context handed to every checkpoint function.
 
-A checkpoint asserts *externally-observable* state — catalog objects, row
+A checkpoint asserts *externally-observable* state, such as catalog objects, row
 counts, tag/comment presence, metric-view resolvability, a sane Genie answer,
 synced-table row parity. To do that on a live workspace it needs a Spark session
 and the participant's catalog/schema. Those are bundled here so the

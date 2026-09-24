@@ -1,4 +1,4 @@
-"""Tests for workshop.provision — schema + volume only, off-platform.
+"""Tests for workshop.provision. Schema and volume only, off-platform.
 
 A recording fake Spark captures the SQL so we can assert exactly what runs
 (idempotent, backtick-safe, and never CREATE CATALOG).

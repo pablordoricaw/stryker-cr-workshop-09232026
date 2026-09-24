@@ -2,8 +2,8 @@
 
 Returns green once the setup notebook has created the schema and UC Volume named
 by the run's :class:`~workshop.config.WorkshopConfig` inside the participant's
-existing catalog. It asserts only externally-observable state — that the catalog
-is *accessible* and the schema and volume *exist* — never how the notebook
+existing catalog. It asserts only externally-observable state, that the catalog
+is *accessible* and the schema and volume *exist*, never how the notebook
 created them, and never that a catalog was created (participants bring their own).
 
 Run it as::
@@ -26,7 +26,7 @@ from workshop.results import CheckResult
 SETUP_CHECKPOINT_ID = "00_setup"
 
 # The name column each SHOW result exposes (header varies by Databricks version).
-# We read *only* the name column — never every string cell — because
+# We read *only* the name column, never every string cell, because
 # ``SHOW VOLUMES`` also returns the schema/database name, so scanning all cells
 # would let a volume whose name equals the schema name false-pass.
 _SCHEMA_NAME_COLUMNS = ("databaseName", "schemaName", "schema_name", "namespace")
@@ -67,7 +67,7 @@ def check_setup(ctx: CheckContext) -> CheckResult:
             False,
             "No catalog/schema to check. Call workshop.check('00_setup', "
             "spark=spark, catalog=config.catalog, schema=config.schema, "
-            "volume=config.volume) — the setup notebook does this for you.",
+            "volume=config.volume). The setup notebook does this for you.",
             {"catalog": catalog, "schema": schema},
         )
 
@@ -86,7 +86,7 @@ def check_setup(ctx: CheckContext) -> CheckResult:
             False,
             f"Catalog `{catalog}` is not accessible ({type(exc).__name__}). Enter "
             f"your team's existing catalog name and confirm you have USE CATALOG "
-            f"on it — the workshop does not create the catalog.",
+            f"on it. The workshop does not create the catalog.",
             {"missing": "catalog", "catalog": catalog, "error_type": type(exc).__name__},
         )
 

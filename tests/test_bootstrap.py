@@ -1,5 +1,5 @@
 """Participant import-path robustness: `import workshop` must work from a
-nested notebooks/ directory the way it does in a Databricks Git folder — not
+nested notebooks/ directory the way it does in a Databricks Git folder, not
 only from the repo root with pytest's pythonpath injection.
 """
 
@@ -92,7 +92,7 @@ def test_import_from_nested_cwd_without_pythonpath():
 
 def test_bare_import_fails_from_nested_cwd_without_bootstrap():
     """Control: without the bootstrap snippet, the bare import fails from
-    notebooks/ — which is exactly why the snippet exists.
+    notebooks/, which is exactly why the snippet exists.
     """
     root = _repo_root()
     notebooks = os.path.join(root, "notebooks")

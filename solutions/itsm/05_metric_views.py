@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 05 · Governed Metric Views — SOLUTION (ITSM)
+# MAGIC # 05 · Governed Metric Views · SOLUTION (ITSM)
 # MAGIC
 # MAGIC This solution creates two Unity Catalog Metric Views in the participant's
 # MAGIC existing resolved schema. They are semantic definitions over the #8 gold
@@ -26,7 +26,7 @@ while not os.path.isfile(os.path.join(_root, "workshop", "__init__.py")):
 if _root not in sys.path:
     sys.path.insert(0, _root)
 import workshop
-dbutils.widgets.text("catalog","","Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog","","Catalog (your existing catalog, required)")
 dbutils.widgets.text("schema","","Schema (blank = your workshop_<you> schema)")
 
 # COMMAND ----------

@@ -1,13 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Gold medallion layer — SOLUTION (Finance)
+# MAGIC # 03 · Gold medallion layer · SOLUTION (Finance)
 # MAGIC
 # MAGIC **Gated reference solution.** This notebook turns the upstream Finance
 # MAGIC tables into two analytics-ready, governed Delta tables:
 # MAGIC
-# MAGIC - **`gold_sales`** — one row per `transaction_id`, enriched with its
+# MAGIC - **`gold_sales`**, one row per `transaction_id`, enriched with its
 # MAGIC   document-derived commercial agreement; and
-# MAGIC - **`gold_contract_performance`** — one row per `contract_id`, with
+# MAGIC - **`gold_contract_performance`**, one row per `contract_id`, with
 # MAGIC   additive sales and margin measures for BI, Metric Views, and the app.
 # MAGIC
 # MAGIC The natural key shared by these sources is intentional:
@@ -45,7 +45,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -76,7 +76,7 @@ gold_contract_performance = workshop.fully_qualified(
 )
 
 print("Your workshop environment:")
-print(f"  catalog : {config.catalog}   (existing — not created)")
+print(f"  catalog : {config.catalog}   (existing, not created)")
 print(f"  schema  : {config.schema}")
 print(f"  detail  : {gold_sales}")
 print(f"  mart    : {gold_contract_performance}")

@@ -6,12 +6,12 @@
 # MAGIC
 # MAGIC You built two Metric Views (`05_metric_views`) and a Genie agent
 # MAGIC (`06_genie`). This module extends **both**, on top of what you already have,
-# MAGIC **without touching the framework** — the `05_metrics` and `06_genie`
+# MAGIC **without touching the framework**. The `05_metrics` and `06_genie`
 # MAGIC checkpoints already accept your *own* contract through `workshop.check`
 # MAGIC extras. It is the same override pattern the Security (#13) and ITSM (#14)
 # MAGIC domains use to reuse the generic checkpoints.
 # MAGIC
-# MAGIC Everything lands in **your existing catalog / `workshop_<you>` schema** — no
+# MAGIC Everything lands in **your existing catalog / `workshop_<you>` schema**. No
 # MAGIC catalog is created, no second schema. Run `05_metric_views` and `06_genie`
 # MAGIC first.
 
@@ -39,7 +39,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -74,7 +74,7 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC ## 2. Add your own Metric View
 # MAGIC
 # MAGIC Author a third governed Metric View in your schema for a question your
-# MAGIC domain asks often — e.g. discounting by product family and sales channel. Keep the
+# MAGIC domain asks often, e.g. discounting by product family and sales channel. Keep the
 # MAGIC YAML `source:` pointed at a gold table, define atomic measures first, then
 # MAGIC compose a ratio with `MEASURE()`. Confirmed `gold_sales` columns you can use:
 # MAGIC `product_family`, `sales_region`, `customer_type`, `sales_channel`,
@@ -89,7 +89,7 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — a discount Metric View skeleton
+# MAGIC ### 💡 Hint: a discount Metric View skeleton
 
 # COMMAND ----------
 
@@ -123,7 +123,7 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # MAGIC
 # MAGIC The generic `05_metrics` check validates any view you describe: pass a
 # MAGIC `metric_views={view_name: {source_table, dimensions, measures}}` contract.
-# MAGIC It is a **per-call** contract — validating your own view here does not change
+# MAGIC It is a **per-call** contract, and validating your own view here does not change
 # MAGIC how the default `05_metrics` grade works.
 
 # COMMAND ----------
@@ -164,7 +164,7 @@ my_metrics = workshop.fully_qualified(config.catalog, config.schema, "finance_di
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — why the superset check is safe
+# MAGIC ### 💡 Hint: why the superset check is safe
 
 # COMMAND ----------
 

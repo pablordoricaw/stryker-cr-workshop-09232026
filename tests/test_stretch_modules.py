@@ -3,17 +3,17 @@
 These are structural, dependency-free checks (no Spark, no SDK, no YAML lib) that
 lock in the three deliverables so they cannot silently rot:
 
-1. **From-scratch mode** — an identical, markdown-only, default-off marker cell on
+1. **From-scratch mode** adds an identical, markdown-only, default-off marker cell on
    every graded *build* stage (and deliberately not on ``00_setup``).
-2. **Package as a DAB** — a *set* of two independently-deployable example bundles
+2. **Package as a DAB** ships a *set* of two independently-deployable example bundles
    (not one monolith) that package the built work (pipeline + app) and target the
    schema/volume ``00_setup`` provisioned, rather than re-declaring them.
-3. **Add your own** — a starter + gated solution that reuse the existing
+3. **Add your own** provides a starter + gated solution that reuse the existing
    checkpoint override knobs rather than changing the framework.
 
 The bundles' *semantic* validity is covered by ``databricks bundle validate
 --strict`` (run out-of-band); these tests assert the workshop-specific invariants
-that validate does not — CREATE-CATALOG-free, no managed schema/volume resource
+that validate does not, namely CREATE-CATALOG-free, no managed schema/volume resource
 (so a deploy never collides with ``00_setup``'s objects), bundle-local app source,
 no dev-mode name prefixing, and the documented cross-references.
 """
@@ -43,7 +43,7 @@ MARKER_HEADING = "# MAGIC ## 🚀 From-scratch mode (optional stretch)"
 # A stable slice of the marker body that must be byte-identical across every
 # stage (this is the "documented once, applied consistently" guarantee).
 MARKER_INVARIANT = (
-    "# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both\n"
+    "# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both\n"
     "# MAGIC modes and is the only thing that grades you."
 )
 
@@ -86,8 +86,8 @@ def test_setup_stage_has_no_from_scratch_marker():
 
 
 def test_from_scratch_marker_is_markdown_only():
-    # Every line the marker cell adds is a `# MAGIC` markdown line — no widget, no
-    # code — so it cannot change what the checkpoint asserts.
+    # Every line the marker cell adds is a `# MAGIC` markdown line, with no widget and no
+    # code, so it cannot change what the checkpoint asserts.
     for stage in BUILD_STAGES:
         text = _read("notebooks", stage)
         start = text.index(MARKER_HEADING)

@@ -24,7 +24,7 @@ Everything here honours the same two workshop rules as the core path:
 
 ## 1. Package your work as a DAB
 
-**The gap this closes.** Your team — Finance, Security, or ITSM — ships pipelines
+**The gap this closes.** Your team, whether Finance, Security, or ITSM, ships pipelines
 and apps by hand. [Databricks Asset Bundles (DABs)](https://docs.databricks.com/aws/en/dev-tools/bundles/)
 version your **built work** as source-controlled YAML, so it is reviewable,
 re-runnable, and promotable between workspaces.

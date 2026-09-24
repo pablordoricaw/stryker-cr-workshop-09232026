@@ -6,7 +6,7 @@ of the notebook so it is unit-testable and so maintainer validation can drive th
 everywhere) so a participant can re-run the setup cell freely.
 
 **Bring-your-own-catalog.** Participants do not have permission to create
-catalogs — each team already has its own. So this never runs ``CREATE CATALOG``.
+catalogs, and each team already has its own. So this never runs ``CREATE CATALOG``.
 It assumes the participant has ``USE CATALOG`` plus ``CREATE SCHEMA`` (and volume
 creation) on their *own* catalog, and creates only the schema and volume with
 plain SQL. Both work on Databricks Free Edition with no web terminal and no

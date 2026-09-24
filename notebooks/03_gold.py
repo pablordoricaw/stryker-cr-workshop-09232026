@@ -6,10 +6,10 @@
 # MAGIC tables for Metric Views, Genie, and the app. Both table names and the
 # MAGIC business key differ per domain (derived for you below):
 # MAGIC
-# MAGIC - a **detail** table — one row per transaction, enriched with its
+# MAGIC - a **detail** table holding one row per transaction, enriched with its
 # MAGIC   document-derived record (Finance `gold_sales`, Security `gold_findings`,
 # MAGIC   ITSM `gold_incidents`); and
-# MAGIC - a **mart** table — one row per business key, with additive measures
+# MAGIC - a **mart** table holding one row per business key, with additive measures
 # MAGIC   (Finance `gold_contract_performance` per `contract_id`, Security
 # MAGIC   `gold_cve_exposure` per `cve_id`, ITSM `gold_service_performance` per
 # MAGIC   `incident_id`).
@@ -18,9 +18,9 @@
 # MAGIC cell, then run `03_gold`. This notebook uses the existing catalog from
 # MAGIC `00_setup`; never create a catalog.
 # MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
-# MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint,
+# MAGIC starting with a nudge, then an API shape, then the gated `solutions/<domain>/` file for
+# MAGIC this checkpoint, one rung at a time. You can also open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
 
@@ -51,7 +51,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -59,7 +59,7 @@ dbutils.widgets.text("volume", "landing", "UC Volume")
 # COMMAND ----------
 
 # Your identity gives you a unique schema in the shared team catalog
-# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+# (workshop_<you>), the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -90,13 +90,13 @@ print(f"Join key       : bronze.{spec.group_key} = silver.{spec.document_key}")
 # MAGIC %md
 # MAGIC ## 🚀 From-scratch mode (optional stretch)
 # MAGIC
-# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC This stage ships in **guided** mode, with the `# TODO` cells and collapsible
 # MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
 # MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
-# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both
 # MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
 # MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
-# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+# MAGIC not a setting**. See [`docs/stretch/README.md`](../docs/stretch/README.md).
 
 # COMMAND ----------
 
@@ -121,14 +121,14 @@ from pyspark.sql import functions as F
 #   - project the extracted document fields from `silver_document` under clear
 #     names, including `spec.detail_document_key` (the document key) and
 #     `spec.detail_document_match` (a non-null document column that proves
-#     enrichment landed) — see your domain's data/<domain>/README.md and gated
+#     enrichment landed). See your domain's data/<domain>/README.md and gated
 #     solutions/<domain>/03_gold.py for the exact field list,
 #   - overwrite the managed Delta target with schema overwrite enabled.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — grain-safe document enrichment
+# MAGIC ### 💡 Hint for grain-safe document enrichment
 
 # COMMAND ----------
 
@@ -155,7 +155,7 @@ from pyspark.sql import functions as F
 # MAGIC ```
 # MAGIC
 # MAGIC Documents from other business processes deliberately use different
-# MAGIC identifiers. Do not manufacture a string match to attach them — the
+# MAGIC identifiers. Do not manufacture a string match to attach them. The
 # MAGIC checkpoint proves the join enriches exactly the expected transactions. The
 # MAGIC exact projected fields are in `data/<domain>/README.md` and the gated
 # MAGIC `solutions/<domain>/03_gold.py`.
@@ -180,7 +180,7 @@ from pyspark.sql import functions as F
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — mart aggregation shape
+# MAGIC ### 💡 Hint for the mart aggregation shape
 
 # COMMAND ----------
 
@@ -200,7 +200,7 @@ from pyspark.sql import functions as F
 # MAGIC     .option("overwriteSchema", "true").saveAsTable(gold_mart)
 # MAGIC ```
 # MAGIC
-# MAGIC The gated `solutions/<domain>/03_gold.py` lists the exact measures — and the
+# MAGIC The gated `solutions/<domain>/03_gold.py` lists the exact measures, and the
 # MAGIC `03_gold` checkpoint reconciles the additive ones back to the transaction
 # MAGIC source for your domain.
 

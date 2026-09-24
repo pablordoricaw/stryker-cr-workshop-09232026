@@ -1,9 +1,9 @@
 """The ``07_app`` checkpoint: a deployed data app over a Lakebase synced table.
 
-Ticket #12 ships a **provided Streamlit app** that participants wire to two things —
+Ticket #12 ships a **provided Streamlit app** that participants wire to two things,
 their per-participant Genie Agent (#11) and a **Lakebase synced table** created
 from one of the #8 gold tables. This checkpoint proves the *deployed* slice using
-**only externally-observable platform state** — never the notebook, the app source,
+**only externally-observable platform state**, never the notebook, the app source,
 or how either object was created. A participant can reach the same state from the
 Apps UI, the CLI, or the SDK and it passes identically.
 
@@ -12,17 +12,17 @@ Two independent facts are asserted, each hardened against a false pass:
 * **The caller's own Lakebase synced table exists and serves the expected rows.**
   The whole team shares one workspace, so the synced table carries a
   per-participant identity suffix (see #22); the check therefore takes the
-  expected ``synced_table`` name as a **required** input — there is deliberately
+  expected ``synced_table`` name as a **required** input, since there is deliberately
   no default, fixed, or shared name. It must sync from the expected gold table
   (Finance default ``gold_contract_performance``), carry the expected primary
   key, be **owned by the caller** (its Unity Catalog owner must match the
-  required ``owner`` — so another participant's synced table is never adopted),
-  and be **online** — Unity-Catalog-provisioned with a healthy, completed sync.
+  required ``owner``, so another participant's synced table is never adopted),
+  and be **online**, Unity-Catalog-provisioned with a healthy, completed sync.
   A missing synced table is RED; the wrong source or key is RED; one owned by
   someone else is RED; a table still provisioning, offline, or whose sync
   pipeline failed is RED. Serving is verified **fail-closed**: the served row
   count (through the client's ``count_rows`` or an observed ``served_row_count``)
-  must be **positive** and, when the source count is known, equal to it — and if
+  must be **positive** and, when the source count is known, equal to it, and if
   the count cannot be obtained at all the checkpoint stays RED, so an online-but-
   empty/stale synced table can never pass on an unverified count.
 
@@ -30,7 +30,7 @@ Two independent facts are asserted, each hardened against a false pass:
   per-participant too, so ``app_name`` is a **required** input with no default,
   and the app must be **owned by the caller** (creator / service principal must
   match ``owner``). It must exist, its latest deployment must have **succeeded**,
-  and its compute must be **running** — deploying an app can leave it stopped,
+  and its compute must be **running**, since deploying an app can leave it stopped,
   and a stopped app answers nothing, so a stopped/starting/errored app is RED
   (the observable form of the "app start is handled explicitly" acceptance
   criterion). The provided Streamlit app serves no ``/api/health`` route, so the
@@ -42,7 +42,7 @@ Two independent facts are asserted, each hardened against a false pass:
 gold source table, the primary key, the expected row count, and the app/synced
 names are all overridable through ``workshop.check`` extras, so Security (#13)
 and ITSM (#14) reuse this module with their own app, synced table, and gold
-source — no edits.
+source, with no edits.
 
 **Off-platform testable.** Like every other checkpoint, this one takes its
 Databricks dependency by injection rather than importing an SDK at module load:
@@ -60,49 +60,49 @@ Run it as::
         apps=WorkspaceClient(),             # or a normalized client / fake
         app_name=app_name,                  # per-participant, required
         synced_table=synced_table,          # per-participant, required (UC name)
-        owner=me,                           # required — binds both to YOU
+        owner=me,                           # required, binds both to YOU
         lakebase_endpoint=endpoint,         # so served rows can be verified
         lakebase_host=host,
     )
 
 Extras forwarded through ``ctx.extras``:
 
-* ``app_name`` — the expected per-participant Databricks App name (**required**).
-* ``synced_table`` — the fully-qualified Unity Catalog name of the caller's own
+* ``app_name`` is the expected per-participant Databricks App name (**required**).
+* ``synced_table`` is the fully-qualified Unity Catalog name of the caller's own
   Lakebase synced table (**required** unless a ``namespace`` is given to derive
   it), created in the participant's *existing* catalog/schema (e.g.
   ``my_catalog.finance.gold_contract_performance_served_ada``). No
   Lakebase-registered catalog is involved: the synced-table id doubles as a UC
   entity in the participant's catalog and a Postgres table ``{table}`` in schema
   ``{schema}``, so no ``CREATE CATALOG`` / ``create-catalog`` is ever required.
-* ``serving_base`` — when the synced-table name is derived from ``namespace``,
+* ``serving_base`` applies when the synced-table name is derived from ``namespace``,
   the serving-table base (default: the namespace helper's Finance base). A
   domain (Security #13 / ITSM #14) passes its own base here so it gets the right
   serving table from the namespace without an ad-hoc name. Ignored when an
   explicit ``synced_table`` is supplied (that always wins).
-* ``apps`` — a normalized app client, a raw ``WorkspaceClient``, or ``None`` to
+* ``apps`` is a normalized app client, a raw ``WorkspaceClient``, or ``None`` to
   build one from ambient workspace credentials.
-* ``source_table`` — the gold table the synced table must sync from (default
+* ``source_table`` is the gold table the synced table must sync from (default
   ``gold_contract_performance``). A local name is resolved in the participant
   schema; a dotted name is treated as an explicit fully-qualified reference.
-* ``primary_key_columns`` — the primary key the synced table must carry (default
+* ``primary_key_columns`` is the primary key the synced table must carry (default
   ``("contract_id",)``); compared as an order-insensitive set.
-* ``owner`` — **required** ownership binding (the caller's identity, e.g.
+* ``owner`` is the **required** ownership binding (the caller's identity, e.g.
   ``current_user()``). Both the app (creator / service principal) and the synced
   table (Unity Catalog owner) must match it, so a same-named resource owned by
   someone else is never adopted.
-* ``expected_row_count`` / ``served_row_count`` — optional integers. The served
+* ``expected_row_count`` / ``served_row_count`` are optional integers. The served
   count must be positive; when an expected count is known (given here, or counted
   from the source table when ``spark`` is provided) the served count must equal
   it. If no served count can be obtained at all, the checkpoint stays RED.
-* ``require_running`` — default ``True``; set ``False`` only to accept a
-  successfully-deployed-but-stopped app (not recommended — a stopped app answers
+* ``require_running`` defaults to ``True``; set ``False`` only to accept a
+  successfully-deployed-but-stopped app (not recommended, since a stopped app answers
   nothing).
-* ``probe_health`` — default ``False`` (the provided Streamlit app has no
+* ``probe_health`` defaults to ``False`` (the provided Streamlit app has no
   ``/api/health`` route); set ``True`` to enable the best-effort HTTP health
   probe for a framework that exposes one.
 * ``lakebase_endpoint`` / ``lakebase_host`` / ``lakebase_user`` /
-  ``lakebase_database`` — connection hints the live SDK adapter uses to read
+  ``lakebase_database`` are connection hints the live SDK adapter uses to read
   directly from Lakebase Postgres in the real participant flow: both the
   served-row count and the synced table's primary key (the synced-table GET
   echoes neither). The normal invocation should pass ``lakebase_endpoint`` +
@@ -122,7 +122,7 @@ from workshop.results import CheckResult
 
 APP_CHECKPOINT_ID = "07_app"
 
-#: The gold table a Finance synced table must serve — the compact contract-grain
+#: The gold table a Finance synced table must serve, the compact contract-grain
 #: mart from #8 (one denormalized row per commercial agreement). Overridable via
 #: the ``source_table`` extra so Security/ITSM point at their own serving table.
 DEFAULT_SOURCE_TABLE = "gold_contract_performance"
@@ -186,8 +186,8 @@ def _fail(message: str, details: dict[str, Any]) -> CheckResult:
 def _normalize_reference(value: str) -> str:
     """Compare UC references independent of SQL quoting/case/whitespace.
 
-    Mirrors ``genie._normalize_reference`` / ``metrics._normalize_reference`` —
-    backticks, double quotes, and spaces are removed and the result lowercased;
+    Mirrors ``genie._normalize_reference`` / ``metrics._normalize_reference``.
+    Backticks, double quotes, and spaces are removed and the result lowercased;
     dots are preserved so ``catalog.schema.table`` stays comparable.
     """
     return value.replace("`", "").replace('"', "").replace(" ", "").lower()
@@ -219,7 +219,7 @@ def _synced_online(info: SyncedTableInfo) -> bool:
 
     The Unity Catalog provisioning state must be ``active`` and the sync
     pipeline's detailed state must be one of the ``online`` states with no
-    failure — so a table still provisioning, offline, or whose pipeline failed
+    failure, so a table still provisioning, offline, or whose pipeline failed
     (``synced_table_online_pipeline_failed``) is never treated as serving.
     """
     provisioning = (info.provisioning_state or "").lower()
@@ -270,7 +270,7 @@ class _SdkAppClient:
     Only ever constructed on a live workspace, so importing the SDK errors here
     is safe. Every read is defensive: a missing object comes back as ``None`` (a
     clean RED at the checkpoint) rather than an exception, and ``count_rows`` is
-    best-effort — it returns ``None`` unless connection hints are supplied and a
+    best-effort, and it returns ``None`` unless connection hints are supplied and a
     Postgres driver is importable.
     """
 
@@ -308,7 +308,7 @@ class _SdkAppClient:
         # Lakebase Autoscaling surface. ``w.postgres.get_synced_table`` takes the
         # resource name ``synced_tables/{catalog}.{schema}.{table}`` and returns a
         # ``SyncedTable`` whose **status** (``detailed_state`` +
-        # ``unity_catalog_provisioning_state``) is all it echoes — the request
+        # ``unity_catalog_provisioning_state``) is all it echoes. The request
         # spec (source table, primary key) is *not* returned on a GET. So the
         # source table is read from the Unity Catalog table entry's
         # ``source_table`` property, and the primary key from the Postgres table
@@ -355,7 +355,7 @@ class _SdkAppClient:
         """The Unity Catalog owner of the synced table (its creator identity).
 
         This is the ownership-scoped observable that binds the synced table to a
-        participant — the analog of a Genie agent's ``parent_path``. A missing
+        participant, the analog of a Genie agent's ``parent_path``. A missing
         table or read error returns ``None`` (the checkpoint then refuses to treat
         it as the caller's own).
         """
@@ -368,7 +368,7 @@ class _SdkAppClient:
         """The Postgres ``(schema, table)`` for a synced-table UC name.
 
         ``w.postgres.create_synced_table`` maps the id ``{catalog}.{schema}.{table}``
-        to a Postgres table ``{table}`` in schema ``{schema}`` — i.e. the last two
+        to a Postgres table ``{table}`` in schema ``{schema}``, i.e. the last two
         dotted segments of the UC name.
         """
         parts = name.split(".")
@@ -432,7 +432,7 @@ class _SdkAppClient:
 
         Requires ``lakebase_endpoint`` (for the OAuth credential) plus a host, and
         an importable Postgres driver. Returns ``None`` on any missing hint or
-        failure — and because serving is verified fail-closed, an unverifiable
+        failure, and because serving is verified fail-closed, an unverifiable
         count keeps the checkpoint RED rather than passing.
         """
         target = self._pg_target(info.name)
@@ -511,7 +511,7 @@ def _source_matches(observed: str | None, expected_norm: str) -> bool:
     Requires normalized **fully-qualified** equality (same quote/case/whitespace
     normalization used elsewhere): a synced table sourced from another
     participant's ``<other-catalog>.<other-schema>.gold_contract_performance``
-    shares the basename but is NOT a match — there is deliberately no
+    shares the basename but is NOT a match, since there is deliberately no
     last-segment fallback, so it cannot be adopted.
     """
     if not observed:
@@ -567,7 +567,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
 
     # Resolve the per-participant namespace once (see workshop.namespace). When a
     # namespace is supplied the app name, synced-table name, and owner are derived
-    # from it — the SAME values the notebook used to create them — so a fixed or
+    # from it, the SAME values the notebook used to create them, so a fixed or
     # shared name is impossible; explicit extras still win for a custom setup.
     ns = ctx.extras.get("namespace")
     app_name = _required_name(ctx, "app_name")
@@ -609,7 +609,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
         return _fail(
             "No owner given. The app and synced table are workspace-scoped and "
             "shared across a team, so this checkpoint must confirm they are YOUR "
-            "own — pass your identity (or a namespace): workshop.check('07_app', "
+            "own. Pass your identity (or a namespace): workshop.check('07_app', "
             "..., owner=spark.sql('SELECT current_user()').collect()[0][0]).",
             {"stage": "configuration", "reason": "missing_owner"},
         )
@@ -673,7 +673,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
         )
 
     # Ownership: the synced table must be demonstrably YOURS. Its Unity Catalog
-    # owner (creator) is the ownership-scoped observable — a same-named table
+    # owner (creator) is the ownership-scoped observable, and a same-named table
     # owned by another participant is never adopted.
     owner_fn = getattr(client, "get_table_owner", None)
     if not callable(owner_fn):
@@ -701,14 +701,14 @@ def check_app(ctx: CheckContext) -> CheckResult:
             f"Synced table {synced_table!r} is not online yet "
             f"(provisioning={synced.provisioning_state!r}, "
             f"sync={synced.detailed_state!r}). Wait for the sync to complete, or "
-            "re-run it — a still-provisioning, offline, or failed sync serves no "
+            "re-run it. A still-provisioning, offline, or failed sync serves no "
             "up-to-date data.",
             {"stage": "synced_offline", "synced_table": synced_table,
              "provisioning_state": synced.provisioning_state,
              "detailed_state": synced.detailed_state, "message": synced.message},
         )
 
-    # Serving proof — FAIL CLOSED. An online synced table can still be empty or
+    # Serving proof, FAIL CLOSED. An online synced table can still be empty or
     # stale, so the checkpoint must positively verify it serves rows; if the
     # served count cannot be obtained it stays RED (never a structure-only pass).
     served = _served_rows(client, ctx, synced)
@@ -724,7 +724,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
     if served <= 0:
         return _fail(
             f"Synced table {synced_table!r} is online but serves 0 rows. The "
-            "sync produced no data — re-run it after the gold table is populated.",
+            "sync produced no data. Re-run it after the gold table is populated.",
             {"stage": "synced_empty", "synced_table": synced_table,
              "served_rows": served},
         )
@@ -782,7 +782,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
         return _fail(
             f"App {app_name!r} is deployed but not running "
             f"(compute state={app.compute_state!r}, app status={app.app_state!r}). "
-            "Start the app — deploying an app can leave it stopped, and a stopped "
+            "Start the app. Deploying an app can leave it stopped, and a stopped "
             "app answers nothing.",
             {"stage": "app_stopped", "app_name": app_name,
              "compute_state": app.compute_state, "app_state": app.app_state},
@@ -798,7 +798,7 @@ def check_app(ctx: CheckContext) -> CheckResult:
         if status is not None and not (200 <= status < 400):
             return _fail(
                 f"App {app_name!r} is running but its health endpoint returned "
-                f"HTTP {status}. Check the app logs — the app is not serving "
+                f"HTTP {status}. Check the app logs. The app is not serving "
                 "successfully.",
                 {"stage": "app_health", "app_name": app_name, "url": app.url,
                  "http_status": status},

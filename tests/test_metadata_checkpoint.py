@@ -6,7 +6,7 @@ classification tag on at least ``min_pi_columns`` columns, and a non-blank
 business-domain tag on each table. A fake Spark session answers the four
 ``information_schema`` queries the checkpoint issues (routed by SQL marker
 comment), so the tests never touch a workspace and never depend on which columns
-a domain happens to ship — Security (#13) and ITSM (#14) reuse the module with
+a domain happens to ship. Security (#13) and ITSM (#14) reuse the module with
 their own gold tables and none of these tests change.
 """
 
@@ -44,9 +44,9 @@ class FakeSpark:
             models a missing table; a blank/None comment models an uncommented
             table).
         columns: ``[(table_name, column_name, comment), ...]``.
-        pi_tags: ``[(table_name, column_name, tag_value), ...]`` — the rows
+        pi_tags: ``[(table_name, column_name, tag_value), ...]``, the rows
             information_schema.column_tags returns for the PI tag key.
-        domain_tags: ``{table_name: tag_value}`` — the table's domain tag value.
+        domain_tags: ``{table_name: tag_value}``, the table's domain tag value.
         missing_stage: marker name whose query should raise (unreadable view).
     """
 
@@ -235,7 +235,7 @@ def test_blank_pi_tag_value_fails():
 
 
 def test_whitespace_only_pi_tag_value_fails():
-    # A whitespace-only tag value is not a classification — _is_blank() trims it.
+    # A whitespace-only tag value is not a classification, since _is_blank() trims it.
     result = _check(
         FakeSpark(pi_tags=[(DEFAULT_TABLES[0], "customer_name", "   ")])
     )

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 06 · Genie agent over gold + metrics — SOLUTION (Security)
+# MAGIC # 06 · Genie agent over gold + metrics · SOLUTION (Security)
 # MAGIC
 # MAGIC This solution creates (or updates, idempotently) a **per-participant Genie
 # MAGIC agent** in the participant's existing catalog, curated over the #8 gold
@@ -15,7 +15,7 @@
 # MAGIC ## Install dependencies
 # MAGIC
 # MAGIC This cell upgrades `databricks-sdk` so the Genie authoring API
-# MAGIC (`w.genie.create_space` / `update_space` / `list_spaces`) is available — the
+# MAGIC (`w.genie.create_space` / `update_space` / `list_spaces`) is available. The
 # MAGIC serverless-default SDK predates it. Installing does not restart the kernel on
 # MAGIC its own, so the next cell calls `dbutils.library.restartPython()` to make the
 # MAGIC upgraded package importable; the bootstrap cell then runs fresh.
@@ -28,7 +28,7 @@
 
 # On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
 # installed package is not importable until the kernel restarts. Restart explicitly
-# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+# here, before any state is built, so the bootstrap cell below runs in the fresh kernel.
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -48,7 +48,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "security", ["security"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -57,7 +57,7 @@ dbutils.widgets.text("warehouse_id", "", "SQL warehouse id (blank = auto-detect)
 # COMMAND ----------
 
 # Your identity resolves the SAME per-participant workshop_<you> schema 00_setup
-# created, and your namespace — the one source of truth for every unique name in
+# created, and your namespace, the one source of truth for every unique name in
 # the shared workspace (here, your Genie agent title).
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
@@ -133,7 +133,7 @@ benchmarks = [
 text_instructions = [
     "## PURPOSE",
     "- Answer Security questions about vulnerability-scan findings, CVE exposure, remediation effort, and value at risk.",
-    "- Users are security analysts — assume fluency with CVEs, CVSS, severity bands, and remediation SLAs.",
+    "- Users are security analysts, so assume fluency with CVEs, CVSS, severity bands, and remediation SLAs.",
     "",
     "## DISAMBIGUATION",
     "- 'Open' means status = 'Open'. 'Critical' means severity = 'Critical' (CVSS >= 9.0).",
@@ -235,7 +235,7 @@ def _under_home(path):
 
 # Only ever update an agent that is demonstrably YOURS (same title AND living
 # under your own workspace path). A same-title agent owned by a teammate is left
-# untouched — we create our own instead — so we never overwrite someone else's.
+# untouched. We create our own instead, so we never overwrite someone else's.
 owned = None
 for s in _pages():
     if (s.title or "").strip() != agent_name:
@@ -298,7 +298,7 @@ result = workshop.check(
     catalog=config.catalog,
     schema=config.schema,
     genie=w,
-    namespace=ns,  # derives your agent title AND owner_path — one source of truth
+    namespace=ns,  # derives your agent title AND owner_path, one source of truth
     genie_space_id=space_id,
     expected_sources=[
         "gold_findings",
@@ -317,7 +317,7 @@ assert result.passed, result.message
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Stretch — tune the agent
+# MAGIC ## Tune the agent (stretch)
 # MAGIC
 # MAGIC Add per-column synonyms/descriptions via `data_sources.tables[].column_configs`,
 # MAGIC example SQL for a tricky question shape (e.g. SLA breaches by owner team),

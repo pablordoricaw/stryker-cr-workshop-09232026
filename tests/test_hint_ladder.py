@@ -41,7 +41,7 @@ import workshop
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(workshop.__file__)))
 
 # The participant hint ladder's source path. It ships as-is at this path on both
-# `dev` and `main`; it is NOT swapped to the repo root — Genie Code does not
+# `dev` and `main`; it is NOT swapped to the repo root, because Genie Code does not
 # auto-discover a repo `AGENTS.md`, so `00_setup` injects this file's content
 # into each participant's `~/.assistant_instructions.md` instead.
 PARTICIPANT_SRC = os.path.join("docs", "genie", ".assistant_instructions.md")
@@ -152,7 +152,7 @@ def test_solution_map_covers_registry_ids_with_exact_modules() -> None:
     mapping = _solution_map(text)
     ids = _checkpoint_ids()
 
-    # The table lists exactly the registered checkpoints — no missing, no extra.
+    # The table lists exactly the registered checkpoints, with none missing and none extra.
     assert set(mapping) == set(ids), (
         f"solution map ids {sorted(mapping)} != registry ids {sorted(ids)}"
     )

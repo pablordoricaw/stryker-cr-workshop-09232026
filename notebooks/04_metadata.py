@@ -6,9 +6,9 @@
 # MAGIC metadata with [**dbxmetagen**](https://github.com/databricks-industry-solutions/dbxmetagen)
 # MAGIC in its three modes:
 # MAGIC
-# MAGIC - **`comment`** — AI-generated table and column descriptions;
-# MAGIC - **`pi`** — PII/PHI/PCI classification tags on sensitive columns; and
-# MAGIC - **`domain`** — a business-domain tag on each table.
+# MAGIC - **`comment`** adds AI-generated table and column descriptions;
+# MAGIC - **`pi`** adds PII/PHI/PCI classification tags on sensitive columns; and
+# MAGIC - **`domain`** adds a business-domain tag on each table.
 # MAGIC
 # MAGIC It documents whichever two gold tables your domain built in `03_gold`
 # MAGIC (derived for you below). The governance model is **stage → review →
@@ -20,9 +20,9 @@
 # MAGIC This notebook uses the existing catalog from `00_setup`; it never creates a
 # MAGIC catalog.
 # MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint.
 # MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC this checkpoint, one rung at a time. You can also open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
 
@@ -32,9 +32,9 @@
 # MAGIC ## 0. Install dbxmetagen (pinned, vendored wheel)
 # MAGIC
 # MAGIC dbxmetagen is installed notebook-only and **pinned to `v0.10.68`** for
-# MAGIC reproducibility. Instead of `%pip install git+…` — which clones *and builds*
+# MAGIC reproducibility. Instead of `%pip install git+…`, which clones *and builds*
 # MAGIC dbxmetagen from GitHub at runtime and **hangs on workspaces without
-# MAGIC github.com egress** — we install a **prebuilt wheel vendored in the repo**
+# MAGIC github.com egress**, we install a **prebuilt wheel vendored in the repo**
 # MAGIC under [`libs/`](../libs/README.md). The install still resolves dbxmetagen's
 # MAGIC dependency tree (`mlflow`, `openai`, …) from **PyPI**, so it needs PyPI egress.
 # MAGIC
@@ -53,7 +53,7 @@ import urllib.request
 
 try:
     urllib.request.urlopen("https://pypi.org/simple/", timeout=5)
-    print("✅ PyPI reachable — run the %pip cell below, then continue.")
+    print("✅ PyPI reachable. Run the %pip cell below, then continue.")
 except Exception as exc:  # any failure ⇒ treat PyPI as unreachable
     raise RuntimeError(
         f"No PyPI egress from this workspace ({type(exc).__name__}). dbxmetagen's "
@@ -94,7 +94,7 @@ import workshop
 # MAGIC   It defaults to `databricks-claude-sonnet-4-6`. **Confirm that endpoint
 # MAGIC   exists** under **Serving → Foundation Models** in your workspace (its
 # MAGIC   availability is region-dependent), or set this widget to another endpoint
-# MAGIC   you can access. This is the *only* place you pick an endpoint — the AI
+# MAGIC   you can access. This is the *only* place you pick an endpoint. The AI
 # MAGIC   Functions in `02_silver_docs` (`ai_parse_document` / `ai_classify` /
 # MAGIC   `ai_extract`) use Databricks' built-in system model with no endpoint to
 # MAGIC   select.
@@ -104,12 +104,12 @@ import workshop
 # MAGIC   The same values flow to dbxmetagen *and* the checkpoint, so they stay in
 # MAGIC   sync.
 # MAGIC
-# MAGIC dbxmetagen writes its review/log tables into your **resolved schema** — the
+# MAGIC dbxmetagen writes its review/log tables into your **resolved schema**, the
 # MAGIC single schema `00_setup` provisioned. No second schema is created.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -120,7 +120,7 @@ dbutils.widgets.text("pi_classification_tag_name", "data_classification", "PI ta
 # COMMAND ----------
 
 # Your identity gives you a unique schema in the shared team catalog
-# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+# (workshop_<you>), the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -155,20 +155,20 @@ print(f"Tag keys: domain={domain_tag_name}, pi={pi_classification_tag_name}")
 # MAGIC %md
 # MAGIC ## 🚀 From-scratch mode (optional stretch)
 # MAGIC
-# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC This stage ships in **guided** mode, with the `# TODO` cells and collapsible
 # MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
 # MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
-# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both
 # MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
 # MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
-# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+# MAGIC not a setting**. See [`docs/stretch/README.md`](../docs/stretch/README.md).
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC > ⏳ **Heads up — this is slow.**
+# MAGIC > ⏳ **Heads up, this is slow.**
 # MAGIC >
-# MAGIC > Each mode re-invokes the foundation-model endpoint once per target table. A single staging or apply pass takes several minutes (longer on cold/scale-to-zero endpoints). This is expected — let it run.
+# MAGIC > Each mode re-invokes the foundation-model endpoint once per target table. A single staging or apply pass takes several minutes (longer on cold/scale-to-zero endpoints). This is expected, so let it run.
 
 # COMMAND ----------
 
@@ -177,8 +177,8 @@ print(f"Tag keys: domain={domain_tag_name}, pi={pi_classification_tag_name}")
 # MAGIC
 # MAGIC Run dbxmetagen once per mode with `apply_ddl=false`. Each run sends the
 # MAGIC gold tables' schema (and, by default, a small row sample) to your model
-# MAGIC endpoint, generates metadata, and **stages** it in the review tables —
-# MAGIC nothing is written to Unity Catalog yet.
+# MAGIC endpoint, generates metadata, and **stages** it in the review tables.
+# MAGIC Nothing is written to Unity Catalog yet.
 
 # COMMAND ----------
 
@@ -193,15 +193,15 @@ from dbxmetagen.main import main
 #   - table_names_source          = "parameter"
 #   - model                       = model_endpoint
 #   - mode                        = the mode
-#   - apply_ddl                   = False            (stage only — do not apply yet)
-#   - include_deterministic_pi    = False            (LLM-based PI only — no spaCy/Presidio)
+#   - apply_ddl                   = False            (stage only, do not apply yet)
+#   - include_deterministic_pi    = False            (LLM-based PI only, no spaCy/Presidio)
 #   - domain_tag_name             = domain_tag_name          (keep keys in sync)
 #   - pi_classification_tag_name  = pi_classification_tag_name
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — stage the three modes
+# MAGIC ### 💡 Hint: stage the three modes
 
 # COMMAND ----------
 
@@ -222,8 +222,8 @@ from dbxmetagen.main import main
 # MAGIC     })
 # MAGIC ```
 # MAGIC
-# MAGIC dbxmetagen generates one mode at a time. `comment` first is a good habit —
-# MAGIC the other modes reuse its context. `schema_name` is your single resolved
+# MAGIC dbxmetagen generates one mode at a time. `comment` first is a good habit,
+# MAGIC because the other modes reuse its context. `schema_name` is your single resolved
 # MAGIC schema, so the review tables land beside the gold tables.
 
 # COMMAND ----------
@@ -267,7 +267,7 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — apply the reviewed metadata
+# MAGIC ### 💡 Hint: apply the reviewed metadata
 
 # COMMAND ----------
 
@@ -292,26 +292,26 @@ display(spark.sql(f"SHOW TABLES IN {config.catalog}.{config.schema}"))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 🛟 No-PyPI fallback — document the tables without dbxmetagen
+# MAGIC ## 🛟 No-PyPI fallback: document the tables without dbxmetagen
 # MAGIC
 # MAGIC **Run this section only if the §0 egress precheck stopped you.** First run
 # MAGIC the §0 *workshop bootstrap* cell (`import workshop`) and the §1 *config* cell
-# MAGIC — neither needs dbxmetagen — then run the cell below. It reaches the *same*
+# MAGIC (neither needs dbxmetagen), then run the cell below. It reaches the *same*
 # MAGIC Unity Catalog state the checkpoint verifies: a comment on every table and
 # MAGIC column, a PI tag on the sensitive columns, and a business-domain tag on each
 # MAGIC table, using hand-written DDL instead of dbxmetagen. Column comments are
-# MAGIC derived from the column names (not AI-authored) — enough to document the
+# MAGIC derived from the column names (not AI-authored), enough to document the
 # MAGIC tables and pass the checkpoint.
 # MAGIC
 # MAGIC Comments always apply. The `SET TAGS` calls are **best-effort**: if your
 # MAGIC metastore governs the `domain` / `data_classification` tag keys, they are
-# MAGIC skipped with a warning — set the tag-key widgets in §1 to a permitted key
+# MAGIC skipped with a warning. Set the tag-key widgets in §1 to a permitted key
 # MAGIC (as in §4) and re-run this cell.
 
 # COMMAND ----------
 
 # The sensitive columns to PI-classify come from the domain spec (resolved in §1),
-# so this shared cell names no domain-specific table or column literal — your
+# so this shared cell names no domain-specific table or column literal, and your
 # domain's participant tags their own columns, never another domain's.
 def _bq(*parts):
     """Backtick-quote each identifier part and join with dots."""
@@ -366,7 +366,7 @@ apply_manual_metadata()
 # MAGIC %md
 # MAGIC ## 5. Checkpoint: `04_metadata`
 # MAGIC
-# MAGIC This check reads only Unity Catalog state — `information_schema` comments
+# MAGIC This check reads only Unity Catalog state, the `information_schema` comments
 # MAGIC and tags. It fails if any target table or column is uncommented, if no
 # MAGIC column carries the PI classification tag, or if any table is missing its
 # MAGIC business-domain tag. It never inspects this notebook. Your domain's gold
@@ -393,4 +393,4 @@ assert result.passed, result.message
 # MAGIC ## ✅ Metadata complete
 # MAGIC
 # MAGIC The gold tables are governed: documented, PI-classified, and
-# MAGIC domain-tagged — ready for Metric Views, Genie, and the app.
+# MAGIC domain-tagged, ready for Metric Views, Genie, and the app.

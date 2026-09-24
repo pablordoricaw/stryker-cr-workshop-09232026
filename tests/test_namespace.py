@@ -1,11 +1,11 @@
-"""Tests for per-participant namespacing — pure, off-platform.
+"""Pure, off-platform tests for per-participant namespacing.
 
 A whole team shares one catalog and one workspace, so the two properties that
 matter most are proven directly here at the unit level:
 
-* **collision-resistance** — two distinct identities derive distinct schema and
+* **collision-resistance** means two distinct identities derive distinct schema and
   suffixes (the acceptance criterion that two participants never collide); and
-* **stability** — the same identity always derives the same names, so a
+* **stability** means the same identity always derives the same names, so a
   notebook's generated object and a later ``workshop.check`` resolve identical
   names.
 """
@@ -91,7 +91,7 @@ def test_distinct_identities_get_distinct_names(domain):
         suffixes.add(ns.suffix)
         dns_suffixes.add(ns.dns_suffix)
     # Every distinct identity maps to a distinct schema, SQL suffix, and DNS
-    # suffix — no two participants collide.
+    # suffix, so no two participants collide.
     unique = {i.strip() for i in IDENTITIES}
     assert len(schemas) == len(unique)
     assert len(suffixes) == len(unique)

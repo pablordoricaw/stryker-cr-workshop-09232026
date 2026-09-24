@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 00 · Setup — provision your workshop environment
+# MAGIC # 00 · Set up your workshop environment
 # MAGIC
 # MAGIC This is the **first notebook you run**. It provisions everything the rest
 # MAGIC of the workshop needs, entirely from the Databricks Workspace UI:
@@ -9,8 +9,8 @@
 # MAGIC 2. **Seed hooks** that load your domain's data (populated by later modules).
 # MAGIC 3. The **`00_setup` checkpoint**, which confirms your environment is ready.
 # MAGIC
-# MAGIC **Bring your own catalog.** The workshop does **not** create a catalog —
-# MAGIC your team already has one. You tell it the catalog name below, and it
+# MAGIC **Bring your own catalog.** The workshop does **not** create a catalog.
+# MAGIC Your team already has one. You tell it the catalog name below, and it
 # MAGIC creates a schema and a UC Volume *inside* that catalog. You only need
 # MAGIC `USE CATALOG` + `CREATE SCHEMA` (and volume-create) on your own catalog.
 # MAGIC
@@ -38,12 +38,12 @@ import workshop
 # MAGIC %md
 # MAGIC ## 1. Enter your catalog and choose your domain
 # MAGIC
-# MAGIC **Catalog** — type your team's **existing** Unity Catalog catalog name.
+# MAGIC **Catalog.** Type your team's **existing** Unity Catalog catalog name.
 # MAGIC This is required; the workshop creates a schema and volume inside it, but
 # MAGIC does not create the catalog. If you're not sure of the name, open
 # MAGIC **Catalog** in the sidebar and use the catalog your team was given.
 # MAGIC
-# MAGIC **Domain** — pick the dataset your team is working in. The workshop is the
+# MAGIC **Domain.** Pick the dataset your team is working in. The workshop is the
 # MAGIC same end-to-end project for all three; only the dataset differs:
 # MAGIC
 # MAGIC | Domain     | Dataset                                        |
@@ -53,7 +53,7 @@ import workshop
 # MAGIC | `itsm`     | IT-Ops incidents + transactions                |
 # MAGIC
 # MAGIC Your **whole team shares one catalog**, so the schema is derived from
-# MAGIC **your identity** — every participant gets their own `workshop_<you>`
+# MAGIC **your identity**. Every participant gets their own `workshop_<you>`
 # MAGIC schema, so two teammates never collide and all workshop schemas sort
 # MAGIC together in Catalog Explorer. Leave the schema blank to use it (recommended);
 # MAGIC the volume defaults to `landing`. Later notebooks derive the **same** schema
@@ -61,7 +61,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -83,8 +83,8 @@ config = workshop.resolve_config(
 print("Your workshop environment:")
 print(f"  identity: {me}")
 print(f"  domain  : {config.domain}")
-print(f"  catalog : {config.catalog}   (existing — not created)")
-print(f"  schema  : {config.schema}   (per-participant — unique to you)")
+print(f"  catalog : {config.catalog}   (existing, not created)")
+print(f"  schema  : {config.schema}   (per-participant, unique to you)")
 print(f"  volume  : {config.volume}   (files land in {config.volume_path})")
 
 # COMMAND ----------
@@ -110,7 +110,7 @@ for statement in report.statements:
 # MAGIC ## 3. Run the seed hooks
 # MAGIC
 # MAGIC Seed hooks load your domain's data into the environment you just created.
-# MAGIC They are registered by later modules — today this reports that there is no
+# MAGIC They are registered by later modules. Today this reports that there is no
 # MAGIC data to load yet, which is expected. Running it now confirms the seed
 # MAGIC mechanism works end to end.
 
@@ -124,8 +124,8 @@ for result in workshop.run_seeds(config, spark=spark):
 # MAGIC %md
 # MAGIC ## 4. Checkpoint: `00_setup`
 # MAGIC
-# MAGIC The single validation seam. It confirms — by looking at your catalog, not
-# MAGIC at this notebook — that your catalog is accessible and that the schema and
+# MAGIC The single validation seam. It confirms, by looking at your catalog, not
+# MAGIC at this notebook, that your catalog is accessible and that the schema and
 # MAGIC UC Volume exist. Green means you're ready for the next module.
 
 # COMMAND ----------
@@ -145,7 +145,7 @@ assert result.passed, result.message
 # MAGIC %md
 # MAGIC ## 5. Give Genie Code your workshop hints
 # MAGIC
-# MAGIC **Genie Code** — the in-workspace coding assistant — helps you through the
+# MAGIC **Genie Code**, the in-workspace coding assistant, helps you through the
 # MAGIC workshop *one rung at a time*. It doesn't read this repo's files on its own;
 # MAGIC what it *does* read is your personal instructions file,
 # MAGIC `~/.assistant_instructions.md`, at the start of every session. This cell
@@ -178,7 +178,7 @@ try:
     with open(personal_path, "r", encoding="utf-8") as _f:
         existing = _f.read()
 except FileNotFoundError:
-    # No personal file yet (most common) — start from empty and only add ours.
+    # No personal file yet (most common), so start from empty and only add ours.
     existing = ""
 
 merged = workshop.merge_block(existing, block)
@@ -197,7 +197,7 @@ print("  (your existing personal instructions, if any, were preserved)")
 # MAGIC ## ✅ Setup complete
 # MAGIC
 # MAGIC Your schema and UC Volume exist inside your catalog, `00_setup` is green,
-# MAGIC and Genie Code has your workshop hints. Move on to the next module — it
+# MAGIC and Genie Code has your workshop hints. Move on to the next module. It
 # MAGIC reuses the domain and names you chose above. When you're done with the
 # MAGIC workshop, run `notebooks/99_teardown.py` to remove the hint block from your
 # MAGIC personal instructions.

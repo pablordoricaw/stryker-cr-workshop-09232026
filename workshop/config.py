@@ -1,10 +1,10 @@
-"""``WorkshopConfig`` — the one place that names a participant's environment.
+"""``WorkshopConfig`` is the one place that names a participant's environment.
 
 The workshop is one shared curriculum across three domains (Finance, Security,
 ITSM); only the dataset and pre-authored semantic content differ. Three things
-need to agree on *where* a participant's data lives — the setup notebook that
+need to agree on *where* a participant's data lives. The setup notebook that
 creates the schema/volume, the seed hooks that populate them, and the
-``00_setup`` checkpoint that asserts they exist — so the names are resolved once,
+``00_setup`` checkpoint that asserts they exist all need it, so the names are resolved once,
 here, and passed around as a :class:`WorkshopConfig`.
 
 Later notebooks (medallion, metric views, Genie, the app) read the same config,
@@ -31,8 +31,8 @@ from .namespace import namespace as _namespace
 #: The domains the workshop ships. A participant picks one in the setup notebook.
 DOMAINS: tuple[str, ...] = ("finance", "security", "itsm")
 
-#: Clean, participant-facing defaults. There is no default catalog — participants
-#: bring their own — but the schema defaults to the domain and the volume to a
+#: Clean, participant-facing defaults. There is no default catalog, since participants
+#: bring their own, but the schema defaults to the domain and the volume to a
 #: standard landing name.
 DEFAULT_DOMAIN = "finance"
 DEFAULT_VOLUME = "landing"
@@ -99,19 +99,19 @@ def resolve_config(
             workshop never creates a catalog; a blank/omitted value is an error.
         domain: ``finance`` (default), ``security``, or ``itsm``. Case- and
             whitespace-insensitive.
-        schema: Schema name. When given (non-blank) it wins — a participant can
+        schema: Schema name. When given (non-blank) it wins, so a participant can
             override. When omitted, it defaults to the per-participant
             identity-derived schema (``workshop_<suffix>``) if ``identity`` is
             supplied, else to the resolved ``domain`` (the pre-namespacing
             behavior, so off-platform callers with no identity still resolve).
         volume: Volume name; defaults to :data:`DEFAULT_VOLUME`.
         suffix: Optional token appended to the *schema* name (``<schema>_<suffix>``).
-            For maintainer/validation isolation only — participants never set it.
+            For maintainer/validation isolation only. Participants never set it.
             It suffixes the schema (not the catalog) because the catalog is a
             pre-existing shared resource.
         identity: The caller's identity (``current_user()``). A whole team shares
             one catalog, so when no explicit ``schema`` is given the schema is
-            derived from this identity via :func:`workshop.namespace` — unique
+            derived from this identity via :func:`workshop.namespace`, unique
             per participant, with a common ``workshop_`` prefix. Blank/omitted
             keeps the domain default.
 
@@ -128,7 +128,7 @@ def resolve_config(
     if not catalog or not catalog.strip():
         raise ValueError(
             "A catalog is required. Enter your team's existing Unity Catalog "
-            "catalog name — the workshop creates a schema and UC Volume inside "
+            "catalog name. The workshop creates a schema and UC Volume inside "
             "it, and does not create the catalog itself."
         )
     resolved_catalog = catalog.strip()

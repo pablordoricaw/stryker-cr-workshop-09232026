@@ -1,4 +1,4 @@
-"""``workshop.check`` — the single test seam participants and CI both call.
+"""``workshop.check`` is the single test seam participants and CI both call.
 
 The runner is deliberately forgiving: an unknown checkpoint id or a checkpoint
 that raises becomes a *failed* :class:`CheckResult` with a clear message, never

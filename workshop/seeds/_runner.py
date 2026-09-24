@@ -1,4 +1,4 @@
-"""``run_seeds`` — run every seed hook that applies to a run's domain.
+"""``run_seeds`` runs every seed hook that applies to a run's domain.
 
 Called by the setup notebook right after provisioning. Like ``workshop.check``,
 it is failure-isolated: a hook that raises becomes a failed :class:`SeedResult`
@@ -59,7 +59,7 @@ def _load_error_results() -> list[SeedResult]:
             module_name,
             False,
             f"Seed module '{module_name}' failed to import: "
-            f"{type(exc).__name__}: {exc}. This is a workshop bug — tell your "
+            f"{type(exc).__name__}: {exc}. This is a workshop bug, so tell your "
             f"facilitator. Other seeds are unaffected.",
             {"unavailable": True, "error_type": type(exc).__name__},
         )

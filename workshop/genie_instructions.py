@@ -1,11 +1,11 @@
 """Build and splice the participant Genie Code hints into a personal file.
 
-Genie Code — the in-workspace coding assistant — does **not** auto-discover the
+Genie Code, the in-workspace coding assistant, does **not** auto-discover the
 repo's ``AGENTS.md`` by walking the directory tree. What it *does* do, verified
 live, is auto-load each user's personal instructions file at
 ``~/.assistant_instructions.md`` (``/Workspace/Users/<email>/.assistant_instructions.md``)
 at the start of every session. So the workshop delivers its three-rung hint
-ladder by *injecting* it into that personal file from ``00_setup`` — and removes
+ladder by *injecting* it into that personal file from ``00_setup``, and removes
 it again on cleanup.
 
 That personal file may already hold the participant's own instructions, so the
@@ -16,23 +16,23 @@ sentinels, and every operation preserves everything outside those sentinels
 files with no final newline all round-trip unchanged). A workshop block is
 recognized only when the start sentinel is immediately followed by the workshop
 heading (:data:`HINTS_HEADER`), so a stray or coincidental sentinel string in
-the participant's own text is never treated as the workshop's block — it is left
+the participant's own text is never treated as the workshop's block, so it is left
 alone rather than clobbered.
 
-Everything here is pure Python — no Spark, no Databricks SDK, no network — so it
+Everything here is pure Python, with no Spark, no Databricks SDK, and no network, so it
 is unit-testable off-platform. The ``00_setup`` notebook supplies the SDK glue
 (reading the source file, reading/writing the personal file through the
 workspace files API); this module just transforms text.
 
 Three functions carry the contract:
 
-* :func:`build_injection_block` — turn the hint-ladder source into a
+* :func:`build_injection_block` turns the hint-ladder source into a
   sentinel-wrapped block, with the participant's repo root and domain filled in.
-* :func:`merge_block` — splice a block into a personal file, guaranteeing exactly
+* :func:`merge_block` splices a block into a personal file, guaranteeing exactly
   one workshop block afterward (replace in place, or append when none is present,
   or collapse several into one), and leaving all personal content byte-for-byte
   untouched. Idempotent across re-runs.
-* :func:`strip_block` — remove every workshop block, restoring the personal
+* :func:`strip_block` removes every workshop block, restoring the personal
   content byte-for-byte.
 """
 
@@ -47,10 +47,10 @@ SENTINEL_END = "<!-- STRYKER-WORKSHOP-END -->"
 
 #: The heading prepended to the injected block so a participant reading their
 #: personal file can see where the workshop's content begins.
-HINTS_HEADER = "## Stryker Workshop — Genie Code Hints"
+HINTS_HEADER = "## Stryker Workshop Genie Code Hints"
 
 #: Shown for the domain line before the participant has chosen a domain.
-_DOMAIN_UNCHOSEN = "not yet chosen — ask me"
+_DOMAIN_UNCHOSEN = "not chosen yet, so ask me"
 
 # Matches a single HTML comment at the very start of the text, with any leading
 # and trailing whitespace. Non-greedy + DOTALL so a multi-line comment matches
@@ -121,14 +121,14 @@ def _find_blocks(text: str) -> list[tuple[int, int]]:
     content:
 
     * The :data:`HINTS_HEADER` anchor means a bare or coincidental sentinel
-      *string* in personal text — a lone marker, an inline mention, or a
-      START/END pair that is not the workshop's — is **not** matched.
+      *string* in personal text, whether a lone marker, an inline mention, or a
+      START/END pair that is not the workshop's, is **not** matched.
     * A ``SENTINEL_START`` that is not header-anchored, or that has no following
       ``SENTINEL_END``, is skipped (the scan resumes just past that marker), so a
       dangling personal ``START`` can never consume the real block or the text
       between them.
     * A header-anchored ``START`` is paired with the **first** ``SENTINEL_END``
-      that has no other ``SENTINEL_START`` before it — a well-formed block's body
+      that has no other ``SENTINEL_START`` before it. A well-formed block's body
       never contains a start marker. This "innermost" pairing means an unclosed
       header-anchored start cannot borrow a *later* block's end and swallow the
       content between them.
@@ -150,7 +150,7 @@ def _find_blocks(text: str) -> list[tuple[int, int]]:
             next_start = text.find(SENTINEL_START, after_start)
             # A well-formed block has an end, and no further start before that
             # end. If another start intervenes, THIS start is malformed/unclosed
-            # — skip it so the later (real) start gets paired instead.
+            # and is skipped so the later (real) start gets paired instead.
             if end != -1 and (next_start == -1 or next_start > end):
                 span_end = end + len(SENTINEL_END)
                 # The block always ships one trailing newline; fold it into the
@@ -193,7 +193,7 @@ def merge_block(existing_text: str, block: str) -> str:
     blocks = _find_blocks(existing_text)
     if not blocks:
         # Append verbatim. `"" + block == block`, and for non-empty content the
-        # block follows directly — no inserted separator to mutate on round trip.
+        # block follows directly with no inserted separator to mutate on round trip.
         return existing_text + block
 
     first_start, first_end = blocks[0]
@@ -210,7 +210,7 @@ def strip_block(existing_text: str) -> str:
     """Remove every workshop block, restoring the personal content byte-for-byte.
 
     Deletes each well-formed workshop block span (see :func:`_find_blocks`) and
-    leaves everything else exactly as it was — including leading/trailing blank
+    leaves everything else exactly as it was, including leading/trailing blank
     lines, whitespace-only files, and files with no final newline. A
     ``build → merge → strip`` round trip returns the original personal text
     unchanged. Text with no workshop block (or only malformed/half sentinels) is

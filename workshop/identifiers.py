@@ -2,7 +2,7 @@
 
 Catalog, schema, volume, and table names in Unity Catalog may legally contain
 hyphens, spaces, and even reserved words. Interpolating such a name straight
-into a SQL string produces either a parse error or — worse — a silently wrong
+into a SQL string produces either a parse error or, worse, a silently wrong
 reference. Every place in the workshop that builds SQL from a name (the
 provisioning helpers, the config's fully-qualified names, the checkpoints)
 routes through here so the escaping rule lives in exactly one spot.

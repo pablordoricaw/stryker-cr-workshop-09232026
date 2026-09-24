@@ -1,8 +1,8 @@
-"""The seed-hook registry — the extension point later data tickets fill in.
+"""The seed-hook registry, the extension point later data tickets fill in.
 
 This ticket ships the *mechanism* plus a no-op placeholder. Later tickets add
 real data loading by dropping a module into ``workshop/seeds/`` and decorating a
-function with :func:`seed_hook` — auto-discovered on ``import workshop``, no
+function with :func:`seed_hook`, auto-discovered on ``import workshop``, no
 central list to edit (exactly like ``workshop/checkpoints/``)::
 
     # workshop/seeds/finance_transactional.py  (a later ticket)

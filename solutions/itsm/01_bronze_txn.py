@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Solution · 01 Transactional ingestion to bronze — ITSM
+# MAGIC # Solution · 01 Transactional ingestion to bronze · ITSM
 # MAGIC
 # MAGIC This solution automatically ensures the `lb_service_tickets_history` CDF
 # MAGIC history table is available, then reconstructs the current state and writes
@@ -10,10 +10,10 @@
 # MAGIC
 # MAGIC The notebook uses a three-tier fallback to guarantee the history table:
 # MAGIC
-# MAGIC 1. **Detect** — if already present, use it.
-# MAGIC 2. **Provision** — create a Lakebase Postgres project (if needed), seed it,
+# MAGIC 1. **Detect**. If already present, use it.
+# MAGIC 2. **Provision**. Create a Lakebase Postgres project (if needed), seed it,
 # MAGIC    and configure CDF→UC (requires workspace admin to enable CDF preview).
-# MAGIC 3. **Synthesize** — on any failure, build the history table in UC from seed.
+# MAGIC 3. **Synthesize**. On any failure, build the history table in UC from seed.
 
 # COMMAND ----------
 
@@ -21,7 +21,7 @@
 # MAGIC ## Install dependencies for Lakebase provisioning
 # MAGIC
 # MAGIC This cell installs `psycopg[binary]` (Postgres client) and upgrades
-# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module) —
+# MAGIC `databricks-sdk` (for the `databricks.sdk.service.postgres` Lakebase CDF module),
 # MAGIC needed only if Lakebase provisioning is attempted. Installing does not restart the
 # MAGIC kernel on its own, so the next cell calls `dbutils.library.restartPython()` to make
 # MAGIC the packages importable; the bootstrap cell then runs fresh and rebuilds state.
@@ -34,7 +34,7 @@
 
 # On serverless / recent runtimes, %pip does not auto-restart Python, so the freshly
 # installed package is not importable until the kernel restarts. Restart explicitly
-# here — before any state is built — so the bootstrap cell below runs in the fresh kernel.
+# here, before any state is built, so the bootstrap cell below runs in the fresh kernel.
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -63,22 +63,22 @@ import workshop
 # MAGIC
 # MAGIC | Widget | What to enter | Leave blank? |
 # MAGIC |--------|---------------|--------------|
-# MAGIC | **catalog** | Your existing workshop catalog — **required** | No — must always provide |
-# MAGIC | **domain** | ITSM (locked to this solution) | Never — selects the ITSM transactional schema |
-# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes — blank is the recommended default |
-# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes — if you used the default, leave blank or keep as `landing` |
-# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No — `auto` is the recommended default |
-# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes — blank is the recommended default |
-# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes — blank is the recommended default |
-# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the ITSM default history table; fill only if bringing your own CDF table | Yes — blank is the recommended default |
+# MAGIC | **catalog** | Your existing workshop catalog, **required** | No, must always provide |
+# MAGIC | **domain** | ITSM (locked to this solution) | Never, it selects the ITSM transactional schema |
+# MAGIC | **schema** | Leave blank to use your personal `workshop_<you>` schema (recommended); only override to target a specific schema | Yes, blank is the recommended default |
+# MAGIC | **volume** | Leave as `landing` unless you used a different UC volume name | Yes, if you used the default, leave blank or keep as `landing` |
+# MAGIC | **source_mode** | Choose your Lakebase CDF approach: `auto` (recommended) = try real CDF, else Delta seed; `lakebase_cdf` = require real CDF (fails if unavailable); `delta_fallback` = skip Lakebase, use committed Delta seed only (fastest) | No, `auto` is the recommended default |
+# MAGIC | **lakebase_project** | **Enter the name of the Lakebase project you created** to exercise the real CDF sync. **Leave blank to synthesize** the history table instead (recommended if you didn't deploy a project) | Yes, blank is the recommended default |
+# MAGIC | **lakebase_database** | (Advanced / optional) Leave blank to use default; fill only if you are bringing your own Lakebase database resource path | Yes, blank is the recommended default |
+# MAGIC | **lakebase_cdf_table** | (Advanced / optional) Leave blank to use the ITSM default history table; fill only if bringing your own CDF table | Yes, blank is the recommended default |
 # MAGIC
 # MAGIC **Setup:** enter your **catalog**, leave the **domain** as ITSM, and leave everything else blank or as-is.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (required — enter your existing workshop catalog)")
-dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain (ITSM — locked to this solution)")
-dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you> — recommended)")
+dbutils.widgets.text("catalog", "", "Catalog (required, enter your existing workshop catalog)")
+dbutils.widgets.dropdown("domain", "itsm", ["itsm"], "Domain (ITSM, locked to this solution)")
+dbutils.widgets.text("schema", "", "Schema (leave blank for workshop_<you>, recommended)")
 dbutils.widgets.text("volume", "landing", "UC Volume (leave as landing unless you used a different name)")
 dbutils.widgets.dropdown(
     "source_mode",
@@ -89,17 +89,17 @@ dbutils.widgets.dropdown(
 dbutils.widgets.text(
     "lakebase_project",
     "",
-    "(Optional) Lakebase project you created — blank = synthesize",
+    "(Optional) Lakebase project you created, blank = synthesize",
 )
 dbutils.widgets.text(
     "lakebase_database",
     "",
-    "(Advanced) Lakebase database — leave blank for default",
+    "(Advanced) Lakebase database, leave blank for default",
 )
 dbutils.widgets.text(
     "lakebase_cdf_table",
     "",
-    "(Advanced) Lakebase CDF table — leave blank for ITSM default",
+    "(Advanced) Lakebase CDF table, leave blank for ITSM default",
 )
 
 # COMMAND ----------

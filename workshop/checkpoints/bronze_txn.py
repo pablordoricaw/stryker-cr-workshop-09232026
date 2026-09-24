@@ -6,10 +6,10 @@ only observes the shared bronze table and its row count.
 
 Extras forwarded through ``ctx.extras``:
 
-* ``bronze_txn_table`` — the transactional bronze table in the caller's schema
+* ``bronze_txn_table`` is the transactional bronze table in the caller's schema
   (default ``bronze_sales_transactions``).
-* ``expected_txn_rows`` — the exact seeded-row count (default ``3_000``).
-* ``transaction_key`` — the key named in the Lakebase CDF deduplication hint
+* ``expected_txn_rows`` is the exact seeded-row count (default ``3_000``).
+* ``transaction_key`` is the key named in the Lakebase CDF deduplication hint
   (default ``transaction_id``).
 """
 

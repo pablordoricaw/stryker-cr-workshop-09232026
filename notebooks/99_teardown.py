@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 99 · Teardown — remove the workshop hints from Genie Code
+# MAGIC # 99 · Remove the workshop hints from Genie Code
 # MAGIC
 # MAGIC `00_setup` injected the workshop's hint ladder into your personal
 # MAGIC instructions file, `~/.assistant_instructions.md`, which **Genie Code**

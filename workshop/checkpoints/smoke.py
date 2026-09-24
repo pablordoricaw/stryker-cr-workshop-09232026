@@ -20,13 +20,13 @@ SMOKE_CHECKPOINT_ID = "smoke"
     summary="Framework self-test; returns green from a fresh clone, no workspace needed.",
 )
 def check_smoke(ctx: CheckContext) -> CheckResult:
-    """Always pass — if this runs at all, ``workshop.check`` is working."""
+    """Always pass. If this runs at all, ``workshop.check`` is working."""
     return CheckResult(
         checkpoint=SMOKE_CHECKPOINT_ID,
         passed=True,
         message=(
             "workshop.check() is wired up correctly. You're ready to start the "
-            "workshop — later checkpoints will validate your Databricks work."
+            "workshop. Later checkpoints will validate your Databricks work."
         ),
         details={"requires_workspace": False},
     )

@@ -41,27 +41,27 @@ solutions/
 The Finance solutions implement the full medallion pipeline with document enrichment:
 
 **Bronze layer:**
-- `01_bronze_docs.py` — land PDFs and register the bronze docs table.
-- `01_bronze_txn.py` — implements both the admin-enabled **Lakebase CDF path** and the no-admin **Delta fallback**; both land `bronze_sales_transactions`.
+- `01_bronze_docs.py` lands PDFs and registers the bronze docs table.
+- `01_bronze_txn.py` implements both the admin-enabled **Lakebase CDF path** and the no-admin **Delta fallback**; both land `bronze_sales_transactions`.
 
 **Silver layer:**
-- `02_silver_docs.py` — builds the document-intelligence silver layer with AI Functions (`ai_parse_document` → `ai_classify` → `ai_extract`), landing `silver_docs` plus one `silver_<class>` table per class.
+- `02_silver_docs.py` builds the document-intelligence silver layer with AI Functions (`ai_parse_document` → `ai_classify` → `ai_extract`), landing `silver_docs` plus one `silver_<class>` table per class.
 
 **Gold layer:**
-- `03_gold.py` — joins sales to extracted commercial agreements without changing transaction grain, building `gold_sales` (transaction grain) and `gold_contract_performance` (contract-grain reconciled mart).
+- `03_gold.py` joins sales to extracted commercial agreements without changing transaction grain, building `gold_sales` (transaction grain) and `gold_contract_performance` (contract-grain reconciled mart).
 
 **Governance and semantics:**
-- `04_metadata.py` — runs dbxmetagen (pinned `v0.10.68`) in `comment`, `pi`, and `domain` modes. Stages metadata with `apply_ddl=false` and then applies comments, PI classification tags, and domain tags to the gold tables.
-- `05_metric_views.py` — defines Finance sales revenue/margin and contract-performance semantic layers as UC Metric Views in the participant's resolved schema. Demonstrates the `MEASURE()` query syntax and documents the optional custom-metric stretch.
+- `04_metadata.py` runs dbxmetagen (pinned `v0.10.68`) in `comment`, `pi`, and `domain` modes. Stages metadata with `apply_ddl=false` and then applies comments, PI classification tags, and domain tags to the gold tables.
+- `05_metric_views.py` defines Finance sales revenue/margin and contract-performance semantic layers as UC Metric Views in the participant's resolved schema. Demonstrates the `MEASURE()` query syntax and documents the optional custom-metric stretch.
 
 **Agent and app:**
-- `06_genie.py` — creates (idempotently) a per-participant Genie agent over the two gold tables and two Metric Views, with an identity-derived name, pre-authored sample questions, and benchmark Q&A. Uses the Databricks SDK (`WorkspaceClient().genie`) and demonstrates how the generated SQL queries the curated data.
-- `07_app.py` — ships the provided Streamlit app (`app/`) wired to a per-participant Lakebase synced table (created from `gold_contract_performance`) and the participant's Genie agent. Shows the complete code for the two participant gaps in `app/backend.py` (the Genie Conversation API call and the Lakebase read), plus Lakebase project/catalog/synced-table + app deploy/start commands.
+- `06_genie.py` creates (idempotently) a per-participant Genie agent over the two gold tables and two Metric Views, with an identity-derived name, pre-authored sample questions, and benchmark Q&A. Uses the Databricks SDK (`WorkspaceClient().genie`) and demonstrates how the generated SQL queries the curated data.
+- `07_app.py` ships the provided Streamlit app (`app/`) wired to a per-participant Lakebase synced table (created from `gold_contract_performance`) and the participant's Genie agent. Shows the complete code for the two participant gaps in `app/backend.py` (the Genie Conversation API call and the Lakebase read), plus Lakebase project/catalog/synced-table + app deploy/start commands.
 
 **Optional Tier-3 stretch:**
-- `stretch/package_as_dab.py` — walkthrough for packaging your built work as independently-deployable Databricks Asset Bundles.
-- `stretch/package_as_dab_bundle/` — a **set of two independently-deployable DABs** (`pipeline`, `app`), deliberately not one monolith. Packages the built work and targets the schema/volume `00_setup` provisioned (neither declares a schema/volume resource, so a first deploy never collides with pre-existing UC objects). The README documents the division rationale, coupling/decoupling tradeoffs, cross-bundle references, and deploy runbook; both pass `databricks bundle validate --strict` offline.
-- `stretch/add_your_own.py` — adds a third Metric View and two Genie benchmark questions, validated through the existing `05_metrics` `metric_views=` and `06_genie` `expected_sources=`/`benchmark_questions=` knobs (no framework change).
+- `stretch/package_as_dab.py` is a walkthrough for packaging your built work as independently-deployable Databricks Asset Bundles.
+- `stretch/package_as_dab_bundle/` is a **set of two independently-deployable DABs** (`pipeline`, `app`), deliberately not one monolith. Packages the built work and targets the schema/volume `00_setup` provisioned (neither declares a schema/volume resource, so a first deploy never collides with pre-existing UC objects). The README documents the division rationale, coupling/decoupling tradeoffs, cross-bundle references, and deploy runbook; both pass `databricks bundle validate --strict` offline.
+- `stretch/add_your_own.py` adds a third Metric View and two Genie benchmark questions, validated through the existing `05_metrics` `metric_views=` and `06_genie` `expected_sources=`/`benchmark_questions=` knobs (no framework change).
 
 All Finance solutions are authored and validated. The stretch modules are additive and ungraded; they ship on both `dev` and the participant release.
 
@@ -74,10 +74,10 @@ The Security solutions run the identical medallion pipeline on the infrastructur
 **Transactional grain:** one row per vulnerability-scan finding in `bronze_scan_findings` (3,000 rows).
 
 **Pipeline adjustments:**
-- `03_gold.py` — joins findings to the extracted CVE advisory on `cve_id`, building `gold_findings` (finding grain) and `gold_cve_exposure` (per-CVE mart).
-- `05_metric_views.py` — defines `security_findings_metrics` and `security_cve_metrics`.
-- `06_genie.py` — includes Security-specific sample/benchmark questions (e.g., open findings by severity, weighted risk by CVE).
-- `07_app.py` — syncs `gold_cve_exposure` on `cve_id`.
+- `03_gold.py` joins findings to the extracted CVE advisory on `cve_id`, building `gold_findings` (finding grain) and `gold_cve_exposure` (per-CVE mart).
+- `05_metric_views.py` defines `security_findings_metrics` and `security_cve_metrics`.
+- `06_genie.py` includes Security-specific sample/benchmark questions (e.g., open findings by severity, weighted risk by CVE).
+- `07_app.py` syncs `gold_cve_exposure` on `cve_id`.
 
 **Domain abstraction:**
 Every domain-specific expectation (table/column names, reconcile measures, metric-view contracts, Genie sources, serving base) is passed to the shared, domain-generic checkpoints through `workshop.check(...)` extras; no shared checkpoint or notebook is modified. The domain-generic `01_bronze_txn` checkpoint takes the Security bronze table name and expected row count as inputs, so it validates Security data without any Finance-specific name baked in.

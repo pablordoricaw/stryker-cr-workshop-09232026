@@ -9,7 +9,7 @@ generalization so it cannot silently regress:
 2. **The spec matches each domain's gated solution.** For every domain, the
    table/entity names, keys, measures, Metric View contracts, benchmark
    questions, and app serving contract the spec exposes appear in the matching
-   ``solutions/<domain>/`` notebook — the reference "filled" notebook — so
+   ``solutions/<domain>/`` notebook, the reference "filled" notebook, so
    generation (participant) and verification (checkpoint) agree.
 3. **The six starter notebooks are single, shared, parameterised scaffolds.**
    Each offers the 3-domain dropdown, derives its names from ``config.domain``
@@ -49,7 +49,7 @@ STARTER_NOTEBOOKS = (
 DOMAIN_DROPDOWN = 'dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")'
 
 # Every domain's transactional-track object names. A shared starter cell must
-# reference NONE of these as a literal — it derives them from the spec instead.
+# reference NONE of these as a literal. It derives them from the spec instead.
 # (Finance's are the sharpest guard: they used to be hardcoded here.)
 DOMAIN_OBJECT_LITERALS = {
     "finance": (
@@ -124,7 +124,7 @@ def test_finance_spec_equals_gold_defaults() -> None:
     assert extras["detail_document_key"] == gold_cp.DEFAULT_DETAIL_DOCUMENT_KEY
     assert extras["detail_document_match"] == gold_cp.DEFAULT_DETAIL_DOCUMENT_MATCH
     assert extras["mart_key"] == gold_cp.DEFAULT_MART_KEY
-    # ``True`` makes the gold check use its built-in additive-measure defaults —
+    # ``True`` makes the gold check use its built-in additive-measure defaults,
     # identical to Finance passing no reconcile_measures at all.
     assert extras["reconcile_measures"] is True
 
@@ -155,7 +155,7 @@ def test_finance_spec_equals_app_defaults() -> None:
     assert spec.app_source_table == app_cp.DEFAULT_SOURCE_TABLE
     assert spec.app_primary_key == app_cp.DEFAULT_PRIMARY_KEY
     # The 07_app checkpoint derives the synced-table name from the namespace's
-    # default serving base when none is passed — Finance's spec must match it.
+    # default serving base when none is passed, so Finance's spec must match it.
     assert spec.app_serving_base == DEFAULT_SERVING_BASE
 
 
@@ -223,7 +223,7 @@ def test_gold_reconcile_measures_are_present_in_solutions() -> None:
     for measure in security.reconcile_measures:
         assert measure in gold, f"security reconcile measure {measure!r} missing"
     # ITSM disables measure reconciliation (its mart measures are not same-named
-    # additive source columns) — the solution passes reconcile_measures=False.
+    # additive source columns), so the solution passes reconcile_measures=False.
     assert workshop.domain_spec("itsm").reconcile_measures is False
     assert "reconcile_measures=False" in _read("solutions", "itsm", "03_gold.py")
 
@@ -246,7 +246,7 @@ def test_every_starter_notebook_derives_from_the_domain_spec() -> None:
 
 
 def test_starter_notebooks_have_no_hardcoded_domain_object_names() -> None:
-    # A shared, parameterised cell derives every object name from the spec — so no
+    # A shared, parameterised cell derives every object name from the spec, so no
     # domain's transactional-track literal (Finance, Security, or ITSM) may appear
     # in executed code. This is the release-blocking guarantee: a Security/ITSM
     # participant is never sent to a Finance table, and vice versa.
@@ -256,7 +256,7 @@ def test_starter_notebooks_have_no_hardcoded_domain_object_names() -> None:
             for literal in literals:
                 assert literal not in code, (
                     f"{notebook}: hardcoded {domain} literal {literal!r} in a shared "
-                    "cell — derive it from workshop.domain_spec instead"
+                    "cell. Derive it from workshop.domain_spec instead"
                 )
 
 

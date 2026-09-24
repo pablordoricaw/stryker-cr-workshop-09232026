@@ -3,7 +3,7 @@
 # MAGIC # 05 · Governed Metric Views
 # MAGIC
 # MAGIC Define your domain's reusable business metrics over the gold layer. You will
-# MAGIC create two Unity Catalog Metric Views in your existing workshop schema — one
+# MAGIC create two Unity Catalog Metric Views in your existing workshop schema, one
 # MAGIC over the transaction-grain detail table and one over the business-key mart.
 # MAGIC Their names differ per domain (Finance `finance_sales_metrics` /
 # MAGIC `finance_contract_metrics`, Security `security_findings_metrics` /
@@ -17,9 +17,9 @@
 # MAGIC **Compute requirement:** `WITH METRICS ... version: 1.1` needs DBR 17.2+
 # MAGIC and `DESCRIBE ... AS JSON` needs DBR 16.2+, so use DBR 17.2+ overall.
 # MAGIC
-# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint —
+# MAGIC **Getting unstuck.** Ask **Genie Code** in the workspace for a graded hint.
 # MAGIC a nudge, then an API shape, then the gated `solutions/<domain>/` file for
-# MAGIC this checkpoint, one rung at a time — or open a collapsible **💡 Hint**
+# MAGIC this checkpoint, one rung at a time. You can also open a collapsible **💡 Hint**
 # MAGIC below. If Genie Code is unavailable (e.g. Free Edition), open that solution
 # MAGIC file for your domain and this checkpoint directly.
 
@@ -51,7 +51,7 @@ import workshop
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "", "Catalog (your existing catalog — required)")
+dbutils.widgets.text("catalog", "", "Catalog (your existing catalog, required)")
 dbutils.widgets.dropdown("domain", "finance", ["finance", "security", "itsm"], "Domain")
 dbutils.widgets.text("schema", "", "Schema (blank = your workshop_<you> schema)")
 dbutils.widgets.text("volume", "landing", "UC Volume")
@@ -59,7 +59,7 @@ dbutils.widgets.text("volume", "landing", "UC Volume")
 # COMMAND ----------
 
 # Your identity gives you a unique schema in the shared team catalog
-# (workshop_<you>) — the same one 00_setup created. Leave the schema blank to use it.
+# (workshop_<you>), the same one 00_setup created. Leave the schema blank to use it.
 me = spark.sql("SELECT current_user()").collect()[0][0]
 
 config = workshop.resolve_config(
@@ -95,13 +95,13 @@ for name, view in spec.metric_views.items():
 # MAGIC %md
 # MAGIC ## 🚀 From-scratch mode (optional stretch)
 # MAGIC
-# MAGIC This stage ships in **guided** mode — the `# TODO` cells and collapsible
+# MAGIC This stage ships in **guided** mode, with the `# TODO` cells and collapsible
 # MAGIC **💡 Hint**s below. Strong engineers can flip it to **from-scratch** mode:
 # MAGIC treat every `# TODO` as **blank**, keep each **💡 Hint** collapsed, and build
-# MAGIC to the **`workshop.check(...)` cell at the end** — it is identical in both
+# MAGIC to the **`workshop.check(...)` cell at the end**, which is identical in both
 # MAGIC modes and is the only thing that grades you. Re-open a hint to drop back to
 # MAGIC guided mode anytime; the checkpoint is unchanged. This is a **convention,
-# MAGIC not a setting** — see [`docs/stretch/README.md`](../docs/stretch/README.md).
+# MAGIC not a setting**. See [`docs/stretch/README.md`](../docs/stretch/README.md).
 
 # COMMAND ----------
 
@@ -123,7 +123,7 @@ for name, view in spec.metric_views.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — metric-view YAML skeleton
+# MAGIC ### 💡 Hint: metric-view YAML skeleton
 
 # COMMAND ----------
 
@@ -165,7 +165,7 @@ for name, view in spec.metric_views.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 Hint — mart KPI pattern
+# MAGIC ### 💡 Hint: mart KPI pattern
 
 # COMMAND ----------
 
@@ -216,7 +216,7 @@ assert result.passed, result.message
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Stretch — add your own governed metric
+# MAGIC ## Stretch: add your own governed metric
 # MAGIC
 # MAGIC Add a third Metric View in this same schema for a question your domain asks
 # MAGIC often. Choose dimensions with useful cardinality, define atomic measures
