@@ -24,17 +24,3 @@ dependencies = [
 # so keep uv from trying to build a wheel for it.
 [tool.uv]
 package = false
-
-# Workshop PyPI proxy workaround.
-#
-# The transitive chain databricks-sdk -> google-auth -> pyasn1-modules pulls in
-# pyasn1. Left unbounded, uv resolves pyasn1 to the newly released 0.6.4, and
-# the workspace proxy (pypi-proxy.cloud.databricks.com) cannot serve that wheel
-# on the Apps build path (the download connect-times-out after 3 retries),
-# which fails `[ERROR] Error installing packages` at deploy time.
-#
-# Pin pyasn1 to the mature 0.6.1, which the proxy has long served and cached.
-# pyasn1-modules 0.4.2 requires pyasn1>=0.6.1,<0.7.0, so 0.6.1 satisfies the
-# chain. This is a constraint, not a project dependency, so the app does not
-# gain pyasn1 as a direct import; it only bounds the transitive resolution.
-constraint-dependencies = ["pyasn1==0.6.1"]
