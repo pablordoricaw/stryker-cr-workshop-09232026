@@ -27,32 +27,14 @@ package = false
 
 # Workshop PyPI proxy workaround.
 #
-# The app installs on the Databricks Apps uv path. The workspace proxy
-# (pypi-proxy.cloud.databricks.com) serves mature, already-cached wheels fast
-# but connect-times-out on recently released wheels of rarely pulled packages:
-# a cache miss triggers a slow upstream fetch that times out after 3 retries,
-# failing package install with `[ERROR] Error installing packages`.
+# The transitive chain databricks-sdk -> google-auth -> pyasn1-modules pulls in
+# pyasn1. Left unbounded, uv resolves pyasn1 to the newly released 0.6.4, and
+# the workspace proxy (pypi-proxy.cloud.databricks.com) cannot serve that wheel
+# on the Apps build path (the download connect-times-out after 3 retries),
+# which fails `[ERROR] Error installing packages` at deploy time.
 #
-# The offenders are the niche auth sub-chain that databricks-sdk pulls in for
-# GCP support (databricks-sdk requires `google-auth~=2.0`), which this Azure
-# workshop never exercises. Left unbounded, uv resolves that sub-chain to its
-# newest, uncached releases:
-#   * pyasn1 0.6.4       (released 2026-07)
-#   * google-auth 2.58.0 (released 2026-09)
-# Both connect-time-out on the Apps build path.
-#
-# Pin the sub-chain to mature versions the proxy has long served and cached,
-# staying inside databricks-sdk 0.141.0's allowed ranges:
-#   * pyasn1 0.6.1       (2024-09); pyasn1-modules 0.4.2 needs pyasn1>=0.6.1,<0.7.0.
-#   * google-auth 2.38.0 (2025-02); satisfies databricks-sdk's google-auth~=2.0.
-#
-# Downgrading google-auth also drops the recent, heavy `cryptography` (only
-# google-auth 2.58.0 pulls it as a core dep) and re-adds the ancient rsa 4.9,
-# so the whole resolved closure is versions the proxy already serves. These are
-# constraints, not project dependencies, so the app gains no new direct import;
-# they only bound the transitive resolution. streamlit, pandas, databricks-sdk,
-# and psycopg[binary] still resolve and import.
-constraint-dependencies = [
-    "pyasn1==0.6.1",
-    "google-auth==2.38.0",
-]
+# Pin pyasn1 to the mature 0.6.1, which the proxy has long served and cached.
+# pyasn1-modules 0.4.2 requires pyasn1>=0.6.1,<0.7.0, so 0.6.1 satisfies the
+# chain. This is a constraint, not a project dependency, so the app does not
+# gain pyasn1 as a direct import; it only bounds the transitive resolution.
+constraint-dependencies = ["pyasn1==0.6.1"]
